@@ -1,0 +1,86 @@
+import { useCallback, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
+
+import { type Me, type Membership, useSignOut } from '@/features/auth'
+import { useDismiss } from '@/hooks/useDismiss'
+
+type UserMenuProps = {
+  me: Me
+  /** The account at the organisation the app is in, when there is one. */
+  account: Membership | null
+}
+
+/** The round button top-right: who is signed in here, their own pages, and signing out. */
+export function UserMenu({ me, account }: UserMenuProps) {
+  const [open, setOpen] = useState(false)
+  const container = useRef<HTMLDivElement>(null)
+  const close = useCallback(() => setOpen(false), [])
+  const signOut = useSignOut()
+  useDismiss(container, open, close)
+
+  // Accounts differ per organisation, so show the one that is in use right now.
+  const name = account?.displayName ?? me.displayName
+  const email = account?.email ?? me.email
+  const signedInElsewhere = me.isOwner || me.memberships.length > 1
+
+  return (
+    <div className="user-menu" ref={container}>
+      <button
+        type="button"
+        className="user-button"
+        aria-expanded={open}
+        aria-label="Account menu"
+        onClick={() => setOpen(!open)}
+      >
+        {initials(name)}
+      </button>
+      {open && (
+        <div className="menu user-menu-panel">
+          <div className="menu-identity">
+            <strong>{name}</strong>
+            <span>{email}</span>
+          </div>
+          <div className="menu-separator" />
+          {account && (
+            <>
+              <Link to={`/${account.slug}/tickets`} className="menu-item" onClick={close}>
+                My tickets
+              </Link>
+              <Link to={`/${account.slug}/cards`} className="menu-item" onClick={close}>
+                My cards
+              </Link>
+            </>
+          )}
+          <Link to="/discover" className="menu-item" onClick={close}>
+            Browse organisations
+          </Link>
+          <div className="menu-separator" />
+          {account && signedInElsewhere && (
+            <button
+              type="button"
+              className="menu-item"
+              onClick={() => signOut.mutate(account.slug)}
+              disabled={signOut.isPending}
+            >
+              Sign out of {account.name}
+            </button>
+          )}
+          <button
+            type="button"
+            className="menu-item"
+            onClick={() => signOut.mutate(undefined)}
+            disabled={signOut.isPending}
+          >
+            {signedInElsewhere ? 'Sign out everywhere' : 'Sign out'}
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function initials(name: string) {
+  const parts = name.trim().split(/\s+/)
+  const letters = parts.length > 1 ? parts[0][0] + parts[parts.length - 1][0] : name.slice(0, 2)
+  return letters.toUpperCase()
+}

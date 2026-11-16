@@ -1,0 +1,120 @@
+using System.Text.Json.Serialization;
+using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+using MyTickets.Api.Data;
+using MyTickets.Api.Endpoints;
+using MyTickets.Api.Services;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// Every organisation has its own database file. A small shared one lists the organisations and their owners.
+builder.Services.AddSingleton<TenantDatabases>();
+builder.Services.AddSingleton<TenantScopes>();
+builder.Services.AddScoped<TenantContext>();
+builder.Services.AddDbContext<PlatformDbContext>((services, options) =>
+    options.UseSqlite(services.GetRequiredService<TenantDatabases>().PlatformConnectionString));
+// Which organisation's database this is depends on who is asking: see TenantContext.
+builder.Services.AddDbContext<AppDbContext>((services, options) => options.UseSqlite(
+    services.GetRequiredService<TenantDatabases>().ConnectionStringFor(services.GetRequiredService<TenantContext>().Required.Id)));
+builder.Services.AddScoped<OrganisationProvisioner>();
+
+// Redis is used when the app is given a "cache" connection (the Aspire host does this). Without it the cache is memory only.
+if (!string.IsNullOrEmpty(builder.Configuration.GetConnectionString("cache")))
+    builder.AddRedisDistributedCache("cache");
+builder.Services.AddHybridCache();
+
+// Pictures go to an S3-compatible bucket when one is configured (the Aspire host starts RustFS), otherwise to a folder.
+if (!string.IsNullOrEmpty(builder.Configuration["Storage:Endpoint"]))
+    builder.Services.AddSingleton<IImageStore, S3ImageStore>();
+else
+    builder.Services.AddSingleton<IImageStore>(new FolderImageStore(
+        builder.Configuration["Storage:Folder"] ?? Path.Combine(builder.Environment.ContentRootPath, "uploaded-images")));
+
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
+builder.Services.AddScoped<AppCache>();
+builder.Services.AddScoped<WalletService>();
+builder.Services.AddScoped<MembershipService>();
+builder.Services.AddScoped<PaymentService>();
+builder.Services.AddHostedService<PaymentExpiryWorker>();
+
+var paymentProvider = builder.Configuration["Payments:Provider"] ?? FakePaymentProvider.ProviderName;
+if (paymentProvider != FakePaymentProvider.ProviderName)
+    throw new InvalidOperationException($"Unknown payment provider '{paymentProvider}'. Only '{FakePaymentProvider.ProviderName}' exists so far.");
+// The test checkout hands out tickets and credit without taking money, so it must never run on a live site by accident.
+if (!builder.Environment.IsDevelopment() && !builder.Configuration.GetValue<bool>("Payments:AllowFakeOutsideDevelopment"))
+    throw new InvalidOperationException("No real payment provider is configured. Refusing to start with the test checkout outside development.");
+builder.Services.AddSingleton<IPaymentProvider, FakePaymentProvider>();
+
+builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme).AddCookie(options =>
+{
+    options.Cookie.Name = "mytickets";
+    options.Cookie.HttpOnly = true;
+    options.Cookie.SameSite = SameSiteMode.Lax;
+    options.ExpireTimeSpan = TimeSpan.FromDays(30);
+    options.SlidingExpiration = true;
+    // This is an API: answer with status codes instead of redirecting to a login page.
+    options.Events.OnRedirectToLogin = ctx => { ctx.Response.StatusCode = 401; return Task.CompletedTask; };
+    options.Events.OnRedirectToAccessDenied = ctx => { ctx.Response.StatusCode = 403; return Task.CompletedTask; };
+});
+builder.Services.AddAuthorization();
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = 429;
+    options.AddPolicy("auth", http => RateLimitPartition.GetFixedWindowLimiter(
+        http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new FixedWindowRateLimiterOptions { PermitLimit = builder.Configuration.GetValue("RateLimits:AuthPerMinute", 20), Window = TimeSpan.FromMinutes(1) }));
+});
+
+builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+
+var app = builder.Build();
+
+using (var scope = app.Services.CreateScope())
+{
+    Directory.CreateDirectory(app.Services.GetRequiredService<TenantDatabases>().Folder);
+    var platform = scope.ServiceProvider.GetRequiredService<PlatformDbContext>();
+    await platform.Database.MigrateAsync();
+    await platform.Database.ExecuteSqlRawAsync("PRAGMA journal_mode=WAL;");
+}
+
+app.UseRouting();
+app.UseRateLimiter();
+app.UseAuthentication();
+
+// A request with an organisation in its address works on that organisation's database, and counts as
+// signed in only if this browser has an account at that organisation.
+app.Use(async (http, next) =>
+{
+    if (http.GetRouteValue("slug") is string slug && http.Request.Path.StartsWithSegments("/api"))
+    {
+        var organisation = await http.RequestServices.GetRequiredService<AppCache>().OrganisationBySlugAsync(slug);
+        if (organisation is null)
+        {
+            await Http.Error(404, "Organisation not found.").ExecuteAsync(http);
+            return;
+        }
+        await http.RequestServices.GetRequiredService<TenantDatabases>().EnsureReadyAsync(organisation.Id);
+        http.RequestServices.GetRequiredService<TenantContext>().Set(organisation);
+        Sessions.NarrowTo(http, organisation.Id);
+    }
+    await next();
+});
+
+app.UseAuthorization();
+
+app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
+app.MapAuth();
+app.MapPublicOrgs();
+app.MapMe();
+app.MapOrgs();
+app.MapAdmin();
+app.MapStaff();
+app.MapImages();
+
+app.Run();
+
+public partial class Program;

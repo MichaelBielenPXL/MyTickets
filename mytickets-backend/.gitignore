@@ -1,0 +1,9 @@
+bin/
+obj/
+.idea/
+*.user
+# The SQLite database and its companions
+*.db
+*.db-shm
+*.db-wal
+uploaded-images/
