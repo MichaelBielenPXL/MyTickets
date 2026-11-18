@@ -2,16 +2,18 @@ import { useState } from 'react'
 
 import { ErrorNote, QueryResult } from '@/components'
 import type { Role } from '@/types'
-import { dateOnly, money } from '@/utils/format'
+import { lastValidDay, money } from '@/utils/format'
 
 import { useAdminTiers, useMembers, useUpdateMember } from '../api/admin'
 import type { Member } from '../types'
+import { JoinRequests } from './JoinRequests'
+import { MemberDetailsList } from './MemberDetailsList'
 
 type MembersTabProps = {
   slug: string
 }
 
-const ROLES: Role[] = ['Member', 'Staff', 'Admin']
+const ROLES: Role[] = ['Member', 'Barman', 'Doorman', 'Staff', 'Admin']
 
 export function MembersTab({ slug }: MembersTabProps) {
   const [search, setSearch] = useState('')
@@ -31,7 +33,11 @@ export function MembersTab({ slug }: MembersTabProps) {
 
   return (
     <div className="stack">
-      <p className="muted">Staff can work the door and the bar. Admins can also change everything here.</p>
+      <JoinRequests slug={slug} />
+      <p className="muted">
+        Barmen work the bar, doormen the door, and both can check a card&apos;s tokens. Staff do all of that
+        and take cash top-ups. Admins can also change everything here.
+      </p>
       <input
         type="search"
         value={search}
@@ -52,9 +58,10 @@ export function MembersTab({ slug }: MembersTabProps) {
                       <strong>{member.displayName}</strong>
                       <p className="muted">{member.email}</p>
                       <p className="muted">
-                        Credit {money(member.balanceCents)}
-                        {member.expiresAt && ` · until ${dateOnly(member.expiresAt)}`}
+                        Tokens {money(member.balanceCents)}
+                        {member.expiresAt && ` · until ${lastValidDay(member.expiresAt)}`}
                       </p>
+                      <MemberDetailsList details={member} />
                     </div>
                     <div className="row wrap">
                       <select

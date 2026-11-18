@@ -1,4 +1,4 @@
-import { Navigate, Outlet, useSearchParams } from 'react-router-dom'
+import { Navigate, Outlet, useLocation, useSearchParams } from 'react-router-dom'
 
 import { Loading } from '@/components'
 import { useMe } from '@/features/auth'
@@ -13,6 +13,7 @@ import { AppHeader } from './AppHeader'
  */
 export function SignedOutOnly() {
   const [params] = useSearchParams()
+  const { pathname } = useLocation()
   const me = useMe()
   const { slugInAddress, membership: account } = useCurrentOrganisation()
 
@@ -24,7 +25,16 @@ export function SignedOutOnly() {
     )
   }
   const alreadyIn = slugInAddress ? Boolean(account) : me.data?.isOwner === true
-  if (alreadyIn) return <Navigate to={safeNext(params.get('next'), slugInAddress)} replace />
+  if (alreadyIn) {
+    // Someone who just signed up at an organisation goes on to choose a membership.
+    const justSignedUp = Boolean(slugInAddress) && pathname.endsWith('/register') && !params.get('next')
+    return (
+      <Navigate
+        to={justSignedUp ? `/${slugInAddress}/join` : safeNext(params.get('next'), slugInAddress)}
+        replace
+      />
+    )
+  }
 
   return (
     <>

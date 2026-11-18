@@ -8,6 +8,7 @@ import {
   usePublicOrganisation,
 } from '@/features/organisations'
 
+import { OrganisationSidebar } from './OrganisationSidebar'
 import { OrganisationTabs } from './OrganisationTabs'
 import { UserMenu } from './UserMenu'
 
@@ -32,58 +33,70 @@ export function AppHeader() {
       : null)
 
   return (
-    <header className="app-header">
-      <div className="header-bar">
-        <Link to="/" className="logo" aria-label="MyTickets home">
-          <LogoMark />
-          {!me && !slugInAddress && <span className="logo-text">MyTickets</span>}
-        </Link>
+    <>
+      <header className="app-header">
+        <div className="header-bar">
+          <Link to="/" className="logo" aria-label="MyTickets home">
+            <LogoMark />
+            {!me && !slugInAddress && <span className="logo-text">MyTickets</span>}
+          </Link>
 
-        {me && (
-          <>
-            <Divider />
-            <OrganisationSwitcher
-              memberships={me.memberships}
-              current={current && slug ? { slug, name: current.name, logoUrl: current.logoUrl } : null}
-              currentLabel={labelFor(account, visiting)}
-              canCreate={me.canCreateOrganisations}
-            />
-          </>
-        )}
-        {!me && slugInAddress && current && (
-          <>
-            <Divider />
-            <Link to={`/${slugInAddress}`} className="switcher-current">
-              <OrganisationAvatar name={current.name} logoUrl={current.logoUrl} />
-              <span className="switcher-name">{current.name}</span>
-            </Link>
-          </>
-        )}
-
-        <div className="header-end">
-          {/* At an organisation there is one way in: the email step works out log in or sign up. */}
-          {slugInAddress && (!me || visiting) && (
-            <Link className="btn primary small" to={`/${slugInAddress}/login`}>
-              Log in
-            </Link>
-          )}
-          {!slugInAddress && !me && (
+          {me && (
             <>
-              <Link className="btn ghost small" to="/login">
-                Log in
-              </Link>
-              <Link className="btn primary small" to="/register">
-                Register
+              <Divider />
+              <OrganisationSwitcher
+                memberships={me.memberships}
+                current={current && slug ? { slug, name: current.name, logoUrl: current.logoUrl } : null}
+                currentLabel={labelFor(account, visiting)}
+                canCreate={me.canCreateOrganisations}
+              />
+            </>
+          )}
+          {!me && slugInAddress && current && (
+            <>
+              <Divider />
+              <Link to={`/${slugInAddress}`} className="switcher-current">
+                <OrganisationAvatar name={current.name} logoUrl={current.logoUrl} size={32} />
+                <span className="switcher-name">{current.name}</span>
               </Link>
             </>
           )}
-          {me && !visiting && <UserMenu me={me} account={account} />}
+
+          <div className="header-end">
+            {/* At an organisation both lead to that organisation's own sign-in, which starts with the email step. */}
+            {slugInAddress && (!me || visiting) && (
+              <>
+                <Link className="btn ghost small" to={`/${slugInAddress}/login`}>
+                  Log in
+                </Link>
+                <Link className="btn primary small" to={`/${slugInAddress}/register`}>
+                  Register
+                </Link>
+              </>
+            )}
+            {!slugInAddress && !me && (
+              <>
+                <Link className="btn ghost small" to="/login">
+                  Log in
+                </Link>
+                <Link className="btn primary small" to="/register">
+                  Register
+                </Link>
+              </>
+            )}
+            {me && !visiting && <UserMenu me={me} account={account} />}
+          </div>
         </div>
-      </div>
+      </header>
+      {/* Outside the header: its frosted glass would otherwise pin these inside it.
+          Wide screens get the sidebar, phones the tab bar along the bottom. */}
       {me && slug && (
-        <OrganisationTabs slug={slug} hasAccount={Boolean(account)} role={account?.role ?? null} />
+        <>
+          <OrganisationSidebar slug={slug} hasAccount={Boolean(account)} role={account?.role ?? null} />
+          <OrganisationTabs slug={slug} hasAccount={Boolean(account)} role={account?.role ?? null} />
+        </>
       )}
-    </header>
+    </>
   )
 }
 
@@ -105,7 +118,7 @@ function Divider() {
 
 function LogoMark() {
   return (
-    <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden>
+    <svg width="28" height="28" viewBox="0 0 24 24" aria-hidden>
       <path
         fill="currentColor"
         d="M4 5.5A1.5 1.5 0 0 1 5.5 4h13A1.5 1.5 0 0 1 20 5.5v3.1a3.5 3.5 0 0 0 0 6.8v3.1a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5v-3.1a3.5 3.5 0 0 0 0-6.8z"

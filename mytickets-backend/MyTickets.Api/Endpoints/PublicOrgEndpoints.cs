@@ -43,7 +43,7 @@ public static class PublicOrgEndpoints
             return Results.Ok(new { Exists = await db.Users.AnyAsync(u => u.Email == email) });
         }).RequireRateLimiting("auth");
 
-        orgs.MapGet("/{slug}", async (string slug, AppDbContext db, TimeProvider clock) =>
+        orgs.MapGet("/{slug}", async (string slug, AppDbContext db, IConfiguration config, TimeProvider clock) =>
         {
             var organisation = await db.Organisations.AsNoTracking().FirstOrDefaultAsync(o => o.Slug == slug);
             if (organisation is null) return Http.Error(404, "Organisation not found.");
@@ -51,12 +51,14 @@ public static class PublicOrgEndpoints
             var now = clock.GetUtcNow().UtcDateTime;
             var tiers = await db.MembershipTiers.AsNoTracking()
                 .Where(t => t.OrganisationId == organisation.Id && !t.Archived && t.IsPublic)
-                .OrderBy(t => t.PriceCents).ThenBy(t => t.Name)
-                .Select(t => new
-                {
-                    t.Id, t.Name, t.Description, t.PriceCents, t.DurationDays, t.IsPublic,
-                    t.TicketDiscountPercent, t.DrinkDiscountPercent,
-                }).ToListAsync();
+                .OrderBy(t => t.SortOrder).ThenBy(t => t.PriceCents).ThenBy(t => t.Name)
+                .ToListAsync();
+            var zone = MembershipService.LocalZone(config);
+            var openTiers = tiers.Where(t => !t.HasEnded(now, zone)).Select(t => new
+            {
+                t.Id, t.Name, t.Description, t.PriceCents, t.EndsOn, t.IsPublic, t.RequiresApproval,
+                t.TicketDiscountPercent, t.DrinkDiscountPercent,
+            }).ToList();
             var events = await db.Events.AsNoTracking()
                 .Where(e => e.OrganisationId == organisation.Id && e.Published && (e.EndsAt ?? e.StartsAt) > now.AddHours(-12))
                 .OrderBy(e => e.StartsAt)
@@ -70,7 +72,8 @@ public static class PublicOrgEndpoints
             return Results.Ok(new
             {
                 organisation.Slug, organisation.Name, organisation.Description, LogoUrl = Images.Url(organisation.LogoKey),
-                Tiers = tiers,
+                organisation.BrandColor,
+                Tiers = openTiers,
                 HasInviteOnlyTiers = await db.MembershipTiers.AnyAsync(t => t.OrganisationId == organisation.Id && !t.Archived && !t.IsPublic),
                 Events = events.Select(e => new { e.Id, e.Name, e.Location, e.StartsAt, e.EndsAt, ImageUrl = Images.Url(e.ImageKey), e.FromPriceCents, e.SoldOut }),
             });

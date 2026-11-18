@@ -17,12 +17,13 @@ export function TierForm({ slug, tier, onDone }: TierFormProps) {
   const [name, setName] = useState(tier?.name ?? '')
   const [description, setDescription] = useState(tier?.description ?? '')
   const [price, setPrice] = useState(euroInput(tier?.priceCents ?? 0))
-  const [durationDays, setDurationDays] = useState(tier?.durationDays ? String(tier.durationDays) : '')
+  const [endsOn, setEndsOn] = useState(tier?.endsOn ?? '')
   const [isPublic, setIsPublic] = useState(tier?.isPublic ?? true)
   const [inviteCode, setInviteCode] = useState(tier?.inviteCode ?? '')
   const [ticketDiscount, setTicketDiscount] = useState(String(tier?.ticketDiscountPercent ?? 0))
   const [drinkDiscount, setDrinkDiscount] = useState(String(tier?.drinkDiscountPercent ?? 0))
   const [archived, setArchived] = useState(tier?.archived ?? false)
+  const [requiresApproval, setRequiresApproval] = useState(tier?.requiresApproval ?? false)
   const [problem, setProblem] = useState('')
   const save = useSaveTier(slug)
 
@@ -34,12 +35,13 @@ export function TierForm({ slug, tier, onDone }: TierFormProps) {
         name,
         description,
         priceCents: requireEuro(price),
-        durationDays: durationDays.trim() ? requireWholeNumber(durationDays, 'the number of days') : null,
+        endsOn: endsOn || null,
         isPublic,
         inviteCode: isPublic ? null : inviteCode,
         ticketDiscountPercent: requireWholeNumber(ticketDiscount, 'the ticket discount'),
         drinkDiscountPercent: requireWholeNumber(drinkDiscount, 'the bar discount'),
         archived,
+        requiresApproval,
       }
       save.mutate({ id: tier?.id, tier: input }, { onSuccess: onDone })
     } catch (error) {
@@ -66,8 +68,11 @@ export function TierForm({ slug, tier, onDone }: TierFormProps) {
         <Field label="Price in euro" hint="0 for free">
           <input inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} />
         </Field>
-        <Field label="Lasts how many days" hint="Empty: never ends. 365: a year.">
-          <input inputMode="numeric" value={durationDays} onChange={(e) => setDurationDays(e.target.value)} />
+        <Field
+          label="Ends on"
+          hint="The last day it's valid, for everyone on it. Leave empty for no end date."
+        >
+          <input type="date" value={endsOn} onChange={(e) => setEndsOn(e.target.value)} />
         </Field>
         <Field label="Discount on tickets (%)">
           <input
@@ -87,6 +92,14 @@ export function TierForm({ slug, tier, onDone }: TierFormProps) {
       <label className="check">
         <input type="checkbox" checked={isPublic} onChange={(e) => setIsPublic(e.target.checked)} />
         Anyone can join this
+      </label>
+      <label className="check">
+        <input
+          type="checkbox"
+          checked={requiresApproval}
+          onChange={(e) => setRequiresApproval(e.target.checked)}
+        />
+        Needs approval: an admin checks each request first (paid ones are paid after approval)
       </label>
       {!isPublic && (
         <Field label="Invite code" hint="People enter this to join. Leave empty and one is made for you.">

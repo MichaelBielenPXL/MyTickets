@@ -175,7 +175,7 @@ public class FlowTests : IClassFixture<TestApp>
         using var admin = org.Admin;
         await admin.PostOkAsync($"{org.Url}/admin/tiers", new
         {
-            name = "Supporter", priceCents = 2500, durationDays = 365, isPublic = true,
+            name = "Supporter", priceCents = 2500, endsOn = MembershipDates.NextSummer, isPublic = true,
         });
         var orgsBefore = await admin.GetOkAsync("/api/orgs");
         using var visitor = _app.CreateClient();
@@ -226,7 +226,7 @@ public class FlowTests : IClassFixture<TestApp>
         Assert.Equal("Valid", ticket.Str("status"));
 
         var checkedIn = await org.Admin.PostOkAsync($"{org.Url}/staff/checkin", new { eventId, cardUid = card });
-        Assert.Equal("Guest", checkedIn.Str("name"));
+        Assert.Equal("Guest Tester", checkedIn.Str("name"));
         var again = await org.Admin.PostAsJsonAsync($"{org.Url}/staff/checkin", new { eventId, cardUid = card });
         Assert.Equal(HttpStatusCode.Conflict, again.StatusCode);
     }
@@ -306,7 +306,7 @@ public class FlowTests : IClassFixture<TestApp>
     {
         var org = await NewOrgAsync();
         var beer = (await org.Admin.PostOkAsync($"{org.Url}/admin/products", new { name = "Beer", priceCents = 300, active = true })).Str("id");
-        var cup = (await org.Admin.PostOkAsync($"{org.Url}/admin/products", new { name = "Cup", priceCents = 100, active = true, returnable = true })).Str("id");
+        var cup = (await org.Admin.PostOkAsync($"{org.Url}/admin/products", new { name = "Cup", priceCents = 100, active = true, isDeposit = true })).Str("id");
         // A membership with a bar discount: it must apply to the beer but never to the deposit.
         var tier = (await org.Admin.PostOkAsync($"{org.Url}/admin/tiers", new { name = "Fan", priceCents = 0, isPublic = true, drinkDiscountPercent = 50 })).Str("id");
         var guest = await _app.NewGuestAsync(org.Slug);
@@ -340,6 +340,173 @@ public class FlowTests : IClassFixture<TestApp>
         var beerBack = await org.Admin.PostAsJsonAsync($"{org.Url}/staff/charge", new { cardUid = card, items = new[] { new { productId = beer, quantity = -1 } } });
         Assert.Equal(HttpStatusCode.BadRequest, beerBack.StatusCode);
         Assert.Equal(550, await BalanceAsync(guest, org));
+    }
+
+    [Fact]
+    public async Task Drinks_that_come_in_a_cup_charge_its_deposit_and_a_returned_cup_swaps_for_free()
+    {
+        var org = await NewOrgAsync();
+        var cup = (await org.Admin.PostOkAsync($"{org.Url}/admin/products", new { name = "Cup", priceCents = 100, active = true, isDeposit = true })).Str("id");
+        var beer = (await org.Admin.PostOkAsync($"{org.Url}/admin/products", new { name = "Beer", priceCents = 300, active = true, depositProductId = cup })).Str("id");
+        var crisps = (await org.Admin.PostOkAsync($"{org.Url}/admin/products", new { name = "Crisps", priceCents = 200, active = true })).Str("id");
+        var guest = await NewMemberAsync(org);
+        var card = await LinkCardAsync(guest, org);
+        await TopUpAsync(guest, org, 2000);
+
+        // The phone only sends the beers and crisps: the server adds a cup per beer, none for the crisps.
+        var first = await org.Admin.PostOkAsync($"{org.Url}/staff/charge", new { cardUid = card, items = new[] { new { productId = beer, quantity = 2 }, new { productId = crisps, quantity = 1 } } });
+        Assert.Equal(1000, first.Int("totalCents"));
+        Assert.Equal(200, first.Int("depositCents"));
+
+        // Two empty cups back for two new beers: the deposits cancel out, only the beer is paid.
+        var swap = await org.Admin.PostOkAsync($"{org.Url}/staff/charge", new { cardUid = card, items = new[] { new { productId = beer, quantity = 2 }, new { productId = cup, quantity = -2 } } });
+        Assert.Equal(600, swap.Int("totalCents"));
+        Assert.Equal(0, swap.Int("depositCents"));
+
+        // Going home with one cup back.
+        var back = await org.Admin.PostOkAsync($"{org.Url}/staff/charge", new { cardUid = card, items = new[] { new { productId = cup, quantity = -1 } } });
+        Assert.Equal(-100, back.Int("totalCents"));
+        Assert.Equal(500, back.Int("balanceCents"));
+
+        var history = (await guest.GetOkAsync($"{org.Url}/wallet"))["transactions"]!.AsArray();
+        Assert.Contains(history, t => t!.Str("description") == "2× Beer, 1× Crisps, 2× Cup deposit");
+        Assert.Contains(history, t => t!.Str("description") == "2× Beer");
+
+        // One cup is still out: its euro is held for the guest, not counted as takings.
+        var summary = await org.Admin.GetOkAsync($"{org.Url}/admin/summary");
+        Assert.Equal(1400, summary.Int("barRevenueCents"));
+        Assert.Equal(100, summary.Int("depositsHeldCents"));
+    }
+
+    [Fact]
+    public async Task A_drink_only_comes_with_a_real_deposit_and_a_deposit_in_use_stays_one()
+    {
+        var org = await NewOrgAsync();
+        var crisps = (await org.Admin.PostOkAsync($"{org.Url}/admin/products", new { name = "Crisps", priceCents = 200, active = true })).Str("id");
+        var notADeposit = await org.Admin.PostAsJsonAsync($"{org.Url}/admin/products", new { name = "Beer", priceCents = 300, active = true, depositProductId = crisps });
+        Assert.Equal(HttpStatusCode.BadRequest, notADeposit.StatusCode);
+
+        var cup = (await org.Admin.PostOkAsync($"{org.Url}/admin/products", new { name = "Cup", priceCents = 100, active = true, isDeposit = true })).Str("id");
+        await org.Admin.PostOkAsync($"{org.Url}/admin/products", new { name = "Beer", priceCents = 300, active = true, depositProductId = cup });
+        var stillUsed = await org.Admin.PutAsJsonAsync($"{org.Url}/admin/products/{cup}", new { name = "Cup", priceCents = 100, active = true, isDeposit = false });
+        Assert.Equal(HttpStatusCode.Conflict, stillUsed.StatusCode);
+    }
+
+    [Fact]
+    public async Task The_admin_orders_the_bar_menu_and_memberships_and_can_delete_items()
+    {
+        var org = await NewOrgAsync();
+        async Task<string> Add(object product) => (await org.Admin.PostOkAsync($"{org.Url}/admin/products", product)).Str("id");
+        var cup = await Add(new { name = "Cup", priceCents = 100, active = true, isDeposit = true });
+        var beer = await Add(new { name = "Beer", priceCents = 300, active = true, depositProductId = cup });
+        var cola = await Add(new { name = "Cola", priceCents = 250, active = true });
+
+        (await org.Admin.PutAsJsonAsync($"{org.Url}/admin/products/order", new { ids = new[] { cola, beer, cup } })).EnsureSuccessStatusCode();
+        var menu = (await org.Admin.GetOkAsync($"{org.Url}/staff/context"))["products"]!.AsArray().Select(p => p!.Str("name"));
+        Assert.Equal(["Cola", "Beer", "Cup"], menu);
+
+        // A cup that drinks still come with stays; an item nobody depends on can go.
+        Assert.Equal(HttpStatusCode.Conflict, (await org.Admin.DeleteAsync($"{org.Url}/admin/products/{cup}")).StatusCode);
+        (await org.Admin.DeleteAsync($"{org.Url}/admin/products/{cola}")).EnsureSuccessStatusCode();
+        Assert.DoesNotContain((await org.Admin.GetOkAsync($"{org.Url}/admin/products")).AsArray(), p => p!.Str("name") == "Cola");
+
+        // Memberships: a new one goes last, and the chosen order is what members see, not cheapest first.
+        var gold = (await org.Admin.PostOkAsync($"{org.Url}/admin/tiers", new { name = "Gold", priceCents = 2500, isPublic = true })).Str("id");
+        var silver = (await org.Admin.PostOkAsync($"{org.Url}/admin/tiers", new { name = "Silver", priceCents = 1000, isPublic = true })).Str("id");
+        Assert.Equal("Silver", (await org.Admin.GetOkAsync($"{org.Url}/admin/tiers")).AsArray().Last()!.Str("name"));
+        (await org.Admin.PutAsJsonAsync($"{org.Url}/admin/tiers/order", new { ids = new[] { gold, silver, org.FreeTierId } })).EnsureSuccessStatusCode();
+        var shown = (await org.Admin.GetOkAsync($"{org.Url}")).AsObject()["tiers"]!.AsArray().Select(t => t!.Str("name"));
+        Assert.Equal(["Gold", "Silver", "Member"], shown);
+
+        var unknown = await org.Admin.PutAsJsonAsync($"{org.Url}/admin/tiers/order", new { ids = new[] { Guid.NewGuid() } });
+        Assert.Equal(HttpStatusCode.Conflict, unknown.StatusCode);
+    }
+
+    [Fact]
+    public async Task The_till_gets_categories_in_order_and_coloured_tiles()
+    {
+        var org = await NewOrgAsync();
+        var beers = (await org.Admin.PostOkAsync($"{org.Url}/admin/categories", new { name = "Bier" })).Str("id");
+        var softs = (await org.Admin.PostOkAsync($"{org.Url}/admin/categories", new { name = "Fris" })).Str("id");
+        (await org.Admin.PutAsJsonAsync($"{org.Url}/admin/categories/order", new { ids = new[] { softs, beers } })).EnsureSuccessStatusCode();
+        await org.Admin.PostOkAsync($"{org.Url}/admin/products", new { name = "Pils", priceCents = 250, active = true, categoryId = beers, color = "yellow" });
+        await org.Admin.PostOkAsync($"{org.Url}/admin/products", new { name = "Cola", priceCents = 250, active = true, categoryId = softs, color = "red" });
+
+        var till = await org.Admin.GetOkAsync($"{org.Url}/staff/context");
+        Assert.Equal(["Fris", "Bier"], till["categories"]!.AsArray().Select(c => c!.Str("name")));
+        var pils = till["products"]!.AsArray().Single(p => p!.Str("name") == "Pils")!;
+        Assert.Equal(beers, pils.Str("categoryId"));
+        Assert.Equal("yellow", pils.Str("color"));
+
+        // Unknown colours and other organisations' categories are refused.
+        Assert.Equal(HttpStatusCode.BadRequest, (await org.Admin.PostAsJsonAsync($"{org.Url}/admin/products", new { name = "X", priceCents = 1, active = true, color = "#ff0000" })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await org.Admin.PostAsJsonAsync($"{org.Url}/admin/products", new { name = "X", priceCents = 1, active = true, categoryId = Guid.NewGuid() })).StatusCode);
+
+        // Deleting a category keeps its items, now without a tab.
+        (await org.Admin.DeleteAsync($"{org.Url}/admin/categories/{beers}")).EnsureSuccessStatusCode();
+        till = await org.Admin.GetOkAsync($"{org.Url}/staff/context");
+        Assert.Single(till["categories"]!.AsArray());
+        Assert.Null(till["products"]!.AsArray().Single(p => p!.Str("name") == "Pils")!["categoryId"]);
+    }
+
+    [Fact]
+    public async Task Online_top_ups_start_at_five_euro_so_the_card_fee_stays_small()
+    {
+        var org = await NewOrgAsync();
+        var guest = await NewMemberAsync(org);
+
+        var tooSmall = await guest.PostAsJsonAsync($"{org.Url}/wallet/topup", new { amountCents = 499 });
+        Assert.Equal(HttpStatusCode.BadRequest, tooSmall.StatusCode);
+        Assert.Contains("5,00", await tooSmall.Content.ReadAsStringAsync());
+        Assert.Equal(500, (await guest.GetOkAsync($"{org.Url}/wallet")).Int("minTopUpCents"));
+        await guest.PostOkAsync($"{org.Url}/wallet/topup", new { amountCents = 500 });
+
+        // Cash at the bar costs no card fee, so a couple of euro is fine there.
+        var card = await LinkCardAsync(guest, org);
+        await org.Admin.PostOkAsync($"{org.Url}/staff/topup", new { cardUid = card, amountCents = 200 });
+    }
+
+    [Fact]
+    public async Task Barmen_work_the_bar_and_doormen_the_door_and_both_can_check_a_card()
+    {
+        var org = await NewOrgAsync();
+        var beer = (await org.Admin.PostOkAsync($"{org.Url}/admin/products", new { name = "Beer", priceCents = 300, active = true })).Str("id");
+        var (eventId, _) = await NewEventAsync(org, 1000, 100);
+        var guest = await NewMemberAsync(org, "Gina");
+        var card = await LinkCardAsync(guest, org);
+        await TopUpAsync(guest, org, 1000);
+
+        async Task<HttpClient> WithRole(string name, string role)
+        {
+            var client = await NewMemberAsync(org, name);
+            var member = (await org.Admin.GetOkAsync($"{org.Url}/admin/members")).AsArray()
+                .Single(m => m!.Str("displayName").StartsWith(name))!;
+            (await org.Admin.PutAsJsonAsync($"{org.Url}/admin/members/{member.Str("id")}",
+                new { role, tierId = member.Str("tierId"), expiresAt = (DateTime?)null })).EnsureSuccessStatusCode();
+            return client;
+        }
+        var barman = await WithRole("Bart", "Barman");
+        var doorman = await WithRole("Dora", "Doorman");
+        var charge = new { cardUid = card, items = new[] { new { productId = beer, quantity = 1 } } };
+        var checkIn = new { eventId, cardUid = card };
+        var cash = new { cardUid = card, amountCents = 500 };
+
+        Assert.Equal(["Bar", "CheckCard"], (await barman.GetOkAsync($"{org.Url}/staff/context"))["tasks"]!.AsArray().Select(t => t!.GetValue<string>()));
+        await barman.PostOkAsync($"{org.Url}/staff/charge", charge);
+        await barman.PostOkAsync($"{org.Url}/staff/lookup", new { cardUid = card });
+        Assert.Equal(HttpStatusCode.Forbidden, (await barman.PostAsJsonAsync($"{org.Url}/staff/checkin", checkIn)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await barman.PostAsJsonAsync($"{org.Url}/staff/topup", cash)).StatusCode);
+
+        Assert.Equal(["Door", "CheckCard"], (await doorman.GetOkAsync($"{org.Url}/staff/context"))["tasks"]!.AsArray().Select(t => t!.GetValue<string>()));
+        await doorman.PostOkAsync($"{org.Url}/staff/lookup", new { cardUid = card });
+        Assert.Equal(HttpStatusCode.Forbidden, (await doorman.PostAsJsonAsync($"{org.Url}/staff/charge", charge)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await doorman.PostAsJsonAsync($"{org.Url}/staff/topup", cash)).StatusCode);
+        // No ticket for this guest: the door answers, so the doorman got past the role check.
+        Assert.NotEqual(HttpStatusCode.Forbidden, (await doorman.PostAsJsonAsync($"{org.Url}/staff/checkin", checkIn)).StatusCode);
+
+        // Neither of them manages anything.
+        Assert.Equal(HttpStatusCode.Forbidden, (await barman.GetAsync($"{org.Url}/admin/products")).StatusCode);
+        Assert.Equal(["Bar", "Door", "CashTopUp", "CheckCard"], (await org.Admin.GetOkAsync($"{org.Url}/staff/context"))["tasks"]!.AsArray().Select(t => t!.GetValue<string>()));
     }
 
     [Fact]
@@ -380,7 +547,7 @@ public class FlowTests : IClassFixture<TestApp>
         var org = await NewOrgAsync();
         var paid = (await org.Admin.PostOkAsync($"{org.Url}/admin/tiers", new
         {
-            name = "Premium", priceCents = 2500, durationDays = 365, isPublic = true, ticketDiscountPercent = 50, drinkDiscountPercent = 20,
+            name = "Premium", priceCents = 2500, endsOn = MembershipDates.NextSummer, isPublic = true, ticketDiscountPercent = 50, drinkDiscountPercent = 20,
         })).Str("id");
         await org.Admin.PostOkAsync($"{org.Url}/admin/tiers", new { name = "Crew", priceCents = 0, isPublic = false, inviteCode = "CREW2026", ticketDiscountPercent = 100 });
         var (eventId, typeId) = await NewEventAsync(org, priceCents: 1000, capacity: 50);
@@ -467,6 +634,7 @@ public class FlowTests : IClassFixture<TestApp>
         // The same email address can sign up there too, and starts from nothing.
         var again = await atFirst.PostAsJsonAsync("/api/auth/register", new { email, password = "another password", displayName = "Gijs", joinOrganisationSlug = second.Slug });
         Assert.True(again.IsSuccessStatusCode, await again.Content.ReadAsStringAsync());
+        (await atFirst.PutAsJsonAsync($"{second.Url}/me/profile", new { firstName = "Gijs", lastName = "Jazz" })).EnsureSuccessStatusCode();
         await atFirst.PostOkAsync($"{second.Url}/join", new { tierId = second.FreeTierId });
         Assert.Equal(2000, await BalanceAsync(atFirst, first));
         Assert.Equal(0, await BalanceAsync(atFirst, second));
@@ -693,6 +861,28 @@ public class ImageAndSettingsTests : IClassFixture<TestApp>
         var moved = JsonNode.Parse(await (await first.PutAsJsonAsync($"{firstUrl}/admin/organisation", new { name = renamed })).Content.ReadAsStringAsync())!.Str("slug");
         Assert.NotNull((await guest.GetOkAsync($"/api/orgs/{moved}"))["membership"]);
         Assert.Equal(0, (await guest.GetOkAsync($"/api/orgs/{moved}/wallet")).Int("balanceCents"));
+    }
+
+    [Fact]
+    public async Task An_organisation_colours_its_pages_and_member_cards()
+    {
+        var (admin, url) = await NewOrgAsync();
+        var slug = url.Split('/').Last();
+        var name = (await admin.GetOkAsync(url)).Str("name");
+
+        // Anything but a "#rrggbb" colour is refused and changes nothing.
+        Assert.Equal(HttpStatusCode.BadRequest, (await admin.PutAsJsonAsync($"{url}/admin/organisation", new { name, brandColor = "red" })).StatusCode);
+        Assert.Null((await admin.GetOkAsync(url))["brandColor"]);
+
+        await admin.PutAsJsonAsync($"{url}/admin/organisation", new { name, brandColor = "#9F1239" });
+        Assert.Equal("#9f1239", (await admin.GetOkAsync($"{url}/admin/organisation")).Str("brandColor"));
+        Assert.Equal("#9f1239", (await admin.GetOkAsync(url)).Str("brandColor"));
+        // Visitors who have not signed in see the same colour on the public page.
+        Assert.Equal("#9f1239", (await _app.CreateClient().GetOkAsync($"/api/public/orgs/{slug}")).Str("brandColor"));
+
+        // Saving without a colour goes back to the house colour.
+        await admin.PutAsJsonAsync($"{url}/admin/organisation", new { name });
+        Assert.Null((await admin.GetOkAsync(url))["brandColor"]);
     }
 
     [Fact]

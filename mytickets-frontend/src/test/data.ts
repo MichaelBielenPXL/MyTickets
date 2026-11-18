@@ -13,7 +13,8 @@ export const premiumTier = {
   name: 'Premium',
   description: '',
   priceCents: 2500,
-  durationDays: 365,
+  endsOn: '2027-06-30',
+  requiresApproval: false,
   isPublic: true,
   ticketDiscountPercent: 50,
   drinkDiscountPercent: 20,
@@ -24,7 +25,7 @@ export const freeTier = {
   id: 'tier-free',
   name: 'Member',
   priceCents: 0,
-  durationDays: null,
+  endsOn: null,
   ticketDiscountPercent: 0,
   drinkDiscountPercent: 0,
 }
@@ -36,6 +37,7 @@ export function anOrganisation(overrides: object = {}) {
     name: 'Night Owls',
     description: 'Student parties',
     logoUrl: null,
+    brandColor: null,
     membership: {
       role: 'Member',
       tierId: premiumTier.id,
@@ -49,6 +51,8 @@ export function anOrganisation(overrides: object = {}) {
     tiers: [freeTier, premiumTier],
     hasInviteOnlyTiers: false,
     events: [],
+    request: null,
+    profileComplete: true,
     ...overrides,
   }
 }

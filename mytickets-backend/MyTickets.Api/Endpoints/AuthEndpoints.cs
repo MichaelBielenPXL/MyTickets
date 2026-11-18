@@ -34,7 +34,10 @@ public static class AuthEndpoints
             var email = req.Email?.Trim().ToLowerInvariant() ?? "";
             var name = req.DisplayName?.Trim() ?? "";
             if (email.Length is < 5 or > 200 || !email.Contains('@')) return Http.Error(400, "Enter a valid email address.");
-            if (name.Length is < 2 or > 80) return Http.Error(400, "Enter your name.");
+            // A name is only asked of organisers here; members give theirs with their other details later.
+            var organiserSignUp = string.IsNullOrWhiteSpace(req.JoinOrganisationSlug);
+            if (organiserSignUp && name.Length is < 2 or > 80) return Http.Error(400, "Enter your name.");
+            if (name.Length > 80) return Http.Error(400, "Your name is too long.");
             if ((req.Password?.Length ?? 0) < 8) return Http.Error(400, "Choose a password of at least 8 characters.");
 
             // Signing up from an organisation's page: a member account in that organisation, and nothing else.
@@ -47,7 +50,12 @@ public static class AuthEndpoints
                 if (await db.Users.AnyAsync(u => u.Email == email))
                     return Http.Error(409, $"There is already an account with this email address at {organisation.Name}.");
 
-                var user = new User { Id = Guid.NewGuid(), Email = email, DisplayName = name, CreatedAt = clock.GetUtcNow().UtcDateTime };
+                // Until they give their name, staff see the first part of their email address.
+                var user = new User
+                {
+                    Id = Guid.NewGuid(), Email = email, DisplayName = name.Length > 0 ? name : email.Split('@')[0],
+                    CreatedAt = clock.GetUtcNow().UtcDateTime,
+                };
                 user.PasswordHash = hasher.HashPassword(user, req.Password!);
                 db.Users.Add(user);
                 try { await db.SaveChangesAsync(); }

@@ -1,8 +1,12 @@
-import { type FormEvent, useEffect, useState } from 'react'
+import { type FormEvent, useEffect, useId, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 
 import { ErrorNote, Field } from '@/components'
-import { useOrganisationSlugAvailability, usePublicOrganisation } from '@/features/organisations'
+import {
+  OrganisationAvatar,
+  useOrganisationSlugAvailability,
+  usePublicOrganisation,
+} from '@/features/organisations'
 
 import { useSignIn } from '../api/auth'
 import { ContinueWithEmail } from '../components/ContinueWithEmail'
@@ -30,6 +34,7 @@ export function AuthPage({ mode }: AuthPageProps) {
   const registering = mode === 'register'
   const checkingName = registering && !slug
   const organisation = usePublicOrganisation(slug, Boolean(slug))
+  const emailId = useId()
   const isCurrentNameChecked = checkedOrganisationName === organisationName.trim()
   const availability = useOrganisationSlugAvailability(
     checkedOrganisationName,
@@ -56,7 +61,8 @@ export function AuthPage({ mode }: AuthPageProps) {
       {
         email,
         password,
-        ...(registering ? { displayName } : {}),
+        // Members give their name with their other details, after choosing a membership.
+        ...(registering && !slug ? { displayName } : {}),
         // Signing in on an organisation's page means the account at that organisation.
         ...(!registering && slug ? { organisationSlug: slug } : {}),
         ...(registering && slug
@@ -67,6 +73,7 @@ export function AuthPage({ mode }: AuthPageProps) {
       },
       {
         onSuccess: (result) => {
+          if (registering && slug) return navigate(`/${slug}/join`)
           navigate(registering ? `/${result.organisationSlug ?? slug}` : slug ? `/${slug}` : next)
         },
       },
@@ -78,6 +85,7 @@ export function AuthPage({ mode }: AuthPageProps) {
   if (slug && !arrival.email) {
     return (
       <main className="narrow auth-page">
+        <OrganisationBadge name={orgName} logoUrl={organisation.data?.logoUrl ?? null} />
         <ContinueWithEmail slug={slug} organisationName={orgName} search={location.search} />
       </main>
     )
@@ -85,31 +93,35 @@ export function AuthPage({ mode }: AuthPageProps) {
 
   return (
     <main className="narrow auth-page">
+      {slug && <OrganisationBadge name={orgName} logoUrl={organisation.data?.logoUrl ?? null} />}
       <div className="auth-intro">
-        <Link to="/" className="brand auth-brand">
-          MyTickets
-        </Link>
+        {!slug && (
+          <Link to="/" className="brand auth-brand">
+            MyTickets
+          </Link>
+        )}
         <h1>
+          {/* At an organisation its logo and name are already above, so the heading only says what to do. */}
           {registering
             ? slug
-              ? `Register for ${orgName}`
+              ? 'Create your account'
               : 'Start your organisation'
             : slug
-              ? `Log in to ${orgName}`
+              ? 'Log in'
               : 'Welcome back'}
         </h1>
         <p className="muted">
           {registering
             ? slug
               ? arrival.fromEmailStep
-                ? `There is no account with this email address at ${orgName} yet. Create one to get tickets.`
-                : 'Create an account to join this organisation and get tickets.'
+                ? 'There is no account with this email address yet. Choose a password to create one.'
+                : 'Choose a password to create your account. You pick a membership next.'
               : 'Choose your organisation page, then create your account.'
             : slug
               ? arrival.fromEmailStep
-                ? `Welcome back. Enter your password for ${orgName}.`
-                : `Sign in to see your ${orgName} tickets and credit.`
-              : 'Sign in to see your tickets, organisations and credit.'}
+                ? 'Welcome back. Enter your password.'
+                : `Sign in to see your ${orgName} tickets and tokens.`
+              : 'Sign in to see your tickets, organisations and tokens.'}
         </p>
       </div>
       <form onSubmit={submit} className="stack panel auth-form">
@@ -137,7 +149,7 @@ export function AuthPage({ mode }: AuthPageProps) {
             )}
           </Field>
         )}
-        {registering && (
+        {registering && !slug && (
           <Field label="Your name" hint="Staff see this when you tap your card.">
             <input
               value={displayName}
@@ -148,12 +160,13 @@ export function AuthPage({ mode }: AuthPageProps) {
           </Field>
         )}
         {slug ? (
-          <div className="known-email">
-            <span className="label">Email</span>
-            <div className="spread">
-              <strong>{email}</strong>
-              {/* Back to the email step: without the handed-over address this page shows it again. */}
-              <Link to={`/${slug}/login${location.search}`} replace>
+          // A real, filled-in field rather than plain text, so password managers pair it with the password.
+          <div className="field">
+            <label htmlFor={emailId}>Email</label>
+            <div className="known-email-field">
+              <input id={emailId} type="email" name="email" value={email} readOnly autoComplete="username" />
+              {/* Back to the email step: without the handed-over address this page asks for it again. */}
+              <Link to={`/${slug}/login${location.search}`} replace aria-label="Change email address">
                 Change
               </Link>
             </div>
@@ -192,5 +205,15 @@ export function AuthPage({ mode }: AuthPageProps) {
         </Link>
       </p>
     </main>
+  )
+}
+
+/** Signing in at an organisation: its logo, big, with its name, so people know where they are. */
+function OrganisationBadge({ name, logoUrl }: { name: string; logoUrl: string | null }) {
+  return (
+    <div className="auth-org">
+      <OrganisationAvatar name={name} logoUrl={logoUrl} size={112} />
+      <p className="auth-org-name">{name}</p>
+    </div>
   )
 }

@@ -1,22 +1,17 @@
-import { useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 
 import { EventsTab } from '../components/EventsTab'
+import { ManageMenu } from '../components/ManageMenu'
 import { MembersTab } from '../components/MembersTab'
 import { MembershipsTab } from '../components/MembershipsTab'
 import { OverviewTab } from '../components/OverviewTab'
+import { PayoutsTab } from '../components/PayoutsTab'
 import { ProductsTab } from '../components/ProductsTab'
 import { SettingsTab } from '../components/SettingsTab'
+import { ADMIN_SECTIONS, type AdminSection, sectionFrom } from '../sections'
 
-const TABS = {
-  overview: 'Overview',
-  events: 'Events',
-  memberships: 'Memberships',
-  members: 'Members',
-  bar: 'Bar menu',
-  settings: 'Settings',
-} as const
-type Tab = keyof typeof TABS
+const TABS = ADMIN_SECTIONS
+type Tab = AdminSection
 
 const TAB_NOTES: Record<Tab, string> = {
   overview: 'Sales, members and wallet activity at a glance.',
@@ -24,16 +19,23 @@ const TAB_NOTES: Record<Tab, string> = {
   memberships: 'Set up free, paid and invite-only membership levels.',
   members: 'Manage membership levels and staff access.',
   bar: 'Keep the products and prices your team sells up to date.',
+  payouts: 'Get paid for what you sell online: Stripe takes the payments and transfers them to your bank.',
   settings: 'Change your organisation’s name, description and logo.',
 }
 
 /** Where an organisation's admins set everything up. */
 export function AdminPage() {
   const { slug = '' } = useParams()
-  const [tab, setTab] = useState<Tab>('overview')
+  // The section lives in the address (?tab=), so the sidebar, the back button and Stripe's return
+  // to ?tab=payouts all land in the right place.
+  const [params, setParams] = useSearchParams()
+  const tab = sectionFrom(params.get('tab'))
+  // On a phone, Manage without a section opens on the list of sections (see ManageMenu).
+  const sectionChosen = params.get('tab') !== null
+  const setTab = (next: Tab) => setParams({ tab: next })
 
   return (
-    <main className="admin-shell">
+    <main className={sectionChosen ? 'admin-shell has-section' : 'admin-shell at-menu'}>
       <header className="admin-page-header">
         <div>
           <Link to={`/${slug}`} className="admin-back">
@@ -46,6 +48,8 @@ export function AdminPage() {
           View organisation
         </Link>
       </header>
+
+      <ManageMenu slug={slug} />
 
       <div className="admin-workspace mx-auto grid w-full max-w-[1320px] grid-cols-1 gap-5 lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-8">
         <aside className="admin-sidebar rounded-2xl border border-zinc-200 bg-white p-3">
@@ -72,6 +76,9 @@ export function AdminPage() {
 
         <section className="min-w-0" aria-labelledby="admin-section-title">
           <header className="mb-5">
+            <Link to={`/${slug}/admin`} className="admin-menu-back">
+              ‹ Manage
+            </Link>
             <h2 id="admin-section-title" className="admin-section-title">
               {TABS[tab]}
             </h2>
@@ -82,6 +89,7 @@ export function AdminPage() {
           {tab === 'memberships' && <MembershipsTab slug={slug} />}
           {tab === 'members' && <MembersTab slug={slug} />}
           {tab === 'bar' && <ProductsTab slug={slug} />}
+          {tab === 'payouts' && <PayoutsTab slug={slug} />}
           {tab === 'settings' && <SettingsTab slug={slug} />}
         </section>
       </div>

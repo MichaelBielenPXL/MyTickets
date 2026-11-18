@@ -41,7 +41,7 @@ export function OrganisationSwitcher({
     <div className="switcher" ref={container}>
       {current && (
         <Link to={`/${current.slug}`} className="switcher-current">
-          <OrganisationAvatar name={current.name} logoUrl={current.logoUrl} />
+          <OrganisationAvatar name={current.name} logoUrl={current.logoUrl} size={32} />
           <span className="switcher-name">{current.name}</span>
           {currentLabel && <span className="pill">{currentLabel}</span>}
         </Link>
@@ -80,7 +80,7 @@ export function OrganisationSwitcher({
                 aria-current={membership.slug === current?.slug ? 'true' : undefined}
                 onClick={close}
               >
-                <OrganisationAvatar name={membership.name} logoUrl={membership.logoUrl} />
+                <OrganisationAvatar name={membership.name} logoUrl={membership.logoUrl} size={24} />
                 <span className="menu-item-text">{membership.name}</span>
                 {membership.slug === current?.slug && <CheckIcon />}
               </Link>

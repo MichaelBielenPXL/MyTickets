@@ -117,9 +117,7 @@ describe('accounts are per organisation', () => {
     server.use(http.get(apiUrl('/public/orgs/night-owls'), () => HttpResponse.json(publicNightOwls)))
     renderApp(<AppRoutes />, { at: '/night-owls', path: '*' })
 
-    expect(
-      await screen.findByRole('heading', { name: 'Tickets and credit at Night Owls' }),
-    ).toBeInTheDocument()
+    expect(await screen.findByRole('form', { name: 'Sign in at Night Owls' })).toBeInTheDocument()
     expect(screen.getByText('Visiting')).toBeInTheDocument()
     expect(screen.getAllByRole('link', { name: 'Log in' })[0]).toHaveAttribute('href', '/night-owls/login')
     // No tabs into an account that does not exist here.

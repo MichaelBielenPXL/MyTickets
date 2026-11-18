@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ErrorNote, Loading } from '@/components'
 import { useAccount } from '@/features/auth'
 import { useOrganisation, usePublicOrganisation } from '@/features/organisations'
+import { useGoToCheckout } from '@/hooks/useGoToCheckout'
 import { dateTime } from '@/utils/format'
 
 import { useEvent, useOrderTickets, usePublicEvent } from '../api/events'
@@ -14,6 +15,7 @@ export function EventPage() {
   const { slug = '', eventId = '' } = useParams()
   const [quantities, setQuantities] = useState<Record<string, number>>({})
   const navigate = useNavigate()
+  const goToCheckout = useGoToCheckout()
   // The account this browser has here, if any. Being signed in at another organisation does not count.
   const me = useAccount(slug)
   const eventQuery = useEvent(slug, eventId, Boolean(me.data))
@@ -49,7 +51,11 @@ export function EventPage() {
     const items = picked.map((t) => ({ ticketTypeId: t.id, quantity: quantities[t.id] }))
     order.mutate(
       { items, payWith },
-      { onSuccess: (result) => navigate(result.checkoutUrl ?? `/${slug}/tickets`) },
+      {
+        // Free tickets, or paid with tokens, are theirs straight away; otherwise on to paying.
+        onSuccess: (result) =>
+          result.checkoutUrl ? goToCheckout(result.checkoutUrl) : navigate(`/${slug}/tickets`),
+      },
     )
   }
 

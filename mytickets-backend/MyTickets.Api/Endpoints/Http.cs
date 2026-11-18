@@ -24,6 +24,13 @@ public static class Http
         return group;
     }
 
+    /// <summary>For one job at the event (bar, door...): refuses roles that don't do it.</summary>
+    public static RouteHandlerBuilder RequireTask(this RouteHandlerBuilder endpoint, StaffTask task) =>
+        endpoint.AddEndpointFilter(async (ctx, next) =>
+            ctx.HttpContext.Org().Membership is { } m && StaffTasks.Can(m.Role, task)
+                ? await next(ctx)
+                : Error(403, "You don't have access to this."));
+
     public static async ValueTask<object?> OrgFilter(EndpointFilterInvocationContext ctx, EndpointFilterDelegate next, OrgRole? minimumRole)
     {
         var http = ctx.HttpContext;
@@ -59,5 +66,10 @@ public static class Http
         return separatorsOnly && hex.Length is >= 8 and <= 20 ? hex : null;
     }
 
-    public static string Euro(int cents) => $"€{cents / 100}.{cents % 100:00}";
+    /// <summary>1250 -> "€12,50", the European way.</summary>
+    public static string Euro(int cents) => $"€{cents / 100},{cents % 100:00}";
+
+    /// <summary>Members spend tokens, one per euro: 700 -> "7 tokens", 1250 -> "12,50 tokens", 100 -> "1 token".</summary>
+    public static string Tokens(int cents) =>
+        (cents % 100 == 0 ? $"{cents / 100}" : $"{cents / 100},{cents % 100:00}") + (cents == 100 ? " token" : " tokens");
 }

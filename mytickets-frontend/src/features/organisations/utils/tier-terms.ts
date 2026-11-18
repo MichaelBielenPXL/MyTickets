@@ -1,14 +1,13 @@
 import type { Tier } from '@/types'
-import { money } from '@/utils/format'
+import { calendarDay, money } from '@/utils/format'
 
-/** What a membership type costs, in words: "Free", "€ 25,00 / year", "Free for 30 days". */
-export function tierTerms(tier: Pick<Tier, 'priceCents' | 'durationDays'>): string {
-  const free = tier.priceCents === 0
-  if (tier.durationDays === null) return free ? 'Free' : money(tier.priceCents)
+/** "2027-06-30" -> "30/06/2027". */
+export const endDate = calendarDay
 
-  const period = tier.durationDays === 365 ? 'year' : `${tier.durationDays} days`
-  if (free) return `Free for ${period === 'year' ? 'a year' : period}`
-  return `${money(tier.priceCents)} / ${period}`
+/** What a membership type costs and how long it runs: "Free", "€ 25,00", "€ 25,00 until 30/06/2027". */
+export function tierTerms(tier: Pick<Tier, 'priceCents' | 'endsOn'>): string {
+  const price = tier.priceCents === 0 ? 'Free' : money(tier.priceCents)
+  return tier.endsOn ? `${price} until ${endDate(tier.endsOn)}` : price
 }
 
 /** "50% off tickets · 20% off at the bar", or an empty string when there is no discount. */

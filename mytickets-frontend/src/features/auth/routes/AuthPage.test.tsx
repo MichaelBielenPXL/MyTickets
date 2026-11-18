@@ -64,7 +64,7 @@ describe('AuthPage', () => {
     expect(screen.getByRole('button', { name: 'Create account' })).toBeDisabled()
   })
 
-  it('registers a member in the organisation they came from without an organisation name', async () => {
+  it('signs a member up with only a password, then sends them to choose a membership', async () => {
     let sent: unknown
     server.use(
       http.get(apiUrl('/public/orgs/night-owls'), () =>
@@ -81,12 +81,15 @@ describe('AuthPage', () => {
       state: { email: 'gijs@example.com' },
     })
 
-    expect(await screen.findByRole('heading', { name: 'Register for Night Owls' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Create your account' })).toBeInTheDocument()
+    // The organisation's name sits by its logo at the top.
+    expect(await screen.findByText('Night Owls')).toBeInTheDocument()
     expect(screen.queryByLabelText(/Organisation name/)).not.toBeInTheDocument()
-    // The address was given in the email step; it is shown, not asked again.
-    expect(screen.getByText('gijs@example.com')).toBeInTheDocument()
-    expect(screen.queryByLabelText('Email')).not.toBeInTheDocument()
-    await user.type(screen.getByLabelText(/Your name/), 'Gijs Guest')
+    // The address was given in the email step: filled in and not editable here, but still a field.
+    expect(screen.getByLabelText('Email')).toHaveValue('gijs@example.com')
+    expect(screen.getByLabelText('Email')).toHaveAttribute('autocomplete', 'username')
+    // No name asked here: that comes with the other details, after choosing a membership.
+    expect(screen.queryByLabelText(/Your name/)).not.toBeInTheDocument()
     await user.type(screen.getByLabelText(/Password/), 'correct horse')
     await user.click(screen.getByRole('button', { name: 'Create account' }))
 
@@ -94,11 +97,10 @@ describe('AuthPage', () => {
       expect(sent).toEqual({
         email: 'gijs@example.com',
         password: 'correct horse',
-        displayName: 'Gijs Guest',
         joinOrganisationSlug: 'night-owls',
       }),
     )
-    expect(await screen.findByText('Now at /night-owls')).toBeInTheDocument()
+    expect(await screen.findByText('Now at /night-owls/join')).toBeInTheDocument()
   })
 
   it('keeps the page the visitor was heading for when switching to "create an account"', () => {
@@ -207,7 +209,7 @@ describe('AuthPage', () => {
       state: { email: 'wrong@example.com' },
     })
 
-    await user.click(await screen.findByRole('link', { name: 'Change' }))
+    await user.click(await screen.findByRole('link', { name: 'Change email address' }))
 
     expect(await screen.findByLabelText('Email')).toHaveValue('')
     expect(screen.queryByLabelText(/Password/)).not.toBeInTheDocument()

@@ -7,8 +7,9 @@ import type { Wallet } from '../types'
 export const walletKeys = { detail: (slug: string) => ['wallet', slug] as const }
 
 /** The member's credit and history with one organisation. */
-export function useWallet(slug: string) {
+export function useWallet(slug: string, enabled = true) {
   return useQuery({
+    enabled,
     queryKey: walletKeys.detail(slug),
     queryFn: () => api.get<Wallet>(`/orgs/${slug}/wallet`),
     staleTime: 0,

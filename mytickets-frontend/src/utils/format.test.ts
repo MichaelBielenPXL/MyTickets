@@ -1,4 +1,4 @@
-import { money, parseEuro, requireEuro, requireWholeNumber } from './format'
+import { money, parseEuro, requireEuro, requireWholeNumber, signedTokens, tokens } from './format'
 
 describe('parseEuro', () => {
   it.each([
@@ -34,5 +34,22 @@ describe('money', () => {
     // Intl puts a non-breaking space after the euro sign.
     expect(money(1250).replace(/\s/g, ' ')).toBe('€ 12,50')
     expect(money(-300).replace(/\s/g, ' ')).toContain('3,00')
+  })
+})
+
+describe('tokens', () => {
+  it.each([
+    [4400, '44 tokens'],
+    [1250, '12,50 tokens'],
+    [100, '1 token'],
+    [0, '0 tokens'],
+    [123456, '1.234,56 tokens'],
+  ])('writes %i cents as %j', (cents, text) => {
+    expect(tokens(cents)).toBe(text)
+  })
+
+  it('signs amounts coming in and going out', () => {
+    expect(signedTokens(4000)).toBe('+40 tokens')
+    expect(signedTokens(-1250)).toBe('−12,50 tokens')
   })
 })

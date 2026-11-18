@@ -2,7 +2,7 @@ import { type FormEvent, useState } from 'react'
 
 import { CardReader, ErrorNote, Field } from '@/components'
 import { ApiError } from '@/lib/api-client'
-import { dateTime, errorText } from '@/utils/format'
+import { dateTime, errorText, timeOnly } from '@/utils/format'
 
 import { useCheckIn } from '../api/staff'
 import type { CheckInRequest, CheckInResult, Outcome, StaffEvent } from '../types'
@@ -128,6 +128,6 @@ function refusal(error: unknown): Outcome {
   const body = error instanceof ApiError ? error.body : {}
   if (typeof body.checkedInAt !== 'string') return { ok: false, title: errorText(error) }
   const who = typeof body.name === 'string' ? `${body.name} · ` : ''
-  const when = new Date(body.checkedInAt).toLocaleTimeString()
+  const when = timeOnly(body.checkedInAt)
   return { ok: false, title: errorText(error), detail: `${who}checked in at ${when}` }
 }

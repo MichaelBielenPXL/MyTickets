@@ -3,9 +3,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { meQueryKey } from '@/features/auth'
 import { api } from '@/lib/api-client'
 
-import type { JoinResult, Organisation, OrganisationSummary } from '../types'
+import type { JoinResult, Organisation, OrganisationSummary, ProfileForm, ProfileValues } from '../types'
 
 export const organisationKeys = {
+  profile: (slug: string) => ['profile', slug] as const,
   list: ['organisations'] as const,
   detail: (slug: string) => ['organisation', slug] as const,
   publicDetail: (slug: string) => ['public-organisation', slug] as const,
@@ -80,6 +81,28 @@ export function useJoinOrganisation(slug: string) {
       Promise.all([
         queryClient.invalidateQueries({ queryKey: organisationKeys.detail(slug) }),
         queryClient.invalidateQueries({ queryKey: organisationKeys.list }),
+        queryClient.invalidateQueries({ queryKey: meQueryKey }),
+      ]),
+  })
+}
+
+/** The person's details, and which ones this organisation asks for. */
+export function useMyProfile(slug: string) {
+  return useQuery({
+    queryKey: organisationKeys.profile(slug),
+    queryFn: () => api.get<ProfileForm>(`/orgs/${slug}/me/profile`),
+  })
+}
+
+export function useSaveProfile(slug: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (values: ProfileValues) => api.put(`/orgs/${slug}/me/profile`, values),
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: organisationKeys.profile(slug) }),
+        queryClient.invalidateQueries({ queryKey: organisationKeys.detail(slug) }),
+        // Their name shows in the header and account menu.
         queryClient.invalidateQueries({ queryKey: meQueryKey }),
       ]),
   })

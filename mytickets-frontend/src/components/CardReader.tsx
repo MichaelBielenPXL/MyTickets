@@ -1,8 +1,7 @@
-import { type FormEvent, useEffect, useRef, useState } from 'react'
-
-import { listenForCards, nfcSupported } from '@/lib/nfc'
+import { type FormEvent, useState } from 'react'
 
 import { ErrorNote } from './ErrorNote'
+import { useCardTaps } from './useCardTaps'
 
 type CardReaderProps = {
   /** Called with the card number each time a card is tapped or typed. */
@@ -13,49 +12,13 @@ type CardReaderProps = {
   disabled?: boolean
 }
 
-// A card held against the phone is read many times a second; act on it once.
-const SAME_CARD_PAUSE_MS = 2500
-
 /**
  * Gets a card number, by holding the card to the phone (Chrome on Android) or by typing it.
  * Once started the reader keeps listening, so staff can serve one guest after another.
  */
 export function CardReader({ onCard, prompt, disabled }: CardReaderProps) {
-  const [listening, setListening] = useState(false)
-  const [problem, setProblem] = useState('')
   const [typed, setTyped] = useState('')
-  // The reader outlives renders, so it reads the latest props through refs.
-  const latest = useRef({ onCard, disabled })
-  const stop = useRef<AbortController | null>(null)
-  const lastRead = useRef({ uid: '', at: 0 })
-
-  useEffect(() => {
-    latest.current = { onCard, disabled }
-  })
-
-  useEffect(() => () => stop.current?.abort(), [])
-
-  async function start() {
-    setProblem('')
-    stop.current = new AbortController()
-    try {
-      await listenForCards(stop.current.signal, handleTap, () =>
-        setProblem("Couldn't read that card. Hold it still against the back of the phone."),
-      )
-      setListening(true)
-    } catch {
-      setProblem('The card reader could not start. Allow NFC for this site, or type the card number.')
-    }
-  }
-
-  function handleTap(uid: string) {
-    const now = Date.now()
-    const repeat = uid === lastRead.current.uid && now - lastRead.current.at < SAME_CARD_PAUSE_MS
-    if (latest.current.disabled || repeat) return
-    lastRead.current = { uid, at: now }
-    navigator.vibrate?.(60)
-    latest.current.onCard(uid)
-  }
+  const { supported, listening, problem, start } = useCardTaps(onCard, disabled)
 
   function submitTyped(event: FormEvent) {
     event.preventDefault()
@@ -66,13 +29,13 @@ export function CardReader({ onCard, prompt, disabled }: CardReaderProps) {
 
   return (
     <div className="card-reader">
-      {nfcSupported && <TapArea listening={listening} prompt={prompt} onStart={start} />}
+      {supported && <TapArea listening={listening} prompt={prompt} onStart={start} />}
       <ErrorNote>{problem}</ErrorNote>
       <form onSubmit={submitTyped} className="row">
         <input
           value={typed}
           onChange={(e) => setTyped(e.target.value)}
-          placeholder={nfcSupported ? 'or type the card number' : 'Card number'}
+          placeholder={supported ? 'or type the card number' : 'Card number'}
           aria-label="Card number"
           autoCapitalize="characters"
           autoComplete="off"
@@ -81,7 +44,7 @@ export function CardReader({ onCard, prompt, disabled }: CardReaderProps) {
           Use
         </button>
       </form>
-      {!nfcSupported && (
+      {!supported && (
         <small className="muted">
           Tapping cards works in Chrome on an Android phone. Here you can type the number.
         </small>

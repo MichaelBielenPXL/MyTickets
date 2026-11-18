@@ -17,12 +17,22 @@ function serveSettings() {
       description: '',
       logoKey: null as string | null,
       logoUrl: null as string | null,
+      brandColor: null as string | null,
     },
     saved: [] as unknown[],
     /** The content type of each upload request. */
     uploads: [] as string[],
   }
   server.use(
+    http.get(apiUrl('/orgs/night-owls/admin/member-fields'), () =>
+      HttpResponse.json({
+        phone: 'Optional',
+        address: 'Optional',
+        school: 'Optional',
+        faculty: 'Optional',
+        studyYear: 'Optional',
+      }),
+    ),
     http.get(apiUrl('/orgs/night-owls/admin/organisation'), () => HttpResponse.json(state.settings)),
     http.put(apiUrl('/orgs/night-owls/admin/organisation'), async ({ request }) => {
       const body = (await request.json()) as { name: string; description: string; logoKey: string | null }
@@ -68,7 +78,7 @@ describe('SettingsTab', () => {
     expect(await screen.findByText('Now at /night-owls-hasselt/admin')).toBeInTheDocument()
     // Sent as a form with a file in it, which is what the server reads.
     expect(state.uploads[0]).toMatch(/^multipart\/form-data/)
-    expect(state.saved).toEqual([{ name: 'Night Owls Hasselt', description: '', logoKey }])
+    expect(state.saved).toEqual([{ name: 'Night Owls Hasselt', description: '', logoKey, brandColor: null }])
   })
 
   it('stays put when only the description changes', async () => {
@@ -79,7 +89,9 @@ describe('SettingsTab', () => {
     await user.click(screen.getByRole('button', { name: 'Save changes' }))
 
     expect(await screen.findByRole('status')).toHaveTextContent('Saved.')
-    expect(state.saved).toEqual([{ name: 'Night Owls', description: 'Student parties', logoKey: null }])
+    expect(state.saved).toEqual([
+      { name: 'Night Owls', description: 'Student parties', logoKey: null, brandColor: null },
+    ])
     expect(screen.queryByLabelText(/Page address/)).not.toBeInTheDocument()
   })
 
@@ -133,6 +145,29 @@ describe('SettingsTab', () => {
     await user.click(screen.getByRole('button', { name: 'Save changes' }))
 
     expect(await screen.findByRole('status')).toHaveTextContent('Saved.')
-    expect(state.saved).toEqual([{ name: 'Night Owls', description: '', logoKey: null }])
+    expect(state.saved).toEqual([{ name: 'Night Owls', description: '', logoKey: null, brandColor: null }])
+  })
+
+  it('saves the colour picked for the member cards', async () => {
+    const state = serveSettings()
+    const { user } = renderApp(<SettingsTab slug="night-owls" />)
+
+    await user.click(await screen.findByRole('radio', { name: '#9f1239' }))
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    await screen.findByText('Saved.')
+    expect(state.saved).toEqual([
+      { name: 'Night Owls', description: '', logoKey: null, brandColor: '#9f1239' },
+    ])
+  })
+
+  it('waits for a whole colour code before using it', async () => {
+    serveSettings()
+    const { user } = renderApp(<SettingsTab slug="night-owls" />)
+
+    await user.type(await screen.findByLabelText('Colour code'), '#12')
+    expect(screen.getByRole('button', { name: 'Save changes' })).toBeDisabled()
+    await user.type(screen.getByLabelText('Colour code'), '3456')
+    expect(screen.getByRole('button', { name: 'Save changes' })).toBeEnabled()
   })
 })

@@ -64,13 +64,13 @@ describe('EventPage', () => {
     expect(order).toEqual({ items: [{ ticketTypeId: 'type-regular', quantity: 2 }], payWith: 'online' })
   })
 
-  it('offers paying with credit only when there is enough of it', async () => {
+  it('offers paying with tokens only when there are enough of them', async () => {
     serve(anEvent(), anOrganisation({ balanceCents: 500 }))
     const { user } = renderApp(<EventPage />, page)
 
     await user.click(await screen.findByRole('button', { name: 'More Regular' }))
 
-    expect(screen.getByRole('button', { name: /Pay with credit/ })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /Pay with tokens/ })).toBeDisabled()
   })
 
   it('tells the buyer when the tickets were sold in the meantime', async () => {

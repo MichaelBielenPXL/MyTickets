@@ -1,9 +1,9 @@
-import { money } from '@/utils/format'
+import { money, tokens } from '@/utils/format'
 
 type OrderBarProps = {
   ticketCount: number
   totalCents: number
-  /** The member's credit with this organisation. */
+  /** The member's tokens with this organisation, in cents (one token is one euro). */
   balanceCents: number
   busy: boolean
   onOrder: (payWith: 'online' | 'wallet') => void
@@ -30,7 +30,7 @@ export function OrderBar({ ticketCount, totalCents, balanceCents, busy, onOrder 
           disabled={busy || balanceCents < totalCents}
           onClick={() => onOrder('wallet')}
         >
-          Pay with credit ({money(balanceCents)})
+          Pay with tokens ({tokens(balanceCents)})
         </button>
       )}
     </section>

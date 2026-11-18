@@ -1,6 +1,10 @@
+import type { ReactNode } from 'react'
 import { NavLink } from 'react-router-dom'
 
 import type { Role } from '@/types'
+
+import { CalendarIcon, GearIcon, TicketIcon, TillIcon, WalletIcon } from './navIcons'
+import { workLabel } from './workLabel'
 
 type OrganisationTabsProps = {
   slug: string
@@ -10,18 +14,55 @@ type OrganisationTabsProps = {
   role: Role | null
 }
 
-/** The row of tabs under the header: the places this person can go within the current organisation. */
+/**
+ * On a phone, the places within the organisation sit in a tab bar along the bottom, as in iOS apps:
+ * in reach of a thumb, and the header stays small. Wide screens use the sidebar instead.
+ */
 export function OrganisationTabs({ slug, hasAccount, role }: OrganisationTabsProps) {
   return (
-    <nav className="header-tabs" aria-label="Organisation">
-      <NavLink to={`/${slug}`} end>
+    <nav className="tab-bar" aria-label="Organisation">
+      <Tab to={`/${slug}`} end icon={<CalendarIcon />}>
         Events
-      </NavLink>
-      {role && <NavLink to={`/${slug}/wallet`}>Wallet</NavLink>}
-      {hasAccount && <NavLink to={`/${slug}/tickets`}>Tickets</NavLink>}
-      {hasAccount && <NavLink to={`/${slug}/cards`}>Cards</NavLink>}
-      {role && role !== 'Member' && <NavLink to={`/${slug}/staff`}>Door &amp; bar</NavLink>}
-      {role === 'Admin' && <NavLink to={`/${slug}/admin`}>Manage</NavLink>}
+      </Tab>
+      {hasAccount && (
+        <Tab to={`/${slug}/wallet`} icon={<WalletIcon />}>
+          Wallet
+        </Tab>
+      )}
+      {hasAccount && (
+        <Tab to={`/${slug}/tickets`} icon={<TicketIcon />}>
+          Tickets
+        </Tab>
+      )}
+      {role && role !== 'Member' && (
+        <Tab to={`/${slug}/staff`} icon={<TillIcon />}>
+          {workLabel(role)}
+        </Tab>
+      )}
+      {role === 'Admin' && (
+        <Tab to={`/${slug}/admin`} icon={<GearIcon />}>
+          Manage
+        </Tab>
+      )}
     </nav>
+  )
+}
+
+function Tab({
+  to,
+  end,
+  icon,
+  children,
+}: {
+  to: string
+  end?: boolean
+  icon: ReactNode
+  children: ReactNode
+}) {
+  return (
+    <NavLink to={to} end={end} className="tab-bar-item">
+      <span aria-hidden="true">{icon}</span>
+      <span className="tab-bar-label">{children}</span>
+    </NavLink>
   )
 }

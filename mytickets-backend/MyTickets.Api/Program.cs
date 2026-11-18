@@ -40,13 +40,14 @@ builder.Services.AddScoped<MembershipService>();
 builder.Services.AddScoped<PaymentService>();
 builder.Services.AddHostedService<PaymentExpiryWorker>();
 
-var paymentProvider = builder.Configuration["Payments:Provider"] ?? FakePaymentProvider.ProviderName;
-if (paymentProvider != FakePaymentProvider.ProviderName)
-    throw new InvalidOperationException($"Unknown payment provider '{paymentProvider}'. Only '{FakePaymentProvider.ProviderName}' exists so far.");
-// The test checkout hands out tickets and credit without taking money, so it must never run on a live site by accident.
-if (!builder.Environment.IsDevelopment() && !builder.Configuration.GetValue<bool>("Payments:AllowFakeOutsideDevelopment"))
-    throw new InvalidOperationException("No real payment provider is configured. Refusing to start with the test checkout outside development.");
-builder.Services.AddSingleton<IPaymentProvider, FakePaymentProvider>();
+// Payments go through Stripe Connect with the platform's key (Stripe:SecretKey). Without it, buyers get the
+// test checkout on a developer's machine and can't pay online anywhere else.
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddHttpClient<StripeClient>(client =>
+{
+    client.BaseAddress = new Uri(builder.Configuration["Stripe:ApiUrl"] ?? "https://api.stripe.com/v1/");
+    client.Timeout = TimeSpan.FromSeconds(20);
+});
 
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme).AddCookie(options =>
 {
@@ -81,6 +82,21 @@ using (var scope = app.Services.CreateScope())
     await platform.Database.ExecuteSqlRawAsync("PRAGMA journal_mode=WAL;");
 }
 
+// A payment that can't be started is the buyer's business to know about, not an error page.
+app.Use(async (http, next) =>
+{
+    try { await next(); }
+    catch (PaymentsNotSetUpException e) when (!http.Response.HasStarted)
+    {
+        await Http.Error(409, e.Message).ExecuteAsync(http);
+    }
+    catch (StripeException e) when (!http.Response.HasStarted)
+    {
+        app.Logger.LogWarning("A Stripe request failed: {Message}", e.Message);
+        await Http.Error(502, "The payment could not be started. Nothing was charged. Try again in a moment.").ExecuteAsync(http);
+    }
+});
+
 app.UseRouting();
 app.UseRateLimiter();
 app.UseAuthentication();
@@ -114,6 +130,7 @@ app.MapOrgs();
 app.MapAdmin();
 app.MapStaff();
 app.MapImages();
+app.MapStripe();
 
 app.Run();
 

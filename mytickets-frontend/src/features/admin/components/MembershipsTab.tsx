@@ -1,9 +1,9 @@
 import { useState } from 'react'
 
-import { QueryResult } from '@/components'
+import { ErrorNote, QueryResult, SortableList } from '@/components'
 import { tierTerms } from '@/features/organisations'
 
-import { useAdminTiers } from '../api/admin'
+import { useAdminTiers, useReorderTiers } from '../api/admin'
 import type { AdminTier } from '../types'
 import { TierForm } from './TierForm'
 
@@ -14,12 +14,14 @@ type MembershipsTabProps = {
 export function MembershipsTab({ slug }: MembershipsTabProps) {
   const [editing, setEditing] = useState<AdminTier | 'new' | null>(null)
   const tiers = useAdminTiers(slug)
+  const reorder = useReorderTiers(slug)
 
   return (
     <div className="stack">
       <p className="muted">
         A membership type is a way to join. Make it free or paid, open to everyone or invite-only (people need
-        the code), and give it discounts on tickets and at the bar.
+        the code), and give it discounts on tickets and at the bar. Drag them into the order members see them
+        in.
       </p>
       {editing ? (
         <TierForm
@@ -35,12 +37,17 @@ export function MembershipsTab({ slug }: MembershipsTabProps) {
       )}
       <QueryResult query={tiers}>
         {(list) => (
-          <div className="list">
-            {list.map((tier) => (
-              <div key={tier.id} className={tier.archived ? 'list-item faded' : 'list-item'}>
-                <div>
+          <SortableList
+            items={list}
+            nameOf={(tier) => tier.name}
+            onReorder={(ids) => reorder.mutate(ids)}
+            renderItem={(tier, handle) => (
+              <div className={tier.archived ? 'list-item product-row faded' : 'list-item product-row'}>
+                {handle}
+                <div className="product-row-main">
                   <strong>{tier.name}</strong> <span className="tag">{tierTerms(tier)}</span>
                   {!tier.isPublic && <span className="tag">Invite-only</span>}
+                  {tier.requiresApproval && <span className="tag">Needs approval</span>}
                   {tier.archived && <span className="tag bad">Closed</span>}
                   <p className="muted">{tierFacts(tier)}</p>
                   {tier.inviteCode && (
@@ -53,10 +60,11 @@ export function MembershipsTab({ slug }: MembershipsTabProps) {
                   Edit
                 </button>
               </div>
-            ))}
-          </div>
+            )}
+          />
         )}
       </QueryResult>
+      <ErrorNote error={reorder.error} />
     </div>
   )
 }

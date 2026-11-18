@@ -6,14 +6,16 @@ namespace MyTickets.Api.Endpoints;
 
 public static class AdminEndpoints
 {
-    public record TierRequest(string? Name, string? Description, int PriceCents, int? DurationDays, bool IsPublic,
-        string? InviteCode, int TicketDiscountPercent, int DrinkDiscountPercent, bool Archived);
+    public record TierRequest(string? Name, string? Description, int PriceCents, DateOnly? EndsOn, bool IsPublic,
+        string? InviteCode, int TicketDiscountPercent, int DrinkDiscountPercent, bool Archived, bool RequiresApproval);
     public record MemberRequest(OrgRole Role, Guid TierId, DateTime? ExpiresAt);
     public record EventRequest(string? Name, string? Description, string? Location, DateTime StartsAt, DateTime? EndsAt, bool Published, string? ImageKey);
-    public record OrganisationRequest(string? Name, string? Description, string? LogoKey);
+    public record OrganisationRequest(string? Name, string? Description, string? LogoKey, string? BrandColor = null);
     public record TicketTypeRequest(string? Name, int PriceCents, int Capacity, int MaxPerUser, DateTime? SalesStartAt,
         DateTime? SalesEndAt, List<Guid>? AllowedTierIds);
-    public record ProductRequest(string? Name, int PriceCents, bool Active, int SortOrder, bool Returnable);
+    public record OrderRequest(List<Guid>? Ids);
+    public record ProductRequest(string? Name, int PriceCents, bool Active, int SortOrder, bool IsDeposit, Guid? DepositProductId, Guid? CategoryId = null, string? Color = null);
+    public record CategoryRequest(string? Name);
 
     private const int MaxPriceCents = 1_000_000;
 
@@ -26,12 +28,15 @@ public static class AdminEndpoints
             var org = http.Org().Org;
             var wallets = db.Wallets.Where(w => w.OrganisationId == org.Id);
             var ledger = db.WalletTransactions.Where(t => wallets.Any(w => w.Id == t.WalletId));
+            var bar = ledger.Where(t => t.Type == WalletTxType.Purchase || t.Type == WalletTxType.Return);
+            var depositsHeld = await bar.SumAsync(t => t.DepositCents);
             return Results.Ok(new
             {
                 Members = await db.Memberships.CountAsync(m => m.OrganisationId == org.Id),
                 CreditOutstandingCents = await wallets.SumAsync(w => w.BalanceCents),
-                // Deposits handed back come off what the bar took in.
-                BarRevenueCents = -await ledger.Where(t => t.Type == WalletTxType.Purchase || t.Type == WalletTxType.Return).SumAsync(t => t.AmountCents),
+                // Deposit money is held for guests until their cups come back, so it isn't takings.
+                BarRevenueCents = -await bar.SumAsync(t => t.AmountCents) - depositsHeld,
+                DepositsHeldCents = depositsHeld,
                 OnlineTopUpsCents = await ledger.Where(t => t.Type == WalletTxType.TopUp).SumAsync(t => t.AmountCents),
                 CashTopUpsCents = await ledger.Where(t => t.Type == WalletTxType.CashTopUp).SumAsync(t => t.AmountCents),
                 TicketRevenueCents = await db.Tickets
@@ -47,7 +52,7 @@ public static class AdminEndpoints
             var id = http.Org().Org.Id;
             // Read from the database, not the cache: this is what the edit form starts from.
             var o = await db.Organisations.AsNoTracking().FirstAsync(x => x.Id == id);
-            return Results.Ok(new { o.Slug, o.Name, o.Description, o.LogoKey, LogoUrl = Images.Url(o.LogoKey) });
+            return Results.Ok(new { o.Slug, o.Name, o.Description, o.LogoKey, LogoUrl = Images.Url(o.LogoKey), o.BrandColor });
         });
 
         admin.MapPut("/organisation", async (OrganisationRequest req, HttpContext http, AppDbContext db, PlatformDbContext platform, AppCache cache) =>
@@ -58,6 +63,8 @@ public static class AdminEndpoints
             var description = req.Description?.Trim() ?? "";
             if (description.Length > 500) return Http.Error(400, "Keep the description under 500 characters.");
             if (req.LogoKey is not null && !Images.BelongsTo(req.LogoKey, current.Id)) return Http.Error(400, "Upload the logo again.");
+            var brandColor = string.IsNullOrWhiteSpace(req.BrandColor) ? null : req.BrandColor.Trim().ToLowerInvariant();
+            if (brandColor is not null && !BrandColors.IsValid(brandColor)) return Http.Error(400, "Pick a colour like #4f46e5.");
 
             // Only a real rename moves the page; saving a new description or logo leaves the address alone.
             var slug = current.Slug;
@@ -85,43 +92,66 @@ public static class AdminEndpoints
             // ...and the organisation's own database keeps a copy for its tickets and payments to refer to.
             await db.Organisations.Where(o => o.Id == current.Id).ExecuteUpdateAsync(s => s
                 .SetProperty(o => o.Name, name).SetProperty(o => o.Slug, slug)
-                .SetProperty(o => o.Description, description).SetProperty(o => o.LogoKey, req.LogoKey));
+                .SetProperty(o => o.Description, description).SetProperty(o => o.LogoKey, req.LogoKey)
+                .SetProperty(o => o.BrandColor, brandColor));
             await cache.OrganisationChangedAsync(current.Slug);
             if (slug != current.Slug) await cache.OrganisationChangedAsync(slug);
             return Results.Ok(new { Slug = slug });
         });
 
         // ---- Membership types ----
+        admin.MapPut("/tiers/order", async (OrderRequest req, HttpContext http, AppDbContext db) =>
+        {
+            var orgId = http.Org().Org.Id;
+            var tiers = await db.MembershipTiers.Where(t => t.OrganisationId == orgId).ToListAsync();
+            if (Reorder(tiers, req.Ids, t => t.Id, (t, i) => t.SortOrder = i) is { } error) return error;
+            await db.SaveChangesAsync();
+            return Results.NoContent();
+        });
+
         admin.MapGet("/tiers", async (HttpContext http, AppDbContext db) =>
         {
             var org = http.Org().Org;
             var counts = await db.Memberships.Where(m => m.OrganisationId == org.Id).GroupBy(m => m.TierId)
                 .Select(g => new { g.Key, Count = g.Count() }).ToDictionaryAsync(g => g.Key, g => g.Count);
             var tiers = await db.MembershipTiers.AsNoTracking().Where(t => t.OrganisationId == org.Id)
-                .OrderBy(t => t.Archived).ThenBy(t => t.PriceCents).ThenBy(t => t.Name).ToListAsync();
+                .OrderBy(t => t.SortOrder).ThenBy(t => t.PriceCents).ThenBy(t => t.Name).ToListAsync();
             return Results.Ok(tiers.Select(t => new
             {
-                t.Id, t.Name, t.Description, t.PriceCents, t.DurationDays, t.IsPublic, t.InviteCode,
+                t.Id, t.Name, t.Description, t.PriceCents, t.EndsOn, t.IsPublic, t.InviteCode, t.RequiresApproval,
                 t.TicketDiscountPercent, t.DrinkDiscountPercent, t.Archived, Members = counts.GetValueOrDefault(t.Id),
             }));
         });
 
-        admin.MapPost("/tiers", async (TierRequest req, HttpContext http, AppDbContext db) =>
+        admin.MapPost("/tiers", async (TierRequest req, HttpContext http, AppDbContext db, IConfiguration config, TimeProvider clock) =>
         {
-            var tier = new MembershipTier { Id = Guid.NewGuid(), OrganisationId = http.Org().Org.Id, Name = "" };
-            if (await ApplyAsync(tier, req, db) is { } error) return error;
+            var orgId = http.Org().Org.Id;
+            // A new membership goes at the end of the list.
+            var last = await db.MembershipTiers.Where(t => t.OrganisationId == orgId).MaxAsync(t => (int?)t.SortOrder) ?? 0;
+            var tier = new MembershipTier { Id = Guid.NewGuid(), OrganisationId = orgId, Name = "", SortOrder = last + 1 };
+            if (await ApplyAsync(tier, req, db, MembershipService.LocalZone(config), clock.GetUtcNow().UtcDateTime) is { } error) return error;
             db.MembershipTiers.Add(tier);
             await db.SaveChangesAsync();
             return Results.Ok(new { tier.Id });
         });
 
-        admin.MapPut("/tiers/{id:guid}", async (Guid id, TierRequest req, HttpContext http, AppDbContext db) =>
+        admin.MapPut("/tiers/{id:guid}", async (Guid id, TierRequest req, HttpContext http, AppDbContext db, IConfiguration config, TimeProvider clock) =>
         {
             var orgId = http.Org().Org.Id;
             var tier = await db.MembershipTiers.FirstOrDefaultAsync(t => t.Id == id && t.OrganisationId == orgId);
             if (tier is null) return Http.Error(404, "Membership type not found.");
-            if (await ApplyAsync(tier, req, db) is { } error) return error;
+            var zone = MembershipService.LocalZone(config);
+            var oldExpiry = tier.ExpiresAt(zone);
+            if (await ApplyAsync(tier, req, db, zone, clock.GetUtcNow().UtcDateTime) is { } error) return error;
+            await using var tx = await db.Database.BeginTransactionAsync();
             await db.SaveChangesAsync();
+            // Moving the end date (say, the season got longer) moves it for everyone who got it from this type.
+            // Members whose date an admin set by hand keep theirs.
+            var newExpiry = tier.ExpiresAt(zone);
+            if (newExpiry != oldExpiry)
+                await db.Memberships.Where(m => m.TierId == tier.Id && m.ExpiresAt == oldExpiry)
+                    .ExecuteUpdateAsync(u => u.SetProperty(m => m.ExpiresAt, newExpiry));
+            await tx.CommitAsync();
             return Results.NoContent();
         });
 
@@ -139,6 +169,8 @@ public static class AdminEndpoints
                 {
                     m.Id, m.User.DisplayName, m.User.Email, m.Role, m.TierId, Tier = m.Tier.Name, m.JoinedAt, m.ExpiresAt,
                     BalanceCents = w == null ? 0 : w.BalanceCents,
+                    m.User.FirstName, m.User.LastName, m.User.Phone, m.User.Street, m.User.PostalCode, m.User.City,
+                    m.User.School, m.User.Faculty, m.User.StudyYear,
                 }).ToListAsync();
             return Results.Ok(members);
         });
@@ -159,6 +191,55 @@ public static class AdminEndpoints
             member.ExpiresAt = Http.Utc(req.ExpiresAt);
             await db.SaveChangesAsync();
             return Results.NoContent();
+        });
+
+        // ---- Requests for memberships that need approval ----
+        admin.MapGet("/requests", async (AppDbContext db) =>
+            Results.Ok(await db.MembershipRequests.AsNoTracking()
+                .Where(r => r.Status == RequestStatus.Pending || r.Status == RequestStatus.Approved)
+                .OrderBy(r => r.Status).ThenBy(r => r.CreatedAt)
+                .Select(r => new
+                {
+                    r.Id, r.Status, r.CreatedAt, r.TierId, Tier = r.Tier.Name, PriceCents = r.Tier.PriceCents,
+                    r.User.DisplayName, r.User.Email, r.User.FirstName, r.User.LastName, r.User.Phone, r.User.Street,
+                    r.User.PostalCode, r.User.City, r.User.School, r.User.Faculty, r.User.StudyYear,
+                }).ToListAsync()));
+
+        // Approving a free membership starts it straight away; a paid one waits for the member to pay.
+        admin.MapPost("/requests/{id:guid}/approve", async (Guid id, HttpContext http, AppDbContext db, MembershipService memberships, TimeProvider clock) =>
+        {
+            var request = await db.MembershipRequests.Include(r => r.Tier).FirstOrDefaultAsync(r => r.Id == id && r.Status == RequestStatus.Pending);
+            if (request is null) return Http.Error(404, "This request was already handled.");
+            request.Status = RequestStatus.Approved;
+            request.DecidedAt = clock.GetUtcNow().UtcDateTime;
+            request.DecidedByUserId = http.User.UserId();
+            await using var tx = await db.Database.BeginTransactionAsync();
+            await db.SaveChangesAsync();
+            if (request.Tier.PriceCents == 0) await memberships.ApplyTierAsync(request.UserId, http.Org().Org.Id, request.Tier);
+            await tx.CommitAsync();
+            return Results.Ok(new { Started = request.Tier.PriceCents == 0 });
+        });
+
+        admin.MapPost("/requests/{id:guid}/reject", async (Guid id, HttpContext http, AppDbContext db, TimeProvider clock) =>
+        {
+            var rows = await db.MembershipRequests.Where(r => r.Id == id && (r.Status == RequestStatus.Pending || r.Status == RequestStatus.Approved))
+                .ExecuteUpdateAsync(u => u.SetProperty(r => r.Status, RequestStatus.Rejected)
+                    .SetProperty(r => r.DecidedAt, clock.GetUtcNow().UtcDateTime).SetProperty(r => r.DecidedByUserId, http.User.UserId()));
+            return rows == 0 ? Http.Error(404, "This request was already handled.") : Results.NoContent();
+        });
+
+        // ---- Which details are asked from members ----
+        admin.MapGet("/member-fields", async (AppDbContext db) =>
+            Results.Ok(ProfileFields.Read(await db.Organisations.AsNoTracking().FirstAsync())));
+
+        admin.MapPut("/member-fields", async (Dictionary<string, FieldMode> modes, AppDbContext db) =>
+        {
+            if (modes.Keys.Any(k => !ProfileFields.Configurable.Contains(k)) || modes.Values.Any(m => !Enum.IsDefined(m)))
+                return Http.Error(400, "Unknown detail.");
+            var organisation = await db.Organisations.FirstAsync();
+            organisation.ProfileFieldsJson = ProfileFields.Write(modes);
+            await db.SaveChangesAsync();
+            return Results.Ok(ProfileFields.Read(organisation));
         });
 
         // ---- Events and their tickets ----
@@ -231,15 +312,98 @@ public static class AdminEndpoints
         {
             var orgId = http.Org().Org.Id;
             return Results.Ok(await db.Products.AsNoTracking().Where(p => p.OrganisationId == orgId)
-                .OrderByDescending(p => p.Active).ThenBy(p => p.SortOrder).ThenBy(p => p.Name)
-                .Select(p => new { p.Id, p.Name, p.PriceCents, p.Active, p.SortOrder, p.Returnable }).ToListAsync());
+                .OrderBy(p => p.SortOrder).ThenBy(p => p.Name)
+                .Select(p => new { p.Id, p.Name, p.PriceCents, p.Active, p.SortOrder, p.IsDeposit, p.DepositProductId, p.CategoryId, p.Color }).ToListAsync());
+        });
+
+        // ---- Tabs at the till ----
+        admin.MapGet("/categories", async (HttpContext http, AppDbContext db) =>
+        {
+            var orgId = http.Org().Org.Id;
+            return Results.Ok(await db.ProductCategories.AsNoTracking().Where(c => c.OrganisationId == orgId)
+                .OrderBy(c => c.SortOrder).ThenBy(c => c.Name).Select(c => new { c.Id, c.Name }).ToListAsync());
+        });
+
+        admin.MapPost("/categories", async (CategoryRequest req, HttpContext http, AppDbContext db, AppCache cache) =>
+        {
+            var orgId = http.Org().Org.Id;
+            if (BadName(req.Name)) return Http.Error(400, "Give the category a name.");
+            var last = await db.ProductCategories.Where(c => c.OrganisationId == orgId).MaxAsync(c => (int?)c.SortOrder) ?? 0;
+            var category = new ProductCategory { Id = Guid.NewGuid(), OrganisationId = orgId, Name = req.Name!.Trim(), SortOrder = last + 1 };
+            db.ProductCategories.Add(category);
+            await db.SaveChangesAsync();
+            await cache.ProductsChangedAsync(orgId);
+            return Results.Ok(new { category.Id });
+        });
+
+        admin.MapPut("/categories/{id:guid}", async (Guid id, CategoryRequest req, HttpContext http, AppDbContext db, AppCache cache) =>
+        {
+            var orgId = http.Org().Org.Id;
+            var category = await db.ProductCategories.FirstOrDefaultAsync(c => c.Id == id && c.OrganisationId == orgId);
+            if (category is null) return Http.Error(404, "Category not found.");
+            if (BadName(req.Name)) return Http.Error(400, "Give the category a name.");
+            category.Name = req.Name!.Trim();
+            await db.SaveChangesAsync();
+            await cache.ProductsChangedAsync(orgId);
+            return Results.NoContent();
+        });
+
+        // Its items stay on the menu, under "Other".
+        admin.MapDelete("/categories/{id:guid}", async (Guid id, HttpContext http, AppDbContext db, AppCache cache) =>
+        {
+            var orgId = http.Org().Org.Id;
+            var category = await db.ProductCategories.FirstOrDefaultAsync(c => c.Id == id && c.OrganisationId == orgId);
+            if (category is null) return Http.Error(404, "Category not found.");
+            await using var tx = await db.Database.BeginTransactionAsync();
+            await db.Products.Where(p => p.CategoryId == id).ExecuteUpdateAsync(s => s.SetProperty(p => p.CategoryId, (Guid?)null));
+            db.ProductCategories.Remove(category);
+            await db.SaveChangesAsync();
+            await tx.CommitAsync();
+            await cache.ProductsChangedAsync(orgId);
+            return Results.NoContent();
+        });
+
+        admin.MapPut("/categories/order", async (OrderRequest req, HttpContext http, AppDbContext db, AppCache cache) =>
+        {
+            var orgId = http.Org().Org.Id;
+            var categories = await db.ProductCategories.Where(c => c.OrganisationId == orgId).ToListAsync();
+            if (Reorder(categories, req.Ids, c => c.Id, (c, i) => c.SortOrder = i) is { } error) return error;
+            await db.SaveChangesAsync();
+            await cache.ProductsChangedAsync(orgId);
+            return Results.NoContent();
+        });
+
+        // The admin drags items into the order the bar app shows them in.
+        admin.MapPut("/products/order", async (OrderRequest req, HttpContext http, AppDbContext db, AppCache cache) =>
+        {
+            var orgId = http.Org().Org.Id;
+            var products = await db.Products.Where(p => p.OrganisationId == orgId).ToListAsync();
+            if (Reorder(products, req.Ids, p => p.Id, (p, i) => p.SortOrder = i) is { } error) return error;
+            await db.SaveChangesAsync();
+            await cache.ProductsChangedAsync(orgId);
+            return Results.NoContent();
+        });
+
+        // Past sales keep their description, so an item can go without losing history. A deposit that drinks
+        // still come with can't: the till would stop charging for the cups.
+        admin.MapDelete("/products/{id:guid}", async (Guid id, HttpContext http, AppDbContext db, AppCache cache) =>
+        {
+            var orgId = http.Org().Org.Id;
+            var product = await db.Products.FirstOrDefaultAsync(p => p.Id == id && p.OrganisationId == orgId);
+            if (product is null) return Http.Error(404, "Product not found.");
+            if (await db.Products.AnyAsync(p => p.DepositProductId == id))
+                return Http.Error(409, $"Drinks still come with \"{product.Name}\". Choose another deposit for them first.");
+            db.Products.Remove(product);
+            await db.SaveChangesAsync();
+            await cache.ProductsChangedAsync(orgId);
+            return Results.NoContent();
         });
 
         admin.MapPost("/products", async (ProductRequest req, HttpContext http, AppDbContext db, AppCache cache) =>
         {
             var orgId = http.Org().Org.Id;
             var product = new Product { Id = Guid.NewGuid(), OrganisationId = orgId, Name = "" };
-            if (Apply(product, req) is { } error) return error;
+            if ((Apply(product, req) ?? await CheckDepositAsync(db, product)) is { } error) return error;
             db.Products.Add(product);
             await db.SaveChangesAsync();
             await cache.ProductsChangedAsync(orgId);
@@ -251,7 +415,7 @@ public static class AdminEndpoints
             var orgId = http.Org().Org.Id;
             var product = await db.Products.FirstOrDefaultAsync(p => p.Id == id && p.OrganisationId == orgId);
             if (product is null) return Http.Error(404, "Product not found.");
-            if (Apply(product, req) is { } error) return error;
+            if ((Apply(product, req) ?? await CheckDepositAsync(db, product)) is { } error) return error;
             await db.SaveChangesAsync();
             await cache.ProductsChangedAsync(orgId);
             return Results.NoContent();
@@ -262,11 +426,15 @@ public static class AdminEndpoints
     private static bool BadPrice(int cents) => cents is < 0 or > MaxPriceCents;
     private static bool BadPercent(int p) => p is < 0 or > 100;
 
-    private static async Task<IResult?> ApplyAsync(MembershipTier tier, TierRequest req, AppDbContext db)
+    private static async Task<IResult?> ApplyAsync(MembershipTier tier, TierRequest req, AppDbContext db, TimeZoneInfo zone, DateTime now)
     {
         if (BadName(req.Name)) return Http.Error(400, "Give the membership type a name.");
         if (BadPrice(req.PriceCents)) return Http.Error(400, "Invalid price.");
-        if (req.DurationDays is < 1 or > 3660) return Http.Error(400, "Duration must be between 1 day and 10 years, or empty for no end date.");
+        // A date in the past is only allowed when it is already the date (an admin editing an ended type's name).
+        var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(now, zone));
+        if (req.EndsOn is { } endsOn && endsOn < today && endsOn != tier.EndsOn)
+            return Http.Error(400, "Choose an end date that is today or later.");
+        if (req.EndsOn is { } far && far > today.AddYears(10)) return Http.Error(400, "Choose an end date within the next ten years.");
         if (BadPercent(req.TicketDiscountPercent) || BadPercent(req.DrinkDiscountPercent)) return Http.Error(400, "A discount is between 0 and 100 percent.");
         var code = string.IsNullOrWhiteSpace(req.InviteCode) ? null : req.InviteCode.Trim();
         if (code is { Length: < 4 or > 40 }) return Http.Error(400, "An invite code is 4 to 40 characters.");
@@ -278,12 +446,13 @@ public static class AdminEndpoints
         tier.Name = req.Name!.Trim();
         tier.Description = req.Description?.Trim() ?? "";
         tier.PriceCents = req.PriceCents;
-        tier.DurationDays = req.DurationDays;
+        tier.EndsOn = req.EndsOn;
         tier.IsPublic = req.IsPublic;
         tier.InviteCode = code;
         tier.TicketDiscountPercent = req.TicketDiscountPercent;
         tier.DrinkDiscountPercent = req.DrinkDiscountPercent;
         tier.Archived = req.Archived;
+        tier.RequiresApproval = req.RequiresApproval;
         return null;
     }
 
@@ -335,7 +504,41 @@ public static class AdminEndpoints
         product.PriceCents = req.PriceCents;
         product.Active = req.Active;
         product.SortOrder = req.SortOrder;
-        product.Returnable = req.Returnable;
+        if (req.Color is not null && !ProductColors.All.Contains(req.Color)) return Http.Error(400, "Pick one of the colours.");
+        product.IsDeposit = req.IsDeposit;
+        product.Color = req.Color;
+        // Deposits aren't on the tiles, so they don't sit in a tab.
+        product.CategoryId = req.IsDeposit ? null : req.CategoryId;
+        // A deposit doesn't come with another deposit.
+        product.DepositProductId = req.IsDeposit ? null : req.DepositProductId;
+        return null;
+    }
+
+    /// <summary>
+    /// Puts items in the order given. Items left out (added on another screen meanwhile) keep their place after the rest.
+    /// </summary>
+    private static IResult? Reorder<T>(List<T> items, List<Guid>? ids, Func<T, Guid> idOf, Action<T, int> setOrder)
+    {
+        if (ids is null || ids.Count == 0 || ids.Distinct().Count() != ids.Count) return Http.Error(400, "Send the new order.");
+        var byId = items.ToDictionary(idOf);
+        if (ids.Any(id => !byId.ContainsKey(id))) return Http.Error(409, "The list has changed. Reload and try again.");
+        for (var i = 0; i < ids.Count; i++) setOrder(byId[ids[i]], i + 1);
+        var next = ids.Count;
+        foreach (var rest in items.Where(t => !ids.Contains(idOf(t)))) setOrder(rest, ++next);
+        return null;
+    }
+
+    /// <summary>A drink can only come with one of this organisation's deposits, and a deposit drinks come with stays one.</summary>
+    private static async Task<IResult?> CheckDepositAsync(AppDbContext db, Product product)
+    {
+        if (product.CategoryId is { } categoryId &&
+            !await db.ProductCategories.AnyAsync(c => c.Id == categoryId && c.OrganisationId == product.OrganisationId))
+            return Http.Error(400, "Choose one of your categories.");
+        if (product.DepositProductId is { } depositId &&
+            !await db.Products.AnyAsync(p => p.Id == depositId && p.OrganisationId == product.OrganisationId && p.IsDeposit))
+            return Http.Error(400, "Choose one of your deposits.");
+        if (!product.IsDeposit && await db.Products.AnyAsync(p => p.DepositProductId == product.Id))
+            return Http.Error(409, $"Drinks still come with \"{product.Name}\". Choose another deposit for them first.");
         return null;
     }
 }

@@ -46,14 +46,18 @@ export function UserMenu({ me, account }: UserMenuProps) {
               <Link to={`/${account.slug}/tickets`} className="menu-item" onClick={close}>
                 My tickets
               </Link>
-              <Link to={`/${account.slug}/cards`} className="menu-item" onClick={close}>
-                My cards
+              <Link to={`/${account.slug}/wallet`} className="menu-item" onClick={close}>
+                My wallet
+              </Link>
+              <Link to={`/${account.slug}/profile`} className="menu-item" onClick={close}>
+                My details
               </Link>
             </>
           )}
           <Link to="/discover" className="menu-item" onClick={close}>
             Browse organisations
           </Link>
+
           <div className="menu-separator" />
           {account && signedInElsewhere && (
             <button

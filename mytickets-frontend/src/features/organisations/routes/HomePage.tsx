@@ -20,7 +20,7 @@ export function HomePage() {
       <header className="page-heading">
         <div>
           <h1>Organisations</h1>
-          <p className="lead">Join an organisation to buy its tickets and get a credit wallet there.</p>
+          <p className="lead">Join an organisation to buy its tickets and get a token wallet there.</p>
         </div>
         {me?.canCreateOrganisations && !creating && (
           <button className="btn" onClick={() => setCreating(true)}>

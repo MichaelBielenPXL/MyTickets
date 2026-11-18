@@ -6,11 +6,30 @@ import type { Payment } from '../types'
 
 export const paymentKeys = { detail: (slug: string, id: string) => ['payment', slug, id] as const }
 
-export function usePayment(slug: string, id: string) {
+/**
+ * One payment, as its buyer sees it. Back from Stripe, it asks Stripe how it went (rather than waiting
+ * for Stripe to tell us) and keeps asking every couple of seconds while the bank is still confirming.
+ */
+export function usePayment(slug: string, id: string, cancelled = false) {
+  const queryClient = useQueryClient()
   return useQuery({
-    queryKey: paymentKeys.detail(slug, id),
-    queryFn: () => api.get<Payment>(`/orgs/${slug}/payments/${id}`),
+    queryKey: [...paymentKeys.detail(slug, id), cancelled],
+    queryFn: async () => {
+      // Back from Stripe without paying: close Stripe's page, so it can't be paid later in another tab.
+      const action = cancelled ? 'cancel' : 'refresh'
+      const payment = await api.post<Payment>(`/orgs/${slug}/payments/${id}/${action}`)
+      // A finished payment may have changed tickets, credit or membership: let those pages load afresh.
+      if (payment.status !== 'Pending')
+        await queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] !== 'payment' })
+      return payment
+    },
     staleTime: 0,
+    refetchInterval: (query) =>
+      query.state.data?.status === 'Pending' &&
+      query.state.data.provider !== 'Fake' &&
+      query.state.dataUpdateCount < 30
+        ? 2000
+        : false,
   })
 }
 

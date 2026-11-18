@@ -1,61 +1,181 @@
-import { useState } from 'react'
+import { type FormEvent, type ReactNode, useState } from 'react'
 
-import { ErrorNote } from '@/components'
-import { euroInput, parseEuro } from '@/utils/format'
+import { ErrorNote, Field } from '@/components'
+import { euroInput, money, parseEuro } from '@/utils/format'
+import { tileFill } from '@/utils/tileColors'
 
-import { useSaveProduct } from '../api/admin'
-import type { Product } from '../types'
+import { useDeleteProduct, useSaveProduct } from '../api/admin'
+import type { Category, Product } from '../types'
+import { CategoryChoice } from './CategoryChoice'
+import { ColourPicker } from './ColourPicker'
+import { DepositChoice } from './DepositChoice'
 
 type ProductRowProps = {
   slug: string
   product: Product
+  /** The organisation's deposits, for choosing which one a drink comes with. */
+  deposits: Product[]
+  categories: Category[]
+  /** The drag handle that moves the row. */
+  handle: ReactNode
 }
 
-/** One line of the bar menu: change the price, or take it off the menu and put it back. */
-export function ProductRow({ slug, product }: ProductRowProps) {
-  const [price, setPrice] = useState(euroInput(product.priceCents))
-  const [problem, setProblem] = useState('')
+/** One line of the bar menu: move it, hide it, or open it to change or delete it. */
+export function ProductRow({ slug, product, deposits, categories, handle }: ProductRowProps) {
+  const [editing, setEditing] = useState(false)
   const save = useSaveProduct(slug)
+  const deposit = deposits.find((d) => d.id === product.depositProductId)
 
-  const typedCents = parseEuro(price)
-  const priceChanged = typedCents !== product.priceCents
-
-  function saveWith(changes: Partial<Product>) {
-    if (typedCents === null) return setProblem('Enter prices like 12,50.')
-    setProblem('')
-    const { id, ...current } = product
-    save.mutate({ id, product: { ...current, priceCents: typedCents, ...changes } })
-  }
+  if (editing)
+    return (
+      <ProductEditor
+        slug={slug}
+        product={product}
+        deposits={deposits}
+        categories={categories}
+        onDone={() => setEditing(false)}
+      />
+    )
 
   return (
-    <div className={product.active ? 'list-item' : 'list-item faded'}>
-      <div>
-        <strong>{product.name}</strong> {product.returnable && <span className="tag">Deposit</span>}
-        {!product.active && <span className="tag">Off the menu</span>}
-        <ErrorNote>{problem}</ErrorNote>
+    <div className={product.active ? 'list-item product-row' : 'list-item product-row faded'}>
+      {handle}
+      {!product.isDeposit && (
+        <span className="tile-dot" style={{ background: tileFill(product.color) }} aria-hidden="true" />
+      )}
+      <div className="product-row-main">
+        <strong>{product.name}</strong>
+        <span className="product-row-price">{money(product.priceCents)}</span>
+        {deposit && (
+          <span className="tag">
+            + {money(deposit.priceCents)} {deposit.name}
+          </span>
+        )}
+        {!product.active && <span className="tag">Hidden</span>}
         <ErrorNote error={save.error} />
       </div>
       <div className="row">
-        <input
-          className="price"
-          inputMode="decimal"
-          value={price}
-          onChange={(e) => setPrice(e.target.value)}
-          aria-label={`Price of ${product.name}`}
-        />
-        {priceChanged && (
-          <button className="btn primary small" disabled={save.isPending} onClick={() => saveWith({})}>
-            Save
-          </button>
-        )}
         <button
           className="btn small"
           disabled={save.isPending}
-          onClick={() => saveWith({ active: !product.active })}
+          onClick={() => {
+            const { id, ...current } = product
+            save.mutate({ id, product: { ...current, active: !product.active } })
+          }}
         >
           {product.active ? 'Hide' : 'Show'}
         </button>
+        <button className="btn small" onClick={() => setEditing(true)}>
+          Edit
+        </button>
       </div>
     </div>
+  )
+}
+
+type ProductEditorProps = {
+  slug: string
+  product: Product
+  deposits: Product[]
+  categories: Category[]
+  onDone: () => void
+}
+
+function ProductEditor({ slug, product, deposits, categories, onDone }: ProductEditorProps) {
+  const [name, setName] = useState(product.name)
+  const [price, setPrice] = useState(euroInput(product.priceCents))
+  const [depositId, setDepositId] = useState(product.depositProductId)
+  const [categoryId, setCategoryId] = useState(product.categoryId)
+  const [color, setColor] = useState(product.color)
+  const [problem, setProblem] = useState('')
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const save = useSaveProduct(slug)
+  const remove = useDeleteProduct(slug)
+
+  function submit(event: FormEvent) {
+    event.preventDefault()
+    const priceCents = parseEuro(price)
+    if (priceCents === null) return setProblem('Enter prices like 12,50.')
+    setProblem('')
+    const { id, ...current } = product
+    save.mutate(
+      {
+        id,
+        product: {
+          ...current,
+          name: name.trim(),
+          priceCents,
+          depositProductId: depositId,
+          categoryId,
+          color,
+        },
+      },
+      { onSuccess: onDone },
+    )
+  }
+
+  return (
+    <form onSubmit={submit} className="list-item product-editor stack" aria-label={`Edit ${product.name}`}>
+      <div className="grid-2">
+        <Field label="Name">
+          <input value={name} onChange={(e) => setName(e.target.value)} required maxLength={80} />
+        </Field>
+        <Field label={product.isDeposit ? 'Deposit in euro' : 'Price in euro'}>
+          <input inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} required />
+        </Field>
+        {!product.isDeposit && (
+          <>
+            <Field label="Category">
+              <CategoryChoice categories={categories} value={categoryId} onChange={setCategoryId} />
+            </Field>
+            <Field label="Comes with">
+              <DepositChoice deposits={deposits} value={depositId} onChange={setDepositId} />
+            </Field>
+          </>
+        )}
+      </div>
+      {!product.isDeposit && <ColourPicker value={color} onChange={setColor} />}
+      <ErrorNote>{problem}</ErrorNote>
+      <ErrorNote error={save.error ?? remove.error} />
+      {confirmingDelete ? (
+        <div className="confirm-delete">
+          <span>
+            Delete {product.name}? Past sales keep their history.
+            {product.isDeposit && ' Cups still out can no longer be handed back for it.'}
+          </span>
+          <div className="row">
+            <button
+              type="button"
+              className="btn danger small"
+              disabled={remove.isPending}
+              onClick={() => remove.mutate(product.id)}
+            >
+              Delete
+            </button>
+            <button type="button" className="btn small" onClick={() => setConfirmingDelete(false)}>
+              Keep it
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="spread">
+          <div className="row">
+            <button className="btn primary small" disabled={save.isPending}>
+              Save
+            </button>
+            <button type="button" className="btn small" onClick={onDone}>
+              Cancel
+            </button>
+          </div>
+          <button
+            type="button"
+            className="btn link danger-text small"
+            onClick={() => setConfirmingDelete(true)}
+          >
+            Delete
+          </button>
+        </div>
+      )}
+    </form>
   )
 }

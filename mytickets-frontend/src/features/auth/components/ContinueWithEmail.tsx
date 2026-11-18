@@ -35,17 +35,18 @@ export function ContinueWithEmail({ slug, organisationName, search = '' }: Conti
   }
 
   return (
-    <form onSubmit={submit} className="panel stack continue-form">
-      <div>
-        <h2>Tickets and credit at {organisationName}</h2>
-        <p className="muted">Enter your email address to continue.</p>
-      </div>
+    // The organisation's logo and name sit above this; the form is just the address.
+    <form
+      onSubmit={submit}
+      className="panel stack continue-form"
+      aria-label={`Sign in at ${organisationName}`}
+    >
       <Field label="Email">
         <input
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          autoComplete="email"
+          autoComplete="username"
           placeholder="you@example.com"
           required
         />

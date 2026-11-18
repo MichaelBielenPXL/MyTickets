@@ -24,33 +24,33 @@ public class WalletService(AppDbContext db, TimeProvider clock)
         db.Wallets.Where(w => w.Id == walletId).Select(w => w.BalanceCents).FirstAsync();
 
     public async Task CreditAsync(Guid walletId, int amountCents, WalletTxType type, string description,
-        Guid? performedBy = null, Guid? paymentId = null, Guid? requestId = null)
+        Guid? performedBy = null, Guid? paymentId = null, Guid? requestId = null, int depositCents = 0)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(amountCents);
         await db.Wallets.Where(w => w.Id == walletId)
             .ExecuteUpdateAsync(s => s.SetProperty(w => w.BalanceCents, w => w.BalanceCents + amountCents));
-        await AddLedgerRowAsync(walletId, amountCents, type, description, performedBy, paymentId, requestId);
+        await AddLedgerRowAsync(walletId, amountCents, type, description, performedBy, paymentId, requestId, depositCents);
     }
 
     /// <summary>Takes credit off the wallet. Returns false, changing nothing, when the balance is too low.</summary>
     public async Task<bool> TryDebitAsync(Guid walletId, int amountCents, WalletTxType type, string description,
-        Guid? performedBy = null, Guid? requestId = null)
+        Guid? performedBy = null, Guid? requestId = null, int depositCents = 0)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(amountCents);
         var rows = await db.Wallets.Where(w => w.Id == walletId && w.BalanceCents >= amountCents)
             .ExecuteUpdateAsync(s => s.SetProperty(w => w.BalanceCents, w => w.BalanceCents - amountCents));
         if (rows == 0) return false;
-        await AddLedgerRowAsync(walletId, -amountCents, type, description, performedBy, null, requestId);
+        await AddLedgerRowAsync(walletId, -amountCents, type, description, performedBy, null, requestId, depositCents);
         return true;
     }
 
     private async Task AddLedgerRowAsync(Guid walletId, int amount, WalletTxType type, string description,
-        Guid? performedBy, Guid? paymentId, Guid? requestId)
+        Guid? performedBy, Guid? paymentId, Guid? requestId, int depositCents)
     {
         db.WalletTransactions.Add(new WalletTransaction
         {
             Id = Guid.NewGuid(), WalletId = walletId, AmountCents = amount, Type = type, Description = description,
-            PerformedByUserId = performedBy, PaymentId = paymentId, RequestId = requestId,
+            PerformedByUserId = performedBy, PaymentId = paymentId, RequestId = requestId, DepositCents = depositCents,
             CreatedAt = clock.GetUtcNow().UtcDateTime,
         });
         await db.SaveChangesAsync();

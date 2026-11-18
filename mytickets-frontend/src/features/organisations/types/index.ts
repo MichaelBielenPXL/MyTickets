@@ -34,16 +34,57 @@ export interface Organisation {
   name: string
   description: string
   logoUrl: string | null
+  /** The organisation's own colour as "#rrggbb", or null for the house colour. */
+  brandColor: string | null
   /** Null when the signed-in person has not joined. */
   membership: MyMembership | null
   balanceCents: number | null
   tiers: Tier[]
   hasInviteOnlyTiers: boolean
   events: UpcomingEvent[]
+  /** An open request for a membership that needs approval, if any. */
+  request: MembershipRequest | null
+  /** Whether the details this organisation asks for are filled in. */
+  profileComplete: boolean
 }
 
-/** Either you are in, or you have to pay first at this address. */
+export interface MembershipRequest {
+  id: string
+  tierId: string
+  tier: string
+  /** Pending: waiting for an admin. Approved: ready to start (after paying, if paid). Rejected: not this time. */
+  status: 'Pending' | 'Approved' | 'Rejected'
+  createdAt: string
+}
+
+/** Whether a detail is asked: not at all, if people want to give it, or always. */
+export type FieldMode = 'Off' | 'Optional' | 'Required'
+
+/** The details an organisation can ask for besides first and last name. */
+export type ProfileFieldName = 'phone' | 'address' | 'school' | 'faculty' | 'studyYear'
+
+export interface ProfileValues {
+  firstName: string | null
+  lastName: string | null
+  phone: string | null
+  street: string | null
+  postalCode: string | null
+  city: string | null
+  school: string | null
+  faculty: string | null
+  studyYear: string | null
+}
+
+export interface ProfileForm {
+  fields: Record<ProfileFieldName, FieldMode>
+  profile: ProfileValues
+  complete: boolean
+  email: string
+}
+
+/** You are in; or you have to pay first at this address; or an admin has to approve you first. */
 export interface JoinResult {
   joined: boolean
+  pending: boolean
   checkoutUrl: string | null
 }

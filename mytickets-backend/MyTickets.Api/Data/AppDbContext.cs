@@ -16,7 +16,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<TicketType> TicketTypes => Set<TicketType>();
     public DbSet<Ticket> Tickets => Set<Ticket>();
     public DbSet<Product> Products => Set<Product>();
+    public DbSet<ProductCategory> ProductCategories => Set<ProductCategory>();
     public DbSet<Payment> Payments => Set<Payment>();
+    public DbSet<StripeAccount> StripeAccounts => Set<StripeAccount>();
+    public DbSet<MembershipRequest> MembershipRequests => Set<MembershipRequest>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder b)
     {
@@ -44,7 +47,15 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         b.Entity<Ticket>().HasIndex(x => new { x.EventId, x.UserId });
         b.Entity<Ticket>().HasIndex(x => x.PaymentId);
         b.Entity<Product>().HasIndex(x => x.OrganisationId);
+        b.Entity<ProductCategory>().HasIndex(x => x.OrganisationId);
+        // The column predates deposits being their own kind of item.
+        b.Entity<Product>().Property(x => x.IsDeposit).HasColumnName("Returnable");
         b.Entity<Payment>().HasIndex(x => new { x.Status, x.CreatedAt });
+        b.Entity<Payment>().HasIndex(x => x.ProviderReference);
+        b.Entity<StripeAccount>().HasKey(x => x.OrganisationId);
+        b.Entity<MembershipRequest>().HasIndex(x => new { x.Status, x.CreatedAt });
+        b.Entity<MembershipRequest>().HasIndex(x => new { x.UserId, x.TierId });
+        b.Entity<MembershipRequest>().HasOne(x => x.Tier).WithMany().OnDelete(DeleteBehavior.Restrict);
     }
 }
 

@@ -17,7 +17,7 @@ describe('TopUpForm', () => {
 
     await user.clear(screen.getByLabelText('Amount in euro'))
     await user.type(screen.getByLabelText('Amount in euro'), '2')
-    await user.click(screen.getByRole('button', { name: 'Top up' }))
+    await user.click(screen.getByRole('button', { name: /^Pay/ }))
 
     expect(screen.getByRole('alert')).toHaveTextContent(/between € 5,00 and € 500,00/)
   })
@@ -35,7 +35,7 @@ describe('TopUpForm', () => {
     await user.click(screen.getByRole('button', { name: '€40' }))
     await user.clear(screen.getByLabelText('Amount in euro'))
     await user.type(screen.getByLabelText('Amount in euro'), '12,50')
-    await user.click(screen.getByRole('button', { name: 'Top up' }))
+    await user.click(screen.getByRole('button', { name: /^Pay €\s12,50 for 12,50 tokens$/ }))
 
     expect(await screen.findByText('Now at /checkout/pay-3')).toBeInTheDocument()
     expect(sent).toEqual({ amountCents: 1250 })

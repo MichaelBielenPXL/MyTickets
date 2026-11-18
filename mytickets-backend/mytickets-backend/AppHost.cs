@@ -26,6 +26,14 @@ var api = builder.AddProject<Projects.MyTickets_Api>("api")
     .WaitFor(storage)
     .WithHttpHealthCheck("/health");
 
+// The platform's Stripe keys, kept out of the code in this project's user secrets (run in this folder):
+//   dotnet user-secrets set Stripe:SecretKey sk_test_...
+//   dotnet user-secrets set Stripe:WebhookSecret whsec_...   (from "stripe listen" or the Stripe dashboard)
+// Without them the API uses the test checkout, where no money moves.
+foreach (var setting in new[] { "Stripe:SecretKey", "Stripe:WebhookSecret", "Stripe:PlatformFeePercent", "Stripe:PlatformFeeMaxCentsPerItem", "Stripe:MinimumMarginCents" })
+    if (builder.Configuration[setting] is { Length: > 0 } value)
+        api.WithEnvironment(setting.Replace(":", "__"), value);
+
 // Fixed address so the site is always at http://localhost:5173.
 builder.AddViteApp("frontend", "../../mytickets-frontend")
     .WithEndpoint("http", endpoint => endpoint.Port = 5173)

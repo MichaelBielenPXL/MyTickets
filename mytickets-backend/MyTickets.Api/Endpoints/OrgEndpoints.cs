@@ -67,15 +67,20 @@ public static partial class OrgEndpoints
 
         var org = app.MapGroup("/api/orgs/{slug}").RequireOrg(null);
 
-        org.MapGet("", async (HttpContext http, AppDbContext db, TimeProvider clock) =>
+        org.MapGet("", async (HttpContext http, AppDbContext db, IConfiguration config, TimeProvider clock) =>
         {
+            var zone = MembershipService.LocalZone(config);
             var (o, membership) = http.Org();
             var now = clock.GetUtcNow().UtcDateTime;
             var userId = http.User.UserId();
             var tiers = await db.MembershipTiers.AsNoTracking()
-                .Where(t => t.OrganisationId == o.Id && !t.Archived).OrderBy(t => t.PriceCents).ThenBy(t => t.Name).ToListAsync();
+                .Where(t => t.OrganisationId == o.Id && !t.Archived).OrderBy(t => t.SortOrder).ThenBy(t => t.PriceCents).ThenBy(t => t.Name).ToListAsync();
             var balance = await db.Wallets.Where(w => w.UserId == userId && w.OrganisationId == o.Id)
                 .Select(w => (int?)w.BalanceCents).FirstOrDefaultAsync();
+            var user = await db.Users.AsNoTracking().FirstAsync(u => u.Id == userId);
+            var request = await db.MembershipRequests.AsNoTracking().Include(r => r.Tier)
+                .Where(r => r.UserId == userId && r.Status != RequestStatus.Completed)
+                .OrderByDescending(r => r.CreatedAt).FirstOrDefaultAsync();
             var since = now.AddHours(-12);
             var events = await db.Events.AsNoTracking()
                 .Where(e => e.OrganisationId == o.Id && e.Published && (e.EndsAt ?? e.StartsAt) > since)
@@ -89,6 +94,8 @@ public static partial class OrgEndpoints
             return Results.Ok(new
             {
                 o.Slug, o.Name, o.Description, LogoUrl = Images.Url(o.LogoKey),
+                // The colour lives only in the organisation's own database, not in the shared list the request came through.
+                BrandColor = await db.Organisations.Where(x => x.Id == o.Id).Select(x => x.BrandColor).FirstOrDefaultAsync(),
                 Membership = membership is null ? null : new
                 {
                     membership.Role, membership.TierId, Tier = membership.Tier.Name, membership.ExpiresAt,
@@ -96,19 +103,23 @@ public static partial class OrgEndpoints
                     membership.Tier.TicketDiscountPercent, membership.Tier.DrinkDiscountPercent,
                 },
                 BalanceCents = balance,
-                // Invite-only tiers stay hidden unless you are already on one.
-                Tiers = tiers.Where(t => t.IsPublic || t.Id == membership?.TierId).Select(t => new
+                // Invite-only and ended tiers stay hidden unless you are already on one.
+                Tiers = tiers.Where(t => (t.IsPublic && !t.HasEnded(now, zone)) || t.Id == membership?.TierId).Select(t => new
                 {
-                    t.Id, t.Name, t.Description, t.PriceCents, t.DurationDays, t.IsPublic,
+                    t.Id, t.Name, t.Description, t.PriceCents, t.EndsOn, t.IsPublic, t.RequiresApproval,
                     t.TicketDiscountPercent, t.DrinkDiscountPercent,
                 }),
-                HasInviteOnlyTiers = tiers.Any(t => !t.IsPublic),
+                // An open request for a membership that needs approval: waiting, approved (ready to pay), or turned down.
+                Request = request is null ? null : new { request.Id, request.TierId, Tier = request.Tier.Name, request.Status, request.CreatedAt },
+                ProfileComplete = ProfileFields.IsComplete(user, ProfileFields.Read(await db.Organisations.AsNoTracking().FirstAsync())),
+                HasInviteOnlyTiers = tiers.Any(t => !t.IsPublic && !t.HasEnded(now, zone)),
                 Events = events.Select(e => new { e.Id, e.Name, e.Location, e.StartsAt, e.EndsAt, ImageUrl = Images.Url(e.ImageKey), e.FromPriceCents, e.SoldOut }),
             });
         });
 
         // Join the organisation, switch tier, or renew. Free tiers apply at once; paid tiers go through checkout.
-        org.MapPost("/join", async (JoinRequest req, HttpContext http, AppDbContext db, MembershipService memberships, PaymentService payments) =>
+        org.MapPost("/join", async (JoinRequest req, HttpContext http, AppDbContext db, MembershipService memberships, PaymentService payments,
+            IConfiguration config, TimeProvider clock) =>
         {
             var (o, _) = http.Org();
             var userId = http.User.UserId();
@@ -127,12 +138,49 @@ public static partial class OrgEndpoints
                 if (!tier.IsPublic) return Http.Error(403, "This membership needs an invite code.");
             }
 
+            var now = clock.GetUtcNow().UtcDateTime;
+            var zone = MembershipService.LocalZone(config);
+            if (tier.HasEnded(now, zone))
+                return Http.Error(409, $"\"{tier.Name}\" ended on {tier.EndsOn:dd/MM/yyyy}. Choose another membership.");
+            // Renewing only makes sense when it gives you more time; never let someone pay for what they have.
+            var current = await db.Memberships.AsNoTracking().FirstOrDefaultAsync(m => m.UserId == userId && m.OrganisationId == o.Id);
+            if (current is not null && current.TierId == tier.Id && current.IsActive(now) && current.ExpiresAt == tier.ExpiresAt(zone))
+                return Http.Error(409, current.ExpiresAt is { } until
+                    ? $"You already have this membership until {TimeZoneInfo.ConvertTimeFromUtc(until, zone).AddDays(-1):dd/MM/yyyy}."
+                    : "You already have this membership.");
+
+            // The organisation's questions come first.
+            var user = await db.Users.AsNoTracking().FirstAsync(u => u.Id == userId);
+            if (!ProfileFields.IsComplete(user, ProfileFields.Read(await db.Organisations.AsNoTracking().FirstAsync())))
+                return Results.Json(new { error = "Fill in your details first.", Code = "profile-incomplete" }, statusCode: 409);
+
+            // Some memberships need an admin's yes first. The request waits; once approved, joining again goes through.
+            if (tier.RequiresApproval)
+            {
+                var request = await db.MembershipRequests
+                    .Where(r => r.UserId == userId && r.TierId == tier.Id && (r.Status == RequestStatus.Pending || r.Status == RequestStatus.Approved))
+                    .OrderByDescending(r => r.CreatedAt).FirstOrDefaultAsync();
+                if (request is null)
+                {
+                    // One open request at a time: asking for another membership replaces the earlier question.
+                    await db.MembershipRequests.Where(r => r.UserId == userId && r.Status == RequestStatus.Pending).ExecuteDeleteAsync();
+                    db.MembershipRequests.Add(new MembershipRequest
+                    {
+                        Id = Guid.NewGuid(), UserId = userId, TierId = tier.Id, Status = RequestStatus.Pending, CreatedAt = now,
+                    });
+                    await db.SaveChangesAsync();
+                    return Results.Ok(new { Joined = false, Pending = true, CheckoutUrl = (string?)null });
+                }
+                if (request.Status == RequestStatus.Pending)
+                    return Http.Error(409, $"Your request for \"{tier.Name}\" is still waiting for approval.");
+            }
+
             if (tier.PriceCents == 0)
             {
                 await using var tx = await db.Database.BeginTransactionAsync();
                 await memberships.ApplyTierAsync(userId, o.Id, tier);
                 await tx.CommitAsync();
-                return Results.Ok(new { Joined = true, CheckoutUrl = (string?)null });
+                return Results.Ok(new { Joined = true, Pending = false, CheckoutUrl = (string?)null });
             }
 
             var url = await payments.StartAsync(new Payment
@@ -140,7 +188,7 @@ public static partial class OrgEndpoints
                 Id = Guid.NewGuid(), UserId = userId, OrganisationId = o.Id, AmountCents = tier.PriceCents,
                 Purpose = PaymentPurpose.Membership, TierId = tier.Id, Description = $"{tier.Name} membership",
             });
-            return Results.Ok(new { Joined = false, CheckoutUrl = (string?)url });
+            return Results.Ok(new { Joined = false, Pending = false, CheckoutUrl = (string?)url });
         });
 
         org.MapGet("/events/{eventId:guid}", async (Guid eventId, HttpContext http, AppDbContext db, TimeProvider clock) =>
@@ -220,25 +268,28 @@ public static partial class OrgEndpoints
             }
 
             string? checkoutUrl = null;
+            Payment? payment = null;
             if (total > 0 && payWithWallet)
             {
                 var wallet = await wallets.GetOrCreateAsync(userId, o.Id);
                 if (!await wallets.TryDebitAsync(wallet.Id, total, WalletTxType.TicketPurchase, $"Tickets for {ev.Name}"))
-                    return Http.Error(402, "You don't have enough credit for this.");
+                    return Http.Error(402, "You don't have enough tokens for this.");
             }
             else if (total > 0)
             {
-                var payment = new Payment
+                payment = new Payment
                 {
                     Id = Guid.NewGuid(), UserId = userId, OrganisationId = o.Id, AmountCents = total,
                     Purpose = PaymentPurpose.Tickets, Description = $"{tickets.Count} ticket(s) for {ev.Name}",
                 };
                 foreach (var t in tickets) { t.Status = TicketStatus.Reserved; t.PaymentId = payment.Id; }
-                checkoutUrl = await payments.StartAsync(payment);
+                await payments.PrepareAsync(payment);
             }
             db.Tickets.AddRange(tickets);
             await db.SaveChangesAsync();
             await tx.CommitAsync();
+            // The tickets are held for this buyer now; open the payment page only after letting go of the database.
+            if (payment is not null) checkoutUrl = await payments.CheckoutAsync(payment.Id);
             return Results.Ok(new { CheckoutUrl = checkoutUrl, Tickets = tickets.Count, TotalCents = total });
         });
 

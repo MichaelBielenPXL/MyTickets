@@ -44,6 +44,20 @@ public class TestApp : WebApplicationFactory<Program>
             displayName = name, joinOrganisationSlug = organisationSlug,
         });
         Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
+        // Their details, as given when choosing a membership. Tests about that form start from NewBareGuestAsync.
+        (await client.PutAsJsonAsync($"/api/orgs/{organisationSlug}/me/profile", new { firstName = name, lastName = "Tester" })).EnsureSuccessStatusCode();
+        return client;
+    }
+
+    /// <summary>A guest who has only chosen an email address and password, as right after signing up.</summary>
+    public async Task<HttpClient> NewBareGuestAsync(string organisationSlug)
+    {
+        var client = CreateClient();
+        var response = await client.PostAsJsonAsync("/api/auth/register", new
+        {
+            email = $"bare-{Guid.NewGuid():N}@example.com", password = "correct horse", joinOrganisationSlug = organisationSlug,
+        });
+        Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
         return client;
     }
 

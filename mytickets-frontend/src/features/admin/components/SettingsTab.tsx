@@ -1,11 +1,14 @@
-import { type FormEvent, useState } from 'react'
+import { type FormEvent, type ReactNode, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { ErrorNote, Field, QueryResult } from '@/components'
+import { useMe } from '@/features/auth'
+import { BRAND_PRESETS, MemberCard, brandStyle, isBrandColor } from '@/features/organisations'
 
 import { useOrganisationSettings, useUpdateOrganisation } from '../api/admin'
 import type { OrganisationSettings, StoredImage } from '../types'
 import { ImageField } from './ImageField'
+import { MemberFieldsPanel } from './MemberFieldsPanel'
 
 type SettingsTabProps = {
   slug: string
@@ -17,10 +20,13 @@ export function SettingsTab({ slug }: SettingsTabProps) {
   const update = useUpdateOrganisation(slug)
 
   return (
-    <QueryResult query={settings}>
-      {/* Keyed on the saved values so the form starts over from what the server has after a save. */}
-      {(saved) => <SettingsForm key={JSON.stringify(saved)} slug={slug} saved={saved} update={update} />}
-    </QueryResult>
+    <div className="stack">
+      <QueryResult query={settings}>
+        {/* Keyed on the saved values so the form starts over from what the server has after a save. */}
+        {(saved) => <SettingsForm key={JSON.stringify(saved)} slug={slug} saved={saved} update={update} />}
+      </QueryResult>
+      <MemberFieldsPanel slug={slug} />
+    </div>
   )
 }
 
@@ -36,15 +42,21 @@ function SettingsForm({ slug, saved, update }: SettingsFormProps) {
   const [logo, setLogo] = useState<StoredImage | null>(
     saved.logoKey && saved.logoUrl ? { key: saved.logoKey, url: saved.logoUrl } : null,
   )
+  const [brandColor, setBrandColor] = useState(saved.brandColor ?? '')
   const navigate = useNavigate()
+  const displayName = useMe().data?.displayName ?? 'Your name'
 
+  const colorToSave = brandColor === '' ? null : brandColor.toLowerCase()
   const changed =
-    name !== saved.name || description !== saved.description || (logo?.key ?? null) !== saved.logoKey
+    name !== saved.name ||
+    description !== saved.description ||
+    (logo?.key ?? null) !== saved.logoKey ||
+    colorToSave !== (saved.brandColor ?? null)
 
   function submit(event: FormEvent) {
     event.preventDefault()
     update.mutate(
-      { name, description, logoKey: logo?.key ?? null },
+      { name, description, logoKey: logo?.key ?? null, brandColor: colorToSave },
       {
         // The page lives at the organisation's name, so after a rename carry on at the new address.
         onSuccess: (result) => {
@@ -75,6 +87,22 @@ function SettingsForm({ slug, saved, update }: SettingsFormProps) {
           maxLength={500}
         />
       </Field>
+      <BrandColorField
+        value={brandColor}
+        onChange={setBrandColor}
+        preview={
+          <MemberCard
+            organisationName={name || saved.name}
+            logoUrl={logo?.url ?? null}
+            memberName={displayName}
+            tier="Member"
+            expiresAt={null}
+            active
+            balanceCents={4400}
+            cardUid={null}
+          />
+        }
+      />
       <ErrorNote error={update.error} />
       <div className="row">
         <button className="btn primary" disabled={update.isPending || !changed}>
@@ -87,5 +115,77 @@ function SettingsForm({ slug, saved, update }: SettingsFormProps) {
         )}
       </div>
     </form>
+  )
+}
+
+type BrandColorFieldProps = {
+  /** "#rrggbb", or "" for the house colour. */
+  value: string
+  onChange: (color: string) => void
+  preview: ReactNode
+}
+
+/** The organisation's own colour, with its member card beside it so the choice is made by eye. */
+function BrandColorField({ value, onChange, preview }: BrandColorFieldProps) {
+  const [typed, setTyped] = useState(value)
+  const shown = isBrandColor(value) ? value.toLowerCase() : null
+
+  function choose(color: string) {
+    setTyped(color)
+    onChange(color)
+  }
+
+  return (
+    <fieldset className="brand-color-field">
+      <legend>Colour</legend>
+      <p className="muted">Fills your members&apos; cards and accents your pages. Match it to your crest.</p>
+      <div className="brand-color-layout">
+        <div className="stack">
+          <div className="swatches" role="radiogroup" aria-label="Ready-made colours">
+            {BRAND_PRESETS.map((color) => (
+              <label key={color} className="swatch" style={{ background: color }} title={color}>
+                <input
+                  type="radio"
+                  name="brand-colour"
+                  value={color}
+                  checked={shown === color}
+                  onChange={() => choose(color)}
+                  aria-label={color}
+                />
+              </label>
+            ))}
+          </div>
+          <div className="brand-color-custom">
+            <input
+              type="color"
+              aria-label="Pick any colour"
+              value={shown ?? '#1c1c1e'}
+              onChange={(e) => choose(e.target.value)}
+            />
+            <input
+              aria-label="Colour code"
+              placeholder="#1c1c1e"
+              value={typed}
+              maxLength={7}
+              spellCheck={false}
+              onChange={(e) => {
+                const text = e.target.value.trim()
+                setTyped(text)
+                // Only a whole colour code changes the colour; half-typed codes wait.
+                if (text === '' || isBrandColor(text)) onChange(text)
+              }}
+            />
+            {value !== '' && (
+              <button type="button" className="btn link" onClick={() => choose('')}>
+                Use the default
+              </button>
+            )}
+          </div>
+        </div>
+        <div className="brand-color-preview organisation-page" style={brandStyle(shown)} aria-hidden="true">
+          {preview}
+        </div>
+      </div>
+    </fieldset>
   )
 }

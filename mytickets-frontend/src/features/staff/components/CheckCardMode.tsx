@@ -7,7 +7,7 @@ type CheckCardModeProps = {
   slug: string
 }
 
-/** Tap a card to see whose it is and how much credit is on it. */
+/** Tap a card to see whose it is and how many tokens are on it. */
 export function CheckCardMode({ slug }: CheckCardModeProps) {
   const lookUp = useLookUpCard(slug)
   const holder = lookUp.data
@@ -33,7 +33,7 @@ export function CheckCardMode({ slug }: CheckCardModeProps) {
       )}
       <ErrorNote error={lookUp.error} />
       <CardReader
-        prompt="Tap a card to see who it belongs to and how much credit is on it"
+        prompt="Tap a card to see who it belongs to and how many tokens are on it"
         onCard={(cardUid) => lookUp.mutate(cardUid)}
       />
     </div>

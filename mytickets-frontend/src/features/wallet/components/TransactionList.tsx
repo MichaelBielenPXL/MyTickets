@@ -1,4 +1,4 @@
-import { dateTime, money } from '@/utils/format'
+import { dateTime, signedTokens } from '@/utils/format'
 
 import type { WalletTransaction, WalletTransactionType } from '../types'
 
@@ -28,15 +28,10 @@ export function TransactionList({ transactions }: TransactionListProps) {
             </p>
           </div>
           <span className={transaction.amountCents >= 0 ? 'good amount' : 'amount'}>
-            {signedMoney(transaction.amountCents)}
+            {signedTokens(transaction.amountCents)}
           </span>
         </div>
       ))}
     </div>
   )
-}
-
-/** "+€ 40,00" for credit coming in, "−€ 12,50" for credit spent. */
-function signedMoney(cents: number) {
-  return `${cents >= 0 ? '+' : '−'}${money(Math.abs(cents))}`
 }

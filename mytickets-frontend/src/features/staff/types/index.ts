@@ -9,14 +9,29 @@ export interface MenuProduct {
   name: string
   priceCents: number
   /** A deposit, such as a reusable cup, that staff can take back for credit. */
-  returnable: boolean
+  isDeposit: boolean
+  /** For a drink: the deposit the server adds with every one sold. */
+  depositProductId: string | null
+  categoryId: string | null
+  color: string | null
+}
+
+export interface MenuCategory {
+  id: string
+  name: string
 }
 
 /** What the door and bar screens need to start: tonight's events and the bar menu. */
+/** The jobs at an event; each person only gets the ones their role does. */
+export type StaffTask = 'Bar' | 'Door' | 'CashTopUp' | 'CheckCard'
+
 export interface StaffContext {
   name: string
+  tasks: StaffTask[]
   events: StaffEvent[]
   products: MenuProduct[]
+  /** The tabs at the till, in order. Empty when the organisation uses none. */
+  categories: MenuCategory[]
 }
 
 export interface CardHolder {
@@ -54,6 +69,8 @@ export interface ChargeRequest {
 export interface ChargeResult {
   /** Negative when more was handed back than bought: that amount went onto the card. */
   totalCents: number
+  /** The deposit part of the total: negative when more cups came back than went out. */
+  depositCents: number
   balanceCents: number
   displayName: string
 }

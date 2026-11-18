@@ -1,6 +1,6 @@
 import { screen, within } from '@testing-library/react'
 
-import { HttpResponse, aMe, anOrganisation, apiUrl, http, jsonError } from '@/test/data'
+import { HttpResponse, aMe, anOrganisation, apiUrl, http } from '@/test/data'
 import { renderApp } from '@/test/render'
 import { server } from '@/test/server'
 
@@ -13,6 +13,7 @@ beforeEach(() => {
   server.use(
     // Signed in with an account at Night Owls.
     http.get(apiUrl('/auth/me'), () => HttpResponse.json(aMe())),
+    http.get(apiUrl('/orgs/night-owls/me/cards'), () => HttpResponse.json([])),
   )
 })
 
@@ -21,65 +22,44 @@ function tierRow(name: string) {
 }
 
 describe('OrganisationPage', () => {
-  it('sends someone joining a paid membership to the checkout', async () => {
-    server.use(
-      http.get(apiUrl('/orgs/night-owls'), () => HttpResponse.json(anOrganisation(notJoined))),
-      http.post(apiUrl('/orgs/night-owls/join'), () =>
-        HttpResponse.json({ joined: false, checkoutUrl: '/checkout/pay-9' }),
-      ),
-    )
+  it('takes someone choosing a membership to the details step', async () => {
+    server.use(http.get(apiUrl('/orgs/night-owls'), () => HttpResponse.json(anOrganisation(notJoined))))
     const { user } = renderApp(<OrganisationPage />, page)
 
     expect(await screen.findByRole('heading', { name: 'Join to buy tickets' })).toBeInTheDocument()
     await user.click(tierRow('Premium').getByRole('button', { name: 'Join' }))
 
-    expect(await screen.findByText('Now at /checkout/pay-9')).toBeInTheDocument()
+    expect(await screen.findByText('Now at /night-owls/join?tier=tier-premium')).toBeInTheDocument()
   })
 
-  it('lets someone in on an invite-only membership with the code', async () => {
-    let joined = false
-    let sent: unknown
+  it('takes an invite code to the details step', async () => {
     server.use(
       http.get(apiUrl('/orgs/night-owls'), () =>
-        HttpResponse.json(
-          joined
-            ? anOrganisation({
-                hasInviteOnlyTiers: true,
-                membership: { ...anOrganisation().membership, tier: 'Crew' },
-              })
-            : anOrganisation({ ...notJoined, hasInviteOnlyTiers: true }),
-        ),
+        HttpResponse.json(anOrganisation({ ...notJoined, hasInviteOnlyTiers: true })),
       ),
-      http.post(apiUrl('/orgs/night-owls/join'), async ({ request }) => {
-        sent = await request.json()
-        joined = true
-        return HttpResponse.json({ joined: true, checkoutUrl: null })
-      }),
     )
     const { user } = renderApp(<OrganisationPage />, page)
 
     await user.type(await screen.findByLabelText('Invite code'), ' CREW2026 ')
     await user.click(screen.getByRole('button', { name: 'Use code' }))
 
-    // The page reloads itself and now shows the membership instead of the options.
-    expect(await screen.findByText('Crew')).toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: 'Join to buy tickets' })).not.toBeInTheDocument()
-    expect(sent).toMatchObject({ inviteCode: 'CREW2026' })
+    expect(await screen.findByText('Now at /night-owls/join?code=CREW2026')).toBeInTheDocument()
   })
 
-  it('says so when the invite code is wrong', async () => {
+  it('shows a request that is waiting for approval, and the way to pay once approved', async () => {
+    const request = { id: 'r1', tierId: 'tier-premium', tier: 'Premium', createdAt: '2026-11-17T12:00:00Z' }
     server.use(
       http.get(apiUrl('/orgs/night-owls'), () =>
-        HttpResponse.json(anOrganisation({ ...notJoined, hasInviteOnlyTiers: true })),
+        HttpResponse.json(anOrganisation({ ...notJoined, request: { ...request, status: 'Approved' } })),
       ),
-      http.post(apiUrl('/orgs/night-owls/join'), () => jsonError(400, 'That invite code is not valid.')),
     )
-    const { user } = renderApp(<OrganisationPage />, page)
+    renderApp(<OrganisationPage />, page)
 
-    await user.type(await screen.findByLabelText('Invite code'), 'WRONG')
-    await user.click(screen.getByRole('button', { name: 'Use code' }))
-
-    expect(await screen.findByRole('alert')).toHaveTextContent('That invite code is not valid.')
+    expect(await screen.findByText("You've been approved")).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Continue to payment' })).toHaveAttribute(
+      'href',
+      '/night-owls/join?tier=tier-premium',
+    )
   })
 
   it('asks a member whose membership ran out to renew', async () => {
@@ -91,5 +71,22 @@ describe('OrganisationPage', () => {
 
     expect(await screen.findByRole('heading', { name: 'Renew your membership' })).toBeInTheDocument()
     expect(screen.getByText(/Expired on/)).toBeInTheDocument()
+  })
+
+  it('opens the change-membership page from a working membership', async () => {
+    server.use(http.get(apiUrl('/orgs/night-owls'), () => HttpResponse.json(anOrganisation())))
+    renderApp(<OrganisationPage />, page)
+
+    expect(await screen.findByRole('link', { name: 'Change membership' })).toHaveAttribute(
+      'href',
+      '/night-owls/join',
+    )
+    // Their card shows who they are, their membership and their tokens (20 euro = 20 tokens).
+    const card = within(await screen.findByRole('group', { name: 'Night Owls membership card' }))
+    expect(card.getByText('Premium')).toBeInTheDocument()
+    expect(card.getByText('20')).toBeInTheDocument()
+    expect(screen.getByText('50% off tickets')).toBeInTheDocument()
+    // The options themselves are not on the organisation's page for someone who already has a membership.
+    expect(screen.queryByRole('heading', { name: 'Join to buy tickets' })).not.toBeInTheDocument()
   })
 })

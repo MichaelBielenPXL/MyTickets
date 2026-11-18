@@ -48,9 +48,19 @@ The first account you create can start an organisation and becomes its admin.
 - **The start page** opens in the organisation you used last on that device; the switcher top-left
   moves between your organisations.
 
-- **Payments are a test checkout.** No real money moves yet. Connect a payment company by implementing
-  `IPaymentProvider` (see `Services/PaymentService.cs`). The API refuses to start outside development
-  while only the test checkout is configured.
+- **Payments go through Stripe Connect.** Each organisation signs up once on Stripe's own pages
+  (Manage › Payouts): its details, an ID and the bank account to be paid on. Buyers then pay on Stripe's
+  page (Bancontact, card), the organisation is the seller, and Stripe pays it out automatically.
+  Buyers pay into the platform's Stripe account; right after each payment the app reads what Stripe
+  charged and transfers the rest to the organisation, minus the platform fee: 5% per ticket or top-up,
+  at most €1.50 each (`Stripe:PlatformFeePercent`, `Stripe:PlatformFeeMaxCentsPerItem`), but never less
+  than Stripe's cost plus €0.05 (`Stripe:MinimumMarginCents`), so no payment costs the platform money.
+  Online payments start at €0.50, Stripe's minimum. Set the keys in the Aspire host's user secrets, in `mytickets-backend/mytickets-backend`:
+  `dotnet user-secrets set Stripe:SecretKey sk_test_...` and `dotnet user-secrets set Stripe:WebhookSecret whsec_...`.
+  The webhook is `/api/payments/stripe-webhook`; on a laptop, `stripe listen --forward-to
+  localhost:5173/api/payments/stripe-webhook` prints the secret. Payments are also confirmed when the
+  buyer comes back and by a check every minute. Without a key, a developer machine uses the test
+  checkout (no money moves) and a live site refuses online payments.
 - **Cards**: tapping works in Chrome on Android (Web NFC). Everywhere else staff type the card number.
   Phones only allow NFC and the camera on an `https://` address, so the real deployment needs HTTPS.
 - **Who may become an organiser**: everyone, unless `Organisations:CreatorEmails` in the API settings

@@ -4,7 +4,7 @@ import { useLocation } from 'react-router-dom'
 import { type Membership, useMe } from '@/features/auth'
 
 // First parts of an address that are pages of the site itself, never an organisation.
-const SITE_PAGES = new Set(['', 'login', 'register', 'discover', 'o'])
+const SITE_PAGES = new Set(['', 'login', 'register', 'discover', 'platform', 'o'])
 const STORAGE_KEY = 'mytickets:last-organisation'
 
 type CurrentOrganisation = {

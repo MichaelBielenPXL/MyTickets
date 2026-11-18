@@ -4,7 +4,8 @@ using MyTickets.Api.Data;
 
 namespace MyTickets.Api.Services;
 
-public record CachedProduct(Guid Id, string Name, int PriceCents, bool Returnable);
+public record CachedProduct(Guid Id, string Name, int PriceCents, bool IsDeposit, Guid? DepositProductId, Guid? CategoryId, string? Color);
+public record CachedCategory(Guid Id, string Name);
 public record CachedOrganisation(Guid Id, string Slug, string Name, string Description, string? LogoKey);
 
 /// <summary>
@@ -39,10 +40,17 @@ public class AppCache(HybridCache cache, PlatformDbContext platform, IServicePro
 
     /// <summary>The bar menu: products currently for sale.</summary>
     public async Task<List<CachedProduct>> ActiveProductsAsync(Guid organisationId) =>
-        await cache.GetOrCreateAsync($"products:v2:{organisationId}", async ct =>
+        await cache.GetOrCreateAsync($"products:v4:{organisationId}", async ct =>
             await Db.Products.AsNoTracking().Where(p => p.OrganisationId == organisationId && p.Active)
                 .OrderBy(p => p.SortOrder).ThenBy(p => p.Name)
-                .Select(p => new CachedProduct(p.Id, p.Name, p.PriceCents, p.Returnable)).ToListAsync(ct), Options);
+                .Select(p => new CachedProduct(p.Id, p.Name, p.PriceCents, p.IsDeposit, p.DepositProductId, p.CategoryId, p.Color)).ToListAsync(ct), Options);
+
+    /// <summary>The tabs at the bar till.</summary>
+    public async Task<List<CachedCategory>> CategoriesAsync(Guid organisationId) =>
+        await cache.GetOrCreateAsync($"categories:v1:{organisationId}", async ct =>
+            await Db.ProductCategories.AsNoTracking().Where(c => c.OrganisationId == organisationId)
+                .OrderBy(c => c.SortOrder).ThenBy(c => c.Name)
+                .Select(c => new CachedCategory(c.Id, c.Name)).ToListAsync(ct), Options);
 
     public async Task OrganisationChangedAsync(string slug)
     {
@@ -50,5 +58,9 @@ public class AppCache(HybridCache cache, PlatformDbContext platform, IServicePro
         await cache.RemoveAsync("tenants:all");
     }
 
-    public async Task ProductsChangedAsync(Guid organisationId) => await cache.RemoveAsync($"products:v2:{organisationId}");
+    public async Task ProductsChangedAsync(Guid organisationId)
+    {
+        await cache.RemoveAsync($"products:v4:{organisationId}");
+        await cache.RemoveAsync($"categories:v1:{organisationId}");
+    }
 }
