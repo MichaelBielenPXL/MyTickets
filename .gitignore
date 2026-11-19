@@ -1,2 +1,7 @@
 # Claude's working notes while building (progress logs), not part of the project.
 .superpowers/
+
+# Local notes and reference screenshots, kept out of the repository.
+.impeccable/
+docs/superpowers/
+entryticketsScreens/
