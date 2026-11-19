@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 
+import { t } from '@/lib/i18n'
 import { listenForCards, nfcSupported } from '@/lib/nfc'
 
 // A card held against the phone is read many times a second; act on it once.
@@ -43,7 +44,7 @@ export function useCardTaps(onCard: (uid: string) => void, ignore = false) {
       )
       setListening(true)
     } catch {
-      setProblem('The card reader could not start. Allow NFC for this site, or type the card number.')
+      setProblem(t('The card reader could not start. Allow NFC for this site, or type the card number.'))
     }
   }
 

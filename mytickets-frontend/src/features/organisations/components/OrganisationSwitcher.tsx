@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 
 import type { Membership } from '@/features/auth'
 import { useDismiss } from '@/hooks/useDismiss'
+import { t } from '@/lib/i18n'
 
 import { OrganisationAvatar } from './OrganisationAvatar'
 
@@ -50,10 +51,10 @@ export function OrganisationSwitcher({
         type="button"
         className="switcher-toggle"
         aria-expanded={open}
-        aria-label={current ? 'Switch organisation' : undefined}
+        aria-label={current ? t('Switch organisation') : undefined}
         onClick={() => (open ? close() : setOpen(true))}
       >
-        {!current && <span>Choose organisation</span>}
+        {!current && <span>{t('Choose organisation')}</span>}
         <UpDownIcon />
       </button>
 
@@ -65,13 +66,13 @@ export function OrganisationSwitcher({
               className="menu-search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Find organisation…"
-              aria-label="Find organisation"
+              placeholder={t('Find organisation…')}
+              aria-label={t('Find organisation')}
               autoFocus
             />
           )}
-          <p className="menu-label">Your organisations</p>
-          <nav aria-label="Your organisations">
+          <p className="menu-label">{t('Your organisations')}</p>
+          <nav aria-label={t('Your organisations')}>
             {shown.map((membership) => (
               <Link
                 key={membership.slug}
@@ -88,18 +89,18 @@ export function OrganisationSwitcher({
           </nav>
           {shown.length === 0 && (
             <p className="menu-empty">
-              {memberships.length === 0 ? 'You have not joined one yet.' : 'No match.'}
+              {memberships.length === 0 ? t('You have not joined one yet.') : t('No match.')}
             </p>
           )}
           <div className="menu-separator" />
           <Link to="/discover" className="menu-item" onClick={close}>
             <SearchIcon />
-            <span className="menu-item-text">Browse organisations</span>
+            <span className="menu-item-text">{t('Browse organisations')}</span>
           </Link>
           {canCreate && (
             <Link to="/discover?new=1" className="menu-item" onClick={close}>
               <PlusIcon />
-              <span className="menu-item-text">Create organisation</span>
+              <span className="menu-item-text">{t('Create organisation')}</span>
             </Link>
           )}
         </div>

@@ -1,3 +1,4 @@
+import { t } from '@/lib/i18n'
 import type { Tier } from '@/types'
 
 import { tierBenefits, tierTerms } from '../utils/tier-terms'
@@ -16,7 +17,7 @@ export function TierChoice({ tier, action, disabled, onChoose }: TierChoiceProps
     <div className="list-item">
       <div className="list-item-main">
         <strong>{tier.name}</strong> <span className="tag">{tierTerms(tier)}</span>
-        {tier.requiresApproval && <span className="tag">Needs approval</span>}
+        {tier.requiresApproval && <span className="tag">{t('Needs approval')}</span>}
         {tier.description && <p className="muted">{tier.description}</p>}
         {tierBenefits(tier) && <p className="muted">{tierBenefits(tier)}</p>}
       </div>

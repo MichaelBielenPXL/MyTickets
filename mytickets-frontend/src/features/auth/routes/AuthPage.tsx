@@ -7,6 +7,7 @@ import {
   useOrganisationSlugAvailability,
   usePublicOrganisation,
 } from '@/features/organisations'
+import { t } from '@/lib/i18n'
 
 import { useSignIn } from '../api/auth'
 import { ContinueWithEmail } from '../components/ContinueWithEmail'
@@ -74,7 +75,10 @@ export function AuthPage({ mode }: AuthPageProps) {
       {
         onSuccess: (result) => {
           if (registering && slug) return navigate(`/${slug}/join`)
-          navigate(registering ? `/${result.organisationSlug ?? slug}` : slug ? `/${slug}` : next)
+          // At an organisation, go on to where they were heading there (a tapped card, say), or its page.
+          const onwards = params.get('next')
+          const safe = onwards?.startsWith('/') && !onwards.startsWith('//') ? onwards : null
+          navigate(registering ? `/${result.organisationSlug ?? slug}` : slug ? (safe ?? `/${slug}`) : next)
         },
       },
     )
@@ -97,38 +101,38 @@ export function AuthPage({ mode }: AuthPageProps) {
       <div className="auth-intro">
         {!slug && (
           <Link to="/" className="brand auth-brand">
-            MyTickets
+            {t('MyTickets')}
           </Link>
         )}
         <h1>
           {/* At an organisation its logo and name are already above, so the heading only says what to do. */}
           {registering
             ? slug
-              ? 'Create your account'
-              : 'Start your organisation'
+              ? t('Create your account')
+              : t('Start your organisation')
             : slug
-              ? 'Log in'
-              : 'Welcome back'}
+              ? t('Log in')
+              : t('Welcome back')}
         </h1>
         <p className="muted">
           {registering
             ? slug
               ? arrival.fromEmailStep
-                ? 'There is no account with this email address yet. Choose a password to create one.'
-                : 'Choose a password to create your account. You pick a membership next.'
-              : 'Choose your organisation page, then create your account.'
+                ? t('There is no account with this email address yet. Choose a password to create one.')
+                : t('Choose a password to create your account. You pick a membership next.')
+              : t('Choose your organisation page, then create your account.')
             : slug
               ? arrival.fromEmailStep
-                ? 'Welcome back. Enter your password.'
-                : `Sign in to see your ${orgName} tickets and tokens.`
-              : 'Sign in to see your tickets, organisations and tokens.'}
+                ? t('Welcome back. Enter your password.')
+                : t('Sign in to see your {org} tickets and tokens.', { org: orgName })
+              : t('Sign in to see your tickets, organisations and tokens.')}
         </p>
       </div>
       <form onSubmit={submit} className="stack panel auth-form">
         {checkingName && (
           <Field
-            label="Organisation name"
-            hint="This will be the name of your public page. You can add a photo and description later."
+            label={t('Organisation name')}
+            hint={t('This will be the name of your public page. You can add a photo and description later.')}
           >
             <input
               value={organisationName}
@@ -141,16 +145,16 @@ export function AuthPage({ mode }: AuthPageProps) {
             {organisationName.trim().length >= 2 && (
               <small aria-live="polite">
                 {!isCurrentNameChecked || availability.isPending
-                  ? 'Checking page address…'
+                  ? t('Checking page address…')
                   : availableSlug
-                    ? `Available: mytickets.be/${availableSlug}`
-                    : (availability.data?.reason ?? 'Could not check this page address.')}
+                    ? t('Available: {address}', { address: `mytickets.be/${availableSlug}` })
+                    : (availability.data?.reason ?? t('Could not check this page address.'))}
               </small>
             )}
           </Field>
         )}
         {registering && !slug && (
-          <Field label="Your name" hint="Staff see this when you tap your card.">
+          <Field label={t('Your name')} hint={t('Staff see this when you tap your card.')}>
             <input
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
@@ -162,17 +166,17 @@ export function AuthPage({ mode }: AuthPageProps) {
         {slug ? (
           // A real, filled-in field rather than plain text, so password managers pair it with the password.
           <div className="field">
-            <label htmlFor={emailId}>Email</label>
+            <label htmlFor={emailId}>{t('Email')}</label>
             <div className="known-email-field">
               <input id={emailId} type="email" name="email" value={email} readOnly autoComplete="username" />
               {/* Back to the email step: without the handed-over address this page asks for it again. */}
-              <Link to={`/${slug}/login${location.search}`} replace aria-label="Change email address">
-                Change
+              <Link to={`/${slug}/login${location.search}`} replace aria-label={t('Change email address')}>
+                {t('Change')}
               </Link>
             </div>
           </div>
         ) : (
-          <Field label="Email">
+          <Field label={t('Email')}>
             <input
               type="email"
               value={typedEmail}
@@ -182,7 +186,7 @@ export function AuthPage({ mode }: AuthPageProps) {
             />
           </Field>
         )}
-        <Field label="Password" hint={registering ? 'At least 8 characters.' : undefined}>
+        <Field label={t('Password')} hint={registering ? t('At least 8 characters.') : undefined}>
           <input
             type="password"
             value={password}
@@ -194,14 +198,14 @@ export function AuthPage({ mode }: AuthPageProps) {
         </Field>
         <ErrorNote error={signIn.error} />
         <button className="btn primary" disabled={signIn.isPending || (checkingName && !nameIsAvailable)}>
-          {registering ? 'Create account' : 'Sign in'}
+          {registering ? t('Create account') : t('Sign in')}
         </button>
       </form>
       <p className="muted auth-switch">
-        {registering ? 'Already have an account? ' : 'New here? '}
+        {registering ? t('Already have an account? ') : t('New here? ')}
         {/* Keeps the address already given, so switching does not start over. */}
         <Link to={otherPage} state={slug ? { email } : undefined}>
-          {registering ? 'Sign in' : 'Create an account'}
+          {registering ? t('Sign in') : t('Create an account')}
         </Link>
       </p>
     </main>

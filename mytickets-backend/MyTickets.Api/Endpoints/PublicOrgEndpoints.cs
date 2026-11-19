@@ -60,7 +60,7 @@ public static class PublicOrgEndpoints
                 t.TicketDiscountPercent, t.DrinkDiscountPercent,
             }).ToList();
             var events = await db.Events.AsNoTracking()
-                .Where(e => e.OrganisationId == organisation.Id && e.Published && (e.EndsAt ?? e.StartsAt) > now.AddHours(-12))
+                .Where(e => e.OrganisationId == organisation.Id && e.Published).Where(Event.NotClosed(now))
                 .OrderBy(e => e.StartsAt)
                 .Select(e => new
                 {
@@ -93,11 +93,12 @@ public static class PublicOrgEndpoints
             return Results.Ok(new
             {
                 ev.Id, ev.Name, ev.Description, ev.Location, ev.StartsAt, ev.EndsAt, ImageUrl = Images.Url(ev.ImageKey),
+                Status = ev.Status(now),
                 TicketTypes = ev.TicketTypes.OrderBy(t => t.PriceCents).ThenBy(t => t.Name).Select(t => new
                 {
                     t.Id, t.Name, t.PriceCents, YourPriceCents = t.PriceCents,
                     Available = t.Capacity - t.Sold, t.MaxPerUser, t.SalesStartAt, t.SalesEndAt,
-                    OnSale = (t.SalesStartAt is null || t.SalesStartAt <= now) && (t.SalesEndAt is null || t.SalesEndAt > now),
+                    OnSale = (t.SalesStartAt is null || t.SalesStartAt <= now) && (t.SalesEndAt is null || t.SalesEndAt > now) && ev.Status(now) != EventStatus.Closed,
                     MembersOnly = t.AllowedTierIds.Count > 0,
                 }),
             });

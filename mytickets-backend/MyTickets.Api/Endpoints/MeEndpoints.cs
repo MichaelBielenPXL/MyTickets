@@ -6,7 +6,6 @@ namespace MyTickets.Api.Endpoints;
 
 public static class MeEndpoints
 {
-    public record LinkCardRequest(string? Uid, string? Label);
     public record BlockCardRequest(bool Blocked);
 
     public static void MapMe(this IEndpointRouteBuilder app)
@@ -55,39 +54,46 @@ public static class MeEndpoints
         group.MapGet("/cards", async (HttpContext http, AppDbContext db) =>
         {
             var userId = http.User.UserId();
-            return Results.Ok(await db.NfcCards.AsNoTracking().Where(c => c.UserId == userId).OrderBy(c => c.LinkedAt)
-                .Select(c => new { c.Id, c.Uid, c.Label, c.Blocked, c.LinkedAt }).ToListAsync());
-        });
-
-        group.MapPost("/cards", async (LinkCardRequest req, HttpContext http, AppDbContext db, TimeProvider clock) =>
-        {
-            var uid = Http.NormaliseCardUid(req.Uid);
-            if (uid is null) return Http.Error(400, "That doesn't look like a card number. It is 8 to 20 letters and digits (0-9, A-F).");
-            var userId = http.User.UserId();
-            var existing = await db.NfcCards.AsNoTracking().FirstOrDefaultAsync(c => c.Uid == uid);
-            if (existing is not null)
-                return Http.Error(409, existing.UserId == userId ? "This card is already linked to your account." : "This card is already linked to another account.");
-
-            var card = new NfcCard { Id = Guid.NewGuid(), Uid = uid, UserId = userId, Label = req.Label?.Trim() ?? "", LinkedAt = clock.GetUtcNow().UtcDateTime };
-            db.NfcCards.Add(card);
-            try { await db.SaveChangesAsync(); }
-            catch (DbUpdateException) { return Http.Error(409, "This card is already linked to an account."); }
-            return Results.Ok(new { card.Id, card.Uid, card.Label, card.Blocked, card.LinkedAt });
+            // Members claim cards by tapping them (see CardEndpoints); they see the printed number, not the chip's serial.
+            var cards = await db.NfcCards.AsNoTracking().Where(c => c.Wallet!.UserId == userId).OrderBy(c => c.LinkedAt)
+                .Select(c => new { c.Id, c.Number, c.Label, c.Blocked, c.LinkedAt }).ToListAsync();
+            return Results.Ok(cards.Select(c => new { c.Id, Number = CardCodes.Display(c.Number), c.Label, c.Blocked, c.LinkedAt }));
         });
 
         group.MapPut("/cards/{id:guid}/blocked", async (Guid id, BlockCardRequest req, HttpContext http, AppDbContext db) =>
         {
             var userId = http.User.UserId();
-            var rows = await db.NfcCards.Where(c => c.Id == id && c.UserId == userId)
+            var rows = await db.NfcCards.Where(c => c.Id == id && c.Wallet!.UserId == userId)
                 .ExecuteUpdateAsync(s => s.SetProperty(c => c.Blocked, req.Blocked));
             return rows == 0 ? Http.Error(404, "Card not found.") : Results.NoContent();
         });
 
-        group.MapDelete("/cards/{id:guid}", async (Guid id, HttpContext http, AppDbContext db) =>
+        // The member's QR code, and which wallet apps it can be saved to on this server.
+        group.MapGet("/pass", async (HttpContext http, AppDbContext db, AppleWalletPasses apple, GoogleWalletPasses google) =>
         {
             var userId = http.User.UserId();
-            var rows = await db.NfcCards.Where(c => c.Id == id && c.UserId == userId).ExecuteDeleteAsync();
-            return rows == 0 ? Http.Error(404, "Card not found.") : Results.NoContent();
+            var membershipId = await db.Memberships.Where(m => m.UserId == userId).Select(m => (Guid?)m.Id).FirstOrDefaultAsync();
+            if (membershipId is null) return Http.Error(404, "Join this organisation first.");
+            var code = await MemberPasses.EnsureCodeAsync(db, membershipId.Value);
+            return Results.Ok(new { Code = code, Display = MemberPasses.Display(code), AppleWallet = apple.Enabled, GoogleWallet = google.Enabled });
+        });
+
+        group.MapGet("/pass/apple", async (HttpContext http, AppDbContext db, IImageStore images, TimeProvider clock, AppleWalletPasses apple) =>
+        {
+            if (!apple.Enabled) return Http.Error(404, "Apple Wallet passes are not set up on this server.");
+            var pass = await PassDataAsync(http, db, images, clock);
+            if (pass is null) return Http.Error(404, "Join this organisation first.");
+            var file = $"{OrganisationSlug.FromName(pass.OrganisationName)}-membership.pkpass";
+            return Results.File(apple.Build(pass), "application/vnd.apple.pkpass", file);
+        });
+
+        group.MapGet("/pass/google", async (HttpContext http, AppDbContext db, IImageStore images, TimeProvider clock, GoogleWalletPasses google, IConfiguration config) =>
+        {
+            if (!google.Enabled) return Http.Error(404, "Google Wallet passes are not set up on this server.");
+            var pass = await PassDataAsync(http, db, images, clock);
+            if (pass is null) return Http.Error(404, "Join this organisation first.");
+            var origin = config["WalletPasses:PublicBaseUrl"]?.TrimEnd('/') ?? $"{http.Request.Scheme}://{http.Request.Host}";
+            return Results.Redirect(google.SaveUrl(pass, origin));
         });
 
         // Payments: the buyer's view of one payment, checking it with Stripe, and the buttons of the test checkout.
@@ -146,5 +152,28 @@ public static class MeEndpoints
         if (!await db.Payments.AnyAsync(p => p.Id == id && p.UserId == userId && p.Provider == TestCheckout.ProviderName))
             return Http.Error(404, "Payment not found.");
         return await finish() ? Results.NoContent() : Http.Error(409, "This payment was already finished or has expired.");
+    }
+
+    private static async Task<MemberPassData?> PassDataAsync(HttpContext http, AppDbContext db, IImageStore images, TimeProvider clock)
+    {
+        var userId = http.User.UserId();
+        var membership = await db.Memberships.AsNoTracking().Include(m => m.Tier).Include(m => m.User).Include(m => m.Organisation)
+            .FirstOrDefaultAsync(m => m.UserId == userId);
+        if (membership is null) return null;
+        var code = await MemberPasses.EnsureCodeAsync(db, membership.Id);
+        var org = membership.Organisation;
+        // Wallet apps only take PNG pictures; a JPEG or WebP logo is left off.
+        byte[]? logo = null;
+        if (org.LogoKey is { } key && key.EndsWith(".png", StringComparison.Ordinal) && await images.OpenAsync(key) is { } stream)
+        {
+            await using (stream)
+            {
+                using var copy = new MemoryStream();
+                await stream.CopyToAsync(copy);
+                logo = copy.ToArray();
+            }
+        }
+        return new MemberPassData(membership.Id, org.Id, org.Name, org.BrandColor, membership.User.DisplayName, membership.Tier.Name,
+            membership.ExpiresAt, membership.IsActive(clock.GetUtcNow().UtcDateTime), code, logo, Images.Url(org.LogoKey));
     }
 }

@@ -2,6 +2,7 @@ import { useState } from 'react'
 
 import { ErrorNote, QueryResult, SortableList } from '@/components'
 import { tierTerms } from '@/features/organisations'
+import { t } from '@/lib/i18n'
 
 import { useAdminTiers, useReorderTiers } from '../api/admin'
 import type { AdminTier } from '../types'
@@ -19,9 +20,9 @@ export function MembershipsTab({ slug }: MembershipsTabProps) {
   return (
     <div className="stack">
       <p className="muted">
-        A membership type is a way to join. Make it free or paid, open to everyone or invite-only (people need
-        the code), and give it discounts on tickets and at the bar. Drag them into the order members see them
-        in.
+        {t(
+          'A membership type is a way to join. Make it free or paid, open to everyone or invite-only (people need the code), and give it discounts on tickets and at the bar. Drag them into the order members see them in.',
+        )}
       </p>
       {editing ? (
         <TierForm
@@ -32,7 +33,7 @@ export function MembershipsTab({ slug }: MembershipsTabProps) {
         />
       ) : (
         <button className="btn primary" onClick={() => setEditing('new')}>
-          New membership type
+          {t('New membership type')}
         </button>
       )}
       <QueryResult query={tiers}>
@@ -46,18 +47,18 @@ export function MembershipsTab({ slug }: MembershipsTabProps) {
                 {handle}
                 <div className="product-row-main">
                   <strong>{tier.name}</strong> <span className="tag">{tierTerms(tier)}</span>
-                  {!tier.isPublic && <span className="tag">Invite-only</span>}
-                  {tier.requiresApproval && <span className="tag">Needs approval</span>}
-                  {tier.archived && <span className="tag bad">Closed</span>}
+                  {!tier.isPublic && <span className="tag">{t('Invite-only')}</span>}
+                  {tier.requiresApproval && <span className="tag">{t('Needs approval')}</span>}
+                  {tier.archived && <span className="tag bad">{t('Closed')}</span>}
                   <p className="muted">{tierFacts(tier)}</p>
                   {tier.inviteCode && (
                     <p>
-                      Invite code: <code>{tier.inviteCode}</code>
+                      {t('Invite code:')} <code>{tier.inviteCode}</code>
                     </p>
                   )}
                 </div>
                 <button className="btn" onClick={() => setEditing(tier)}>
-                  Edit
+                  {t('Edit')}
                 </button>
               </div>
             )}
@@ -70,8 +71,10 @@ export function MembershipsTab({ slug }: MembershipsTabProps) {
 }
 
 function tierFacts(tier: AdminTier) {
-  const facts = [`${tier.members} member${tier.members === 1 ? '' : 's'}`]
-  if (tier.ticketDiscountPercent > 0) facts.push(`${tier.ticketDiscountPercent}% off tickets`)
-  if (tier.drinkDiscountPercent > 0) facts.push(`${tier.drinkDiscountPercent}% off bar`)
+  const facts = [tier.members === 1 ? t('1 member') : t('{count} members', { count: tier.members })]
+  if (tier.ticketDiscountPercent > 0)
+    facts.push(t('{percent}% off tickets', { percent: tier.ticketDiscountPercent }))
+  if (tier.drinkDiscountPercent > 0)
+    facts.push(t('{percent}% off bar', { percent: tier.drinkDiscountPercent }))
   return facts.join(' · ')
 }

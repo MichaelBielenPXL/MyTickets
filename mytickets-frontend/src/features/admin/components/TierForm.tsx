@@ -1,6 +1,7 @@
 import { type FormEvent, useState } from 'react'
 
 import { ErrorNote, Field } from '@/components'
+import { t } from '@/lib/i18n'
 import { euroInput, requireEuro, requireWholeNumber } from '@/utils/format'
 
 import { useSaveTier } from '../api/admin'
@@ -38,50 +39,50 @@ export function TierForm({ slug, tier, onDone }: TierFormProps) {
         endsOn: endsOn || null,
         isPublic,
         inviteCode: isPublic ? null : inviteCode,
-        ticketDiscountPercent: requireWholeNumber(ticketDiscount, 'the ticket discount'),
-        drinkDiscountPercent: requireWholeNumber(drinkDiscount, 'the bar discount'),
+        ticketDiscountPercent: requireWholeNumber(ticketDiscount, t('the ticket discount')),
+        drinkDiscountPercent: requireWholeNumber(drinkDiscount, t('the bar discount')),
         archived,
         requiresApproval,
       }
       save.mutate({ id: tier?.id, tier: input }, { onSuccess: onDone })
     } catch (error) {
-      setProblem(error instanceof Error ? error.message : 'Check the form.')
+      setProblem(error instanceof Error ? error.message : t('Check the form.'))
     }
   }
 
   return (
     <form onSubmit={submit} className="panel stack">
-      <h2>{tier ? 'Edit membership type' : 'New membership type'}</h2>
-      <Field label="Name">
+      <h2>{tier ? t('Edit membership type') : t('New membership type')}</h2>
+      <Field label={t('Name')}>
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="Student"
+          placeholder={t('Student')}
           required
           maxLength={80}
         />
       </Field>
-      <Field label="Description">
+      <Field label={t('Description')}>
         <input value={description} onChange={(e) => setDescription(e.target.value)} />
       </Field>
       <div className="grid-2">
-        <Field label="Price in euro" hint="0 for free">
+        <Field label={t('Price in euro')} hint={t('0 for free')}>
           <input inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} />
         </Field>
         <Field
-          label="Ends on"
-          hint="The last day it's valid, for everyone on it. Leave empty for no end date."
+          label={t('Ends on')}
+          hint={t("The last day it's valid, for everyone on it. Leave empty for no end date.")}
         >
           <input type="date" value={endsOn} onChange={(e) => setEndsOn(e.target.value)} />
         </Field>
-        <Field label="Discount on tickets (%)">
+        <Field label={t('Discount on tickets (%)')}>
           <input
             inputMode="numeric"
             value={ticketDiscount}
             onChange={(e) => setTicketDiscount(e.target.value)}
           />
         </Field>
-        <Field label="Discount at the bar (%)">
+        <Field label={t('Discount at the bar (%)')}>
           <input
             inputMode="numeric"
             value={drinkDiscount}
@@ -91,7 +92,7 @@ export function TierForm({ slug, tier, onDone }: TierFormProps) {
       </div>
       <label className="check">
         <input type="checkbox" checked={isPublic} onChange={(e) => setIsPublic(e.target.checked)} />
-        Anyone can join this
+        {t('Anyone can join this')}
       </label>
       <label className="check">
         <input
@@ -99,27 +100,30 @@ export function TierForm({ slug, tier, onDone }: TierFormProps) {
           checked={requiresApproval}
           onChange={(e) => setRequiresApproval(e.target.checked)}
         />
-        Needs approval: an admin checks each request first (paid ones are paid after approval)
+        {t('Needs approval: an admin checks each request first (paid ones are paid after approval)')}
       </label>
       {!isPublic && (
-        <Field label="Invite code" hint="People enter this to join. Leave empty and one is made for you.">
+        <Field
+          label={t('Invite code')}
+          hint={t('People enter this to join. Leave empty and one is made for you.')}
+        >
           <input value={inviteCode} onChange={(e) => setInviteCode(e.target.value)} maxLength={40} />
         </Field>
       )}
       {tier && (
         <label className="check">
           <input type="checkbox" checked={archived} onChange={(e) => setArchived(e.target.checked)} />
-          Closed: nobody new can join (current members keep it)
+          {t('Closed: nobody new can join (current members keep it)')}
         </label>
       )}
       <ErrorNote>{problem}</ErrorNote>
       <ErrorNote error={save.error} />
       <div className="row">
         <button className="btn primary" disabled={save.isPending}>
-          Save
+          {t('Save')}
         </button>
         <button type="button" className="btn" onClick={onDone}>
-          Cancel
+          {t('Cancel')}
         </button>
       </div>
     </form>

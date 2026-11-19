@@ -2,6 +2,7 @@ import { type FormEvent, useState } from 'react'
 import { Link } from 'react-router-dom'
 
 import { ErrorNote, Field } from '@/components'
+import { t } from '@/lib/i18n'
 
 import type { FieldMode, ProfileFieldName, ProfileForm, ProfileValues } from '../types'
 
@@ -26,7 +27,7 @@ export function ProfileFormFields({
   cancelTo,
 }: ProfileFormFieldsProps) {
   const [values, setValues] = useState<ProfileValues>(form.profile)
-  const mode = (field: ProfileFieldName): FieldMode => form.fields[field] ?? 'Optional'
+  const mode = (field: ProfileFieldName): FieldMode => form.fields[field] ?? t('Optional')
   const set = (key: keyof ProfileValues) => (e: { target: { value: string } }) =>
     setValues((v) => ({ ...v, [key]: e.target.value }))
   const value = (key: keyof ProfileValues) => values[key] ?? ''
@@ -39,7 +40,7 @@ export function ProfileFormFields({
   return (
     <form onSubmit={submit} className="stack profile-form">
       <div className="grid-2">
-        <Field label="First name">
+        <Field label={t('First name')}>
           <input
             value={value('firstName')}
             onChange={set('firstName')}
@@ -48,7 +49,7 @@ export function ProfileFormFields({
             maxLength={80}
           />
         </Field>
-        <Field label="Last name">
+        <Field label={t('Last name')}>
           <input
             value={value('lastName')}
             onChange={set('lastName')}
@@ -75,7 +76,7 @@ export function ProfileFormFields({
       {mode('address') !== 'Off' && (
         <fieldset className="stack">
           <legend>{label('Address', mode('address'))}</legend>
-          <Field label="Street and number">
+          <Field label={t('Street and number')}>
             <input
               value={value('street')}
               onChange={set('street')}
@@ -84,7 +85,7 @@ export function ProfileFormFields({
             />
           </Field>
           <div className="grid-2">
-            <Field label="Postal code">
+            <Field label={t('Postal code')}>
               <input
                 value={value('postalCode')}
                 onChange={set('postalCode')}
@@ -93,7 +94,7 @@ export function ProfileFormFields({
                 required={mode('address') === 'Required'}
               />
             </Field>
-            <Field label="City">
+            <Field label={t('City')}>
               <input
                 value={value('city')}
                 onChange={set('city')}
@@ -112,7 +113,7 @@ export function ProfileFormFields({
               <input
                 value={value('school')}
                 onChange={set('school')}
-                placeholder="UHasselt"
+                placeholder={t('UHasselt')}
                 required={mode('school') === 'Required'}
               />
             </Field>
@@ -122,7 +123,7 @@ export function ProfileFormFields({
               <input
                 value={value('faculty')}
                 onChange={set('faculty')}
-                placeholder="Rechten"
+                placeholder={t('Rechten')}
                 required={mode('faculty') === 'Required'}
               />
             </Field>
@@ -132,7 +133,7 @@ export function ProfileFormFields({
               <input
                 value={value('studyYear')}
                 onChange={set('studyYear')}
-                placeholder="2nd bachelor"
+                placeholder={t('2nd bachelor')}
                 required={mode('studyYear') === 'Required'}
               />
             </Field>
@@ -143,11 +144,11 @@ export function ProfileFormFields({
       <ErrorNote error={error} />
       <div className="form-actions">
         <button className="btn primary" disabled={busy}>
-          {busy ? 'One moment…' : submitLabel}
+          {busy ? t('One moment…') : submitLabel}
         </button>
         {cancelTo && (
           <Link className="btn" to={cancelTo}>
-            Cancel
+            {t('Cancel')}
           </Link>
         )}
       </div>
@@ -157,5 +158,5 @@ export function ProfileFormFields({
 
 /** Optional details say so; required ones are the norm and need no marker. */
 function label(text: string, mode: FieldMode) {
-  return mode === 'Optional' ? `${text} (optional)` : text
+  return mode === 'Optional' ? t('{field} (optional)', { field: text }) : text
 }

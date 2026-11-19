@@ -1,3 +1,4 @@
+import { t } from '@/lib/i18n'
 import { money, tokens } from '@/utils/format'
 
 type OrderBarProps = {
@@ -16,13 +17,11 @@ export function OrderBar({ ticketCount, totalCents, balanceCents, busy, onOrder 
   return (
     <section className="panel checkout-bar">
       <div className="spread">
-        <span>
-          {ticketCount} ticket{ticketCount > 1 && 's'}
-        </span>
-        <strong>{free ? 'Free' : money(totalCents)}</strong>
+        <span>{ticketCount === 1 ? t('1 ticket') : t('{count} tickets', { count: ticketCount })}</span>
+        <strong>{free ? t('Free') : money(totalCents)}</strong>
       </div>
       <button className="btn primary block" disabled={busy} onClick={() => onOrder('online')}>
-        {free ? 'Get tickets' : `Pay ${money(totalCents)}`}
+        {free ? t('Get tickets') : t('Pay {price}', { price: money(totalCents) })}
       </button>
       {!free && (
         <button
@@ -30,7 +29,7 @@ export function OrderBar({ ticketCount, totalCents, balanceCents, busy, onOrder 
           disabled={busy || balanceCents < totalCents}
           onClick={() => onOrder('wallet')}
         >
-          Pay with tokens ({tokens(balanceCents)})
+          {t('Pay with tokens ({balance})', { balance: tokens(balanceCents) })}
         </button>
       )}
     </section>

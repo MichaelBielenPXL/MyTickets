@@ -10,11 +10,14 @@ const iconProps = {
   strokeLinejoin: 'round' as const,
 }
 
-export function CalendarIcon() {
+/** The organisation's home: the member's card and what's on. */
+export function DashboardIcon() {
   return (
     <svg {...iconProps}>
-      <rect x="3.5" y="5" width="17" height="15" rx="2.5" />
-      <path d="M3.5 10h17M8 3v4M16 3v4" />
+      <rect x="3.5" y="3.5" width="7" height="9" rx="1.8" />
+      <rect x="13.5" y="3.5" width="7" height="5" rx="1.8" />
+      <rect x="3.5" y="15.5" width="7" height="5" rx="1.8" />
+      <rect x="13.5" y="11.5" width="7" height="9" rx="1.8" />
     </svg>
   )
 }

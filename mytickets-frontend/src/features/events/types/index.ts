@@ -26,6 +26,8 @@ export interface EventDetail {
   endsAt: string | null
   imageUrl: string | null
   ticketTypes: TicketType[]
+  /** Closed events sell no more tickets. */
+  status: 'Upcoming' | 'Open' | 'Closed'
 }
 
 export interface OrderRequest {

@@ -1,3 +1,6 @@
 export { CardsPage } from './routes/CardsPage'
 export { CardsSummary } from './components/CardsSummary'
 export { useCards } from './api/cards'
+export { CardLinkPage } from './routes/CardLinkPage'
+export { LinkCardDialog } from './components/LinkCardDialog'
+export { takePendingCard } from './utils/pending-card'

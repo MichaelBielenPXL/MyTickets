@@ -7,8 +7,10 @@ import { staffKeys } from '@/features/staff'
 import { api } from '@/lib/api-client'
 
 import type {
+  AdminCard,
   AdminEvent,
   AdminTier,
+  CardWriting,
   Category,
   EventInput,
   JoinRequest,
@@ -36,6 +38,9 @@ export const adminKeys = {
   events: (slug: string) => ['admin', slug, 'events'] as const,
   products: (slug: string) => ['admin', slug, 'products'] as const,
   categories: (slug: string) => ['admin', slug, 'categories'] as const,
+  topUpDeals: (slug: string) => ['admin', slug, 'topup-deals'] as const,
+  cards: (slug: string) => ['admin', slug, 'cards'] as const,
+  cardWriting: (slug: string) => ['admin', slug, 'card-writing'] as const,
 }
 
 const base = (slug: string) => `/orgs/${slug}/admin`
@@ -260,4 +265,87 @@ export function useDeleteCategory(slug: string) {
 
 export function useReorderCategories(slug: string) {
   return useReorder<Category>(slug, adminKeys.categories(slug), `${base(slug)}/categories/order`)
+}
+
+export type TopUpDealInput = { priceCents: number; tokensCents: number }
+
+/** The organisation's own top-ups, in the order members see them. */
+export function useTopUpDeals(slug: string) {
+  return useQuery({
+    queryKey: adminKeys.topUpDeals(slug),
+    queryFn: () => api.get<(TopUpDealInput & { id: string })[]>(`${base(slug)}/topup-deals`),
+  })
+}
+
+/** Saves the whole list at once; an empty list goes back to one token per euro. */
+export function useSaveTopUpDeals(slug: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (deals: TopUpDealInput[]) =>
+      api.put<(TopUpDealInput & { id: string })[]>(`${base(slug)}/topup-deals`, deals),
+    onSuccess: (saved) => queryClient.setQueryData(adminKeys.topUpDeals(slug), saved),
+  })
+}
+
+export function useAdminCards(slug: string) {
+  return useQuery({
+    queryKey: adminKeys.cards(slug),
+    queryFn: () => api.get<AdminCard[]>(`${base(slug)}/cards`),
+  })
+}
+
+export function useCardWriting(slug: string) {
+  return useQuery({
+    queryKey: adminKeys.cardWriting(slug),
+    queryFn: () => api.get<CardWriting>(`${base(slug)}/cards/writing`),
+  })
+}
+
+/** Every change to cards reloads the list. */
+function useCardsMutation<TInput, TResult>(slug: string, mutationFn: (input: TInput) => Promise<TResult>) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: adminKeys.cards(slug) }),
+  })
+}
+
+export function useCreateCards(slug: string) {
+  return useCardsMutation(slug, (count: number) => api.post<AdminCard[]>(`${base(slug)}/cards`, { count }))
+}
+
+/** A new card for a blank chip, made just before it is written. */
+export function useCreateBlankCard(slug: string) {
+  return useCardsMutation(slug, () => api.post<AdminCard>(`${base(slug)}/cards/blank`, {}))
+}
+
+/** Tells the server which chip a card was written to. Safe to send again for the same chip. */
+export function useReportCardWritten(slug: string) {
+  return useCardsMutation(slug, ({ id, uid }: { id: string; uid: string }) =>
+    api.post<AdminCard>(`${base(slug)}/cards/${id}/written`, { uid, locked: true }),
+  )
+}
+
+export function useSetCardBlocked(slug: string) {
+  return useCardsMutation(slug, ({ id, blocked }: { id: string; blocked: boolean }) =>
+    api.put<void>(`${base(slug)}/cards/${id}/blocked`, { blocked }),
+  )
+}
+
+export function useUnlinkCard(slug: string) {
+  return useCardsMutation(slug, (id: string) => api.delete<void>(`${base(slug)}/cards/${id}/link`))
+}
+
+export function useDeleteCard(slug: string) {
+  return useCardsMutation(slug, (id: string) => api.delete<void>(`${base(slug)}/cards/${id}`))
+}
+
+/** Lets a member link one more card within the year, for a lost one. */
+export function useAllowExtraCard(slug: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ memberId, allowed }: { memberId: string; allowed: boolean }) =>
+      api.put<void>(`${base(slug)}/members/${memberId}/extra-card`, { allowed }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: adminKeys.members(slug) }),
+  })
 }

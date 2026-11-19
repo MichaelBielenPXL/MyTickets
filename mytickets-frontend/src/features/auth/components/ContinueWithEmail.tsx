@@ -2,6 +2,7 @@ import { type FormEvent, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { ErrorNote, Field } from '@/components'
+import { t } from '@/lib/i18n'
 
 import { useCheckAccount } from '../api/auth'
 
@@ -39,21 +40,21 @@ export function ContinueWithEmail({ slug, organisationName, search = '' }: Conti
     <form
       onSubmit={submit}
       className="panel stack continue-form"
-      aria-label={`Sign in at ${organisationName}`}
+      aria-label={t('Sign in at {org}', { org: organisationName })}
     >
-      <Field label="Email">
+      <Field label={t('Email')}>
         <input
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           autoComplete="username"
-          placeholder="you@example.com"
+          placeholder={t('you@example.com')}
           required
         />
       </Field>
       <ErrorNote error={check.error} />
       <button className="btn primary" disabled={check.isPending}>
-        {check.isPending ? 'Checking…' : 'Continue'}
+        {check.isPending ? t('Checking…') : t('Continue')}
       </button>
     </form>
   )

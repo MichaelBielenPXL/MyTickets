@@ -1,6 +1,7 @@
 import { type FormEvent, useState } from 'react'
 
 import { ErrorNote, Field, QueryResult, SortableList } from '@/components'
+import { t } from '@/lib/i18n'
 import { parseEuro } from '@/utils/format'
 
 import { useCategories, useProducts, useReorderProducts, useSaveProduct } from '../api/admin'
@@ -41,7 +42,7 @@ export function ProductsTab({ slug }: ProductsTabProps) {
         return (
           <div className="stack">
             <section className="panel stack">
-              <h2>Drinks and food</h2>
+              <h2>{t('Drinks and food')}</h2>
               <AddProduct slug={slug} kind="item" count={list.length} deposits={deposits} categories={tabs} />
             </section>
             <ErrorNote error={reorder.error} />
@@ -64,17 +65,17 @@ export function ProductsTab({ slug }: ProductsTabProps) {
                 />
               </div>
             ))}
-            {items.length === 0 && <p className="muted">Nothing on the menu yet.</p>}
+            {items.length === 0 && <p className="muted">{t('Nothing on the menu yet.')}</p>}
 
             <CategoriesPanel slug={slug} categories={tabs} />
 
             <section className="panel stack">
               <div>
-                <h2>Deposits</h2>
+                <h2>{t('Deposits')}</h2>
                 <p className="muted">
-                  A reusable cup, for example. The till charges it with every drink that comes with it, and a
-                  &ldquo;returned&rdquo; button gives it back. Bringing back an empty cup for a new drink
-                  costs nothing extra.
+                  {t(
+                    'A reusable cup, for example. The till charges it with every drink that comes with it, and a “returned” button gives it back. Bringing back an empty cup for a new drink costs nothing extra.',
+                  )}
                 </p>
               </div>
               {deposits.length > 0 && (
@@ -117,7 +118,7 @@ function groupByCategory(items: Product[], categories: Category[]) {
   }))
   const known = new Set(categories.map((c) => c.id))
   const rest = items.filter((p) => !p.categoryId || !known.has(p.categoryId))
-  return [...groups, { key: 'other', name: 'Other', items: rest }].filter((g) => g.items.length > 0)
+  return [...groups, { key: 'other', name: t('Other'), items: rest }].filter((g) => g.items.length > 0)
 }
 
 type AddProductProps = {
@@ -145,7 +146,7 @@ function AddProduct({ slug, kind, count, deposits, categories }: AddProductProps
   function submit(event: FormEvent) {
     event.preventDefault()
     const priceCents = parseEuro(price)
-    if (priceCents === null) return setProblem('Enter prices like 12,50.')
+    if (priceCents === null) return setProblem(t('Enter prices like 12,50.'))
     setProblem('')
     add.mutate(
       {
@@ -172,16 +173,16 @@ function AddProduct({ slug, kind, count, deposits, categories }: AddProductProps
   return (
     <form onSubmit={submit} className="stack add-product">
       <div className="grid-2">
-        <Field label={isDeposit ? 'Deposit name' : 'Name'}>
+        <Field label={isDeposit ? t('Deposit name') : t('Name')}>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder={isDeposit ? 'Cup' : 'Beer'}
+            placeholder={isDeposit ? t('Cup') : t('Beer')}
             required
             maxLength={80}
           />
         </Field>
-        <Field label={isDeposit ? 'Deposit in euro' : 'Price in euro'}>
+        <Field label={isDeposit ? t('Deposit in euro') : t('Price in euro')}>
           <input
             inputMode="decimal"
             value={price}
@@ -192,10 +193,10 @@ function AddProduct({ slug, kind, count, deposits, categories }: AddProductProps
         </Field>
         {!isDeposit && (
           <>
-            <Field label="Category">
+            <Field label={t('Category')}>
               <CategoryChoice categories={categories} value={categoryId} onChange={setCategoryId} />
             </Field>
-            <Field label="Comes with">
+            <Field label={t('Comes with')}>
               <DepositChoice deposits={deposits} value={chosenDeposit} onChange={setDepositId} />
             </Field>
           </>
@@ -205,7 +206,7 @@ function AddProduct({ slug, kind, count, deposits, categories }: AddProductProps
       <ErrorNote>{problem}</ErrorNote>
       <ErrorNote error={add.error} />
       <button className={isDeposit ? 'btn' : 'btn primary'} disabled={add.isPending}>
-        {isDeposit ? 'Add deposit' : 'Add to the menu'}
+        {isDeposit ? t('Add deposit') : t('Add to the menu')}
       </button>
     </form>
   )

@@ -211,7 +211,7 @@ public class PaymentService(AppDbContext db, WalletService wallets, MembershipSe
         {
             case PaymentPurpose.TopUp:
                 var wallet = await wallets.GetOrCreateAsync(payment.UserId, payment.OrganisationId);
-                await wallets.CreditAsync(wallet.Id, payment.AmountCents, WalletTxType.TopUp, "Online top-up", paymentId: payment.Id);
+                await wallets.CreditAsync(wallet.Id, payment.TokensCents ?? payment.AmountCents, WalletTxType.TopUp, "Online top-up", paymentId: payment.Id);
                 break;
             case PaymentPurpose.Tickets:
                 await db.Tickets.Where(t => t.PaymentId == payment.Id && t.Status == TicketStatus.Reserved)

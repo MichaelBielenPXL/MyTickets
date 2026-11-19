@@ -1,3 +1,4 @@
+import { t } from '@/lib/i18n'
 import { money } from '@/utils/format'
 
 import { type CupLine, type TicketLine, chargeLabel } from '../utils/till'
@@ -28,14 +29,14 @@ export function OrderTicket(props: OrderTicketProps) {
   return (
     <div className="till-ticket">
       <header className="till-ticket-head">
-        <h2>Order</h2>
+        <h2>{t('Order')}</h2>
         <div className="row">
           <button className="till-ghost" onClick={props.onCheckCredit}>
-            Check tokens
+            {t('Check tokens')}
           </button>
           {props.onClose && (
             <button className="till-ghost till-sheet-close" onClick={props.onClose}>
-              Done
+              {t('Done')}
             </button>
           )}
         </div>
@@ -43,16 +44,22 @@ export function OrderTicket(props: OrderTicketProps) {
       {props.reader}
 
       <div className="till-lines">
-        {empty && <p className="till-empty">Tap items to start an order.</p>}
+        {empty && <p className="till-empty">{t('Tap items to start an order.')}</p>}
         {bought.map(({ product, count }) => (
           <div key={product.id} className="till-line">
             <span className="till-line-name">{product.name}</span>
             <span className="till-stepper">
-              <button onClick={() => props.onLess(product.id)} aria-label={`One less ${product.name}`}>
+              <button
+                onClick={() => props.onLess(product.id)}
+                aria-label={t('One less {name}', { name: product.name })}
+              >
                 −
               </button>
               <b>{count}</b>
-              <button onClick={() => props.onAdd(product.id)} aria-label={`One more ${product.name}`}>
+              <button
+                onClick={() => props.onAdd(product.id)}
+                aria-label={t('One more {name}', { name: product.name })}
+              >
                 +
               </button>
             </span>
@@ -68,13 +75,13 @@ export function OrderTicket(props: OrderTicketProps) {
             <span className="till-stepper">
               <button
                 onClick={() => props.onCups(line.deposit.id, -1)}
-                aria-label={`Return a ${line.deposit.name}`}
+                aria-label={t('Return a {name}', { name: line.deposit.name })}
               >
                 −
               </button>
               <button
                 onClick={() => props.onCups(line.deposit.id, 1)}
-                aria-label={`One more ${line.deposit.name}`}
+                aria-label={t('One more {name}', { name: line.deposit.name })}
               >
                 +
               </button>
@@ -88,16 +95,16 @@ export function OrderTicket(props: OrderTicketProps) {
       </div>
 
       <div className="till-total">
-        <span>{totalCents < 0 ? 'Back onto the card' : 'Total'}</span>
+        <span>{totalCents < 0 ? t('Back onto the card') : t('Total')}</span>
         <strong>{money(Math.abs(totalCents))}</strong>
       </div>
-      <small className="till-note">Member discounts are applied when the card is charged.</small>
+      <small className="till-note">{t('Member discounts are applied when the card is charged.')}</small>
       <button className="till-charge" disabled={empty} onClick={props.onCharge}>
         {chargeLabel(empty, totalCents)}
       </button>
       {!empty && (
         <button className="till-ghost till-clear" onClick={props.onClear}>
-          Clear order
+          {t('Clear order')}
         </button>
       )}
     </div>
@@ -106,15 +113,15 @@ export function OrderTicket(props: OrderTicketProps) {
 
 function cupTitle({ deposit, net }: CupLine) {
   if (net > 0) return `${net}× ${deposit.name}`
-  if (net < 0) return `${-net}× ${deposit.name} returned`
-  return `${deposit.name} swapped`
+  if (net < 0) return t('{count}× {name} returned', { count: -net, name: deposit.name })
+  return t('{name} swapped', { name: deposit.name })
 }
 
 /** Where the number comes from: "2 with drinks · 1 returned". */
 function cupDetail({ withDrinks, adjusted }: CupLine) {
   const parts = []
-  if (withDrinks > 0) parts.push(`${withDrinks} with drinks`)
-  if (adjusted > 0) parts.push(`${adjusted} extra`)
-  if (adjusted < 0) parts.push(`${-adjusted} returned`)
+  if (withDrinks > 0) parts.push(t('{count} with drinks', { count: withDrinks }))
+  if (adjusted > 0) parts.push(t('{count} extra', { count: adjusted }))
+  if (adjusted < 0) parts.push(t('{count} returned', { count: -adjusted }))
   return parts.join(' · ')
 }

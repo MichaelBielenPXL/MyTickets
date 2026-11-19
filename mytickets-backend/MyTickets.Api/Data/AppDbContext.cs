@@ -20,6 +20,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<Payment> Payments => Set<Payment>();
     public DbSet<StripeAccount> StripeAccounts => Set<StripeAccount>();
     public DbSet<MembershipRequest> MembershipRequests => Set<MembershipRequest>();
+    public DbSet<TopUpDeal> TopUpDeals => Set<TopUpDeal>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder b)
     {
@@ -34,13 +35,18 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         b.Entity<MembershipTier>().HasIndex(x => x.OrganisationId);
         b.Entity<Membership>().HasIndex(x => new { x.UserId, x.OrganisationId }).IsUnique();
         b.Entity<Membership>().HasIndex(x => x.OrganisationId);
+        b.Entity<Membership>().HasIndex(x => x.PassCode).IsUnique();
+        b.Entity<TopUpDeal>().HasIndex(x => x.OrganisationId);
         b.Entity<Membership>().HasOne(x => x.Tier).WithMany().OnDelete(DeleteBehavior.Restrict);
         b.Entity<Wallet>().HasIndex(x => new { x.UserId, x.OrganisationId }).IsUnique();
         b.Entity<Wallet>().ToTable(t => t.HasCheckConstraint("ck_wallet_balance_not_negative", "\"BalanceCents\" >= 0"));
         b.Entity<WalletTransaction>().HasIndex(x => new { x.WalletId, x.CreatedAt });
         b.Entity<WalletTransaction>().HasIndex(x => x.RequestId).IsUnique();
-        b.Entity<NfcCard>().HasIndex(x => x.Uid).IsUnique();
-        b.Entity<NfcCard>().HasIndex(x => x.UserId);
+        b.Entity<NfcCard>().HasIndex(x => x.Uid).IsUnique().HasFilter("\"Uid\" IS NOT NULL");
+        b.Entity<NfcCard>().HasIndex(x => x.Code).IsUnique().HasFilter("\"Code\" IS NOT NULL");
+        b.Entity<NfcCard>().HasIndex(x => x.Number).IsUnique();
+        b.Entity<NfcCard>().HasIndex(x => x.WalletId);
+        b.Entity<NfcCard>().HasOne(x => x.Wallet).WithMany().OnDelete(DeleteBehavior.SetNull);
         b.Entity<Event>().HasIndex(x => new { x.OrganisationId, x.StartsAt });
         b.Entity<TicketType>().ToTable(t => t.HasCheckConstraint("ck_ticket_type_not_oversold", "\"Sold\" >= 0 AND \"Sold\" <= \"Capacity\""));
         b.Entity<Ticket>().HasIndex(x => x.Code).IsUnique();

@@ -1,4 +1,5 @@
 import { ErrorNote, QueryResult } from '@/components'
+import { t } from '@/lib/i18n'
 import { money } from '@/utils/format'
 
 import { usePayoutSetup, useStripeLink } from '../api/admin'
@@ -31,15 +32,15 @@ export function PayoutsTab({ slug }: PayoutsTabProps) {
           {(s.status === 'not-started' || s.status === 'incomplete') && (
             <button className="btn primary" disabled={link.isPending} onClick={() => goTo('onboarding')}>
               {link.isPending
-                ? 'Opening Stripe…'
+                ? t('Opening Stripe…')
                 : s.status === 'not-started'
-                  ? 'Set up payouts'
-                  : 'Continue setting up'}
+                  ? t('Set up payouts')
+                  : t('Continue setting up')}
             </button>
           )}
           {(s.status === 'active' || s.status === 'pending') && (
             <button className="btn" disabled={link.isPending} onClick={() => goTo('dashboard')}>
-              {link.isPending ? 'Opening Stripe…' : 'Open your Stripe dashboard'}
+              {link.isPending ? t('Opening Stripe…') : t('Open your Stripe dashboard')}
             </button>
           )}
         </section>
@@ -51,39 +52,42 @@ export function PayoutsTab({ slug }: PayoutsTabProps) {
 function Status({ setup }: { setup: PayoutSetup }) {
   switch (setup.status) {
     case 'unavailable':
-      return <p className="muted">Online payments are not switched on for this platform yet.</p>
+      return <p className="muted">{t('Online payments are not switched on for this platform yet.')}</p>
     case 'not-started':
       return (
         <div className="stack">
-          <h3 className="panel-title">Get paid for online sales</h3>
+          <h3 className="panel-title">{t('Get paid for online sales')}</h3>
           <p className="muted">
-            Buyers pay by Bancontact or card on Stripe&apos;s secure page, and Stripe transfers the money to
-            your bank account. Setting up takes about five minutes: Stripe asks for your details, an ID and
-            the bank account to be paid on.
+            {t(
+              "Buyers pay by Bancontact or card on Stripe's secure page, and Stripe transfers the money to your bank account. Setting up takes about five minutes: Stripe asks for your details, an ID and the bank account to be paid on.",
+            )}
           </p>
           <p className="note warn-note" role="status">
-            Until this is done, members can only pay with tokens bought in cash.
+            {t('Until this is done, members can only pay with tokens bought in cash.')}
           </p>
         </div>
       )
     case 'incomplete':
       return (
         <div className="stack">
-          <h3 className="panel-title">Almost there</h3>
+          <h3 className="panel-title">{t('Almost there')}</h3>
           <p className="muted">
-            Stripe still needs{' '}
-            {setup.requirementsDue === 1 ? 'one more detail' : `${setup.requirementsDue} more details`} before
-            you can take online payments.
+            {setup.requirementsDue === 1
+              ? t('Stripe still needs one more detail before you can take online payments.')
+              : t('Stripe still needs {count} more details before you can take online payments.', {
+                  count: setup.requirementsDue,
+                })}
           </p>
         </div>
       )
     case 'pending':
       return (
         <div className="stack">
-          <h3 className="panel-title">Stripe is checking your details</h3>
+          <h3 className="panel-title">{t('Stripe is checking your details')}</h3>
           <p className="muted">
-            This usually takes a few minutes, sometimes a day. You&apos;ll be able to sell online as soon as
-            it&apos;s done.
+            {t(
+              "This usually takes a few minutes, sometimes a day. You'll be able to sell online as soon as it's done.",
+            )}
           </p>
         </div>
       )
@@ -91,11 +95,12 @@ function Status({ setup }: { setup: PayoutSetup }) {
       return (
         <div className="stack">
           <h3 className="panel-title">
-            <span className="good">●</span> Payouts are active
+            <span className="good">●</span> {t('Payouts are active')}
           </h3>
           <p className="muted">
-            Online payments go straight to your Stripe account and are paid out to your bank automatically.
-            Your Stripe dashboard shows every payment, payout and your bank account.
+            {t(
+              'Online payments go straight to your Stripe account and are paid out to your bank automatically. Your Stripe dashboard shows every payment, payout and your bank account.',
+            )}
           </p>
         </div>
       )
@@ -108,7 +113,13 @@ function Status({ setup }: { setup: PayoutSetup }) {
  */
 function feeTerms({ feePercent, feeMaxCentsPerItem }: PayoutSetup) {
   return (
-    `MyTickets keeps ${feePercent}% of each ticket or top-up, at most ${money(feeMaxCentsPerItem)} each. ` +
-    "On very small payments it keeps just enough to cover Stripe's cost. You get the rest, straight after each payment."
+    t('MyTickets keeps {percent}% of each ticket or top-up, at most {max} each.', {
+      percent: feePercent,
+      max: money(feeMaxCentsPerItem),
+    }) +
+    ' ' +
+    t(
+      "On very small payments it keeps just enough to cover Stripe's cost. You get the rest, straight after each payment.",
+    )
   )
 }

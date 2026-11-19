@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 
 import { QueryResult } from '@/components'
 import { useMe } from '@/features/auth'
+import { t } from '@/lib/i18n'
 
 import { useOrganisations } from '../api/organisations'
 import { CreateOrganisationForm } from '../components/CreateOrganisationForm'
@@ -19,12 +20,12 @@ export function HomePage() {
     <main className="customer-page home-page">
       <header className="page-heading">
         <div>
-          <h1>Organisations</h1>
-          <p className="lead">Join an organisation to buy its tickets and get a token wallet there.</p>
+          <h1>{t('Organisations')}</h1>
+          <p className="lead">{t('Join an organisation to buy its tickets and get a token wallet there.')}</p>
         </div>
         {me?.canCreateOrganisations && !creating && (
           <button className="btn" onClick={() => setCreating(true)}>
-            Start an organisation
+            {t('Start an organisation')}
           </button>
         )}
       </header>
@@ -37,12 +38,12 @@ export function HomePage() {
             <>
               <section className="content-section">
                 <div className="section-heading">
-                  <h2>Your organisations</h2>
-                  <span className="muted">{joined.length} joined</span>
+                  <h2>{t('Your organisations')}</h2>
+                  <span className="muted">{t('{count} joined', { count: joined.length })}</span>
                 </div>
                 {joined.length === 0 && (
                   <p className="muted">
-                    You haven't joined an organisation yet. Join one below to buy tickets.
+                    {t("You haven't joined an organisation yet. Join one below to buy tickets.")}
                   </p>
                 )}
                 <OrganisationList organisations={joined} />
@@ -50,7 +51,7 @@ export function HomePage() {
               {others.length > 0 && (
                 <section className="content-section">
                   <div className="section-heading">
-                    <h2>Discover</h2>
+                    <h2>{t('Discover')}</h2>
                   </div>
                   <OrganisationList organisations={others} />
                 </section>

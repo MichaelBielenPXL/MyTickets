@@ -1,6 +1,8 @@
 import { useState } from 'react'
 
 import { QueryResult } from '@/components'
+import { EventDoors } from '@/features/staff'
+import { t } from '@/lib/i18n'
 import { dateTime } from '@/utils/format'
 
 import { useAdminEvents, useAdminTiers } from '../api/admin'
@@ -28,20 +30,20 @@ export function EventsTab({ slug }: EventsTabProps) {
         />
       ) : (
         <button className="btn primary" onClick={() => setEditing('new')}>
-          New event
+          {t('New event')}
         </button>
       )}
       <QueryResult query={events}>
         {(list) => (
           <>
-            {list.length === 0 && <p className="muted">No events yet.</p>}
+            {list.length === 0 && <p className="muted">{t('No events yet.')}</p>}
             {list.map((event) => (
               <section key={event.id} className="panel stack">
                 <div className="spread">
                   <div>
                     <strong>{event.name}</strong>{' '}
                     <span className={event.published ? 'tag good' : 'tag'}>
-                      {event.published ? 'Published' : 'Draft'}
+                      {event.published ? t('Published') : t('Draft')}
                     </span>
                     <p className="muted">
                       {dateTime(event.startsAt)}
@@ -49,9 +51,10 @@ export function EventsTab({ slug }: EventsTabProps) {
                     </p>
                   </div>
                   <button className="btn" onClick={() => setEditing(event)}>
-                    Edit
+                    {t('Edit')}
                   </button>
                 </div>
+                {event.published && <EventDoors slug={slug} event={event} />}
                 <TicketTypeList slug={slug} event={event} tiers={tiers} />
               </section>
             ))}

@@ -4,10 +4,13 @@ import { type Membership, useMe } from '@/features/auth'
 import {
   OrganisationAvatar,
   OrganisationSwitcher,
+  useBrandTheme,
   useCurrentOrganisation,
   usePublicOrganisation,
 } from '@/features/organisations'
+import { t } from '@/lib/i18n'
 
+import { LanguagePicker } from './LanguagePicker'
 import { OrganisationSidebar } from './OrganisationSidebar'
 import { OrganisationTabs } from './OrganisationTabs'
 import { UserMenu } from './UserMenu'
@@ -25,6 +28,7 @@ export function AppHeader() {
   // see. The page itself already asked for it; this reads the same remembered answer.
   const visiting = Boolean(slugInAddress && !account)
   const visited = usePublicOrganisation(slugInAddress ?? '', visiting).data
+  useBrandTheme(slugInAddress)
 
   const current =
     account ??
@@ -36,9 +40,9 @@ export function AppHeader() {
     <>
       <header className="app-header">
         <div className="header-bar">
-          <Link to="/" className="logo" aria-label="MyTickets home">
+          <Link to="/" className="logo" aria-label={t('MyTickets home')}>
             <LogoMark />
-            {!me && !slugInAddress && <span className="logo-text">MyTickets</span>}
+            {!me && !slugInAddress && <span className="logo-text">{t('MyTickets')}</span>}
           </Link>
 
           {me && (
@@ -63,24 +67,25 @@ export function AppHeader() {
           )}
 
           <div className="header-end">
+            <LanguagePicker />
             {/* At an organisation both lead to that organisation's own sign-in, which starts with the email step. */}
             {slugInAddress && (!me || visiting) && (
               <>
                 <Link className="btn ghost small" to={`/${slugInAddress}/login`}>
-                  Log in
+                  {t('Log in')}
                 </Link>
                 <Link className="btn primary small" to={`/${slugInAddress}/register`}>
-                  Register
+                  {t('Register')}
                 </Link>
               </>
             )}
             {!slugInAddress && !me && (
               <>
                 <Link className="btn ghost small" to="/login">
-                  Log in
+                  {t('Log in')}
                 </Link>
                 <Link className="btn primary small" to="/register">
-                  Register
+                  {t('Register')}
                 </Link>
               </>
             )}
@@ -102,10 +107,10 @@ export function AppHeader() {
 
 /** Staff and admins see their role, members which membership they have; without an account you are visiting. */
 function labelFor(account: Membership | null, visiting: boolean) {
-  if (visiting) return 'Visiting'
+  if (visiting) return t('Visiting')
   if (!account) return undefined
-  if (!account.role) return 'Not joined yet'
-  return account.role === 'Member' ? (account.tier ?? undefined) : account.role
+  if (!account.role) return t('Not joined yet')
+  return account.role === 'Member' ? (account.tier ?? undefined) : t(account.role)
 }
 
 function Divider() {

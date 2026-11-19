@@ -10,7 +10,7 @@ public static partial class OrgEndpoints
     public record JoinRequest(Guid TierId, string? InviteCode);
     public record OrderItem(Guid TicketTypeId, int Quantity);
     public record OrderRequest(List<OrderItem>? Items, string? PayWith);
-    public record TopUpRequest(int AmountCents);
+    public record TopUpRequest(int AmountCents, Guid? DealId = null);
 
     public const int MinTopUpCents = 500;
     public const int MaxTopUpCents = 50_000;
@@ -81,9 +81,8 @@ public static partial class OrgEndpoints
             var request = await db.MembershipRequests.AsNoTracking().Include(r => r.Tier)
                 .Where(r => r.UserId == userId && r.Status != RequestStatus.Completed)
                 .OrderByDescending(r => r.CreatedAt).FirstOrDefaultAsync();
-            var since = now.AddHours(-12);
             var events = await db.Events.AsNoTracking()
-                .Where(e => e.OrganisationId == o.Id && e.Published && (e.EndsAt ?? e.StartsAt) > since)
+                .Where(e => e.OrganisationId == o.Id && e.Published).Where(Event.NotClosed(now))
                 .OrderBy(e => e.StartsAt)
                 .Select(e => new
                 {
@@ -206,11 +205,12 @@ public static partial class OrgEndpoints
             return Results.Ok(new
             {
                 ev.Id, ev.Name, ev.Description, ev.Location, ev.StartsAt, ev.EndsAt, ImageUrl = Images.Url(ev.ImageKey),
+                Status = ev.Status(now),
                 TicketTypes = ev.TicketTypes.OrderBy(t => t.PriceCents).ThenBy(t => t.Name).Select(t => new
                 {
                     t.Id, t.Name, t.PriceCents, YourPriceCents = Http.Discounted(t.PriceCents, discount),
                     Available = t.Capacity - t.Sold, t.MaxPerUser, t.SalesStartAt, t.SalesEndAt,
-                    OnSale = OnSale(t, now),
+                    OnSale = OnSale(t, now) && ev.Status(now) != EventStatus.Closed,
                     AllowedForYou = active && (t.AllowedTierIds.Count == 0 || t.AllowedTierIds.Contains(membership!.TierId)),
                     MembersOnly = t.AllowedTierIds.Count > 0,
                     Owned = owned.GetValueOrDefault(t.Id),
@@ -236,6 +236,7 @@ public static partial class OrgEndpoints
             var ev = await db.Events.AsNoTracking().Include(e => e.TicketTypes)
                 .FirstOrDefaultAsync(e => e.Id == eventId && e.OrganisationId == o.Id && e.Published);
             if (ev is null) return Http.Error(404, "Event not found.");
+            if (ev.Status(now) == EventStatus.Closed) return Http.Error(409, "This event is closed. Tickets are no longer sold.");
 
             // Writers queue up on the database here, so the checks below and the reservation happen as one step.
             await using var tx = await db.Database.BeginTransactionAsync();
@@ -302,19 +303,38 @@ public static partial class OrgEndpoints
             var transactions = await db.WalletTransactions.AsNoTracking().Where(t => t.WalletId == wallet.Id)
                 .OrderByDescending(t => t.CreatedAt).Take(100)
                 .Select(t => new { t.Id, t.AmountCents, t.Type, t.Description, t.CreatedAt }).ToListAsync();
-            return Results.Ok(new { wallet.BalanceCents, Transactions = transactions, MinTopUpCents, MaxTopUpCents });
+            var deals = await db.TopUpDeals.AsNoTracking().Where(d => d.OrganisationId == o.Id).OrderBy(d => d.SortOrder)
+                .Select(d => new { d.Id, d.PriceCents, d.TokensCents }).ToListAsync();
+            return Results.Ok(new { wallet.BalanceCents, Transactions = transactions, MinTopUpCents, MaxTopUpCents, Deals = deals });
         });
 
-        org.MapPost("/wallet/topup", async (TopUpRequest req, HttpContext http, PaymentService payments) =>
+        // Top up with one of the organisation's deals (its own price for its own number of tokens), or any
+        // amount at one token per euro. The price and tokens of a deal come from the database, never the phone.
+        org.MapPost("/wallet/topup", async (TopUpRequest req, HttpContext http, AppDbContext db, PaymentService payments) =>
         {
             var (o, membership) = http.Org();
             if (membership is null) return Http.Error(403, "Join this organisation to get a wallet.");
-            if (req.AmountCents is < MinTopUpCents or > MaxTopUpCents)
-                return Http.Error(400, $"Top up between {Http.Euro(MinTopUpCents)} and {Http.Euro(MaxTopUpCents)}.");
+            int priceCents, tokensCents;
+            if (req.DealId is { } dealId)
+            {
+                var deal = await db.TopUpDeals.AsNoTracking().FirstOrDefaultAsync(d => d.Id == dealId && d.OrganisationId == o.Id);
+                if (deal is null) return Http.Error(409, "This top-up is no longer offered. Reload and pick another.");
+                (priceCents, tokensCents) = (deal.PriceCents, deal.TokensCents);
+            }
+            else
+            {
+                // An organisation with its own deals sells only those: no amount of your own choosing.
+                if (await db.TopUpDeals.AnyAsync(d => d.OrganisationId == o.Id))
+                    return Http.Error(409, "Pick one of the top-ups on offer.");
+                if (req.AmountCents is < MinTopUpCents or > MaxTopUpCents)
+                    return Http.Error(400, $"Top up between {Http.Euro(MinTopUpCents)} and {Http.Euro(MaxTopUpCents)}.");
+                (priceCents, tokensCents) = (req.AmountCents, req.AmountCents);
+            }
             var url = await payments.StartAsync(new Payment
             {
-                Id = Guid.NewGuid(), UserId = http.User.UserId(), OrganisationId = o.Id, AmountCents = req.AmountCents,
-                Purpose = PaymentPurpose.TopUp, Description = $"Wallet top-up {Http.Euro(req.AmountCents)}",
+                Id = Guid.NewGuid(), UserId = http.User.UserId(), OrganisationId = o.Id, AmountCents = priceCents,
+                TokensCents = tokensCents == priceCents ? null : tokensCents,
+                Purpose = PaymentPurpose.TopUp, Description = $"{Http.Tokens(tokensCents)} for {Http.Euro(priceCents)}",
             });
             return Results.Ok(new { CheckoutUrl = url });
         });

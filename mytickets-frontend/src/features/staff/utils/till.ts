@@ -1,3 +1,4 @@
+import { t } from '@/lib/i18n'
 import { money } from '@/utils/format'
 
 import type { MenuProduct } from '../types'
@@ -13,7 +14,7 @@ export type CupLine = { deposit: MenuProduct; withDrinks: number; adjusted: numb
 
 /** What the Charge button says: the amount to charge, or to give back when more cups came back. */
 export function chargeLabel(empty: boolean, totalCents: number) {
-  if (empty) return 'Charge'
-  if (totalCents < 0) return `Give back ${money(-totalCents)}`
-  return `Charge ${money(totalCents)}`
+  if (empty) return t('Charge')
+  if (totalCents < 0) return t('Give back {amount}', { amount: money(-totalCents) })
+  return t('Charge {amount}', { amount: money(totalCents) })
 }

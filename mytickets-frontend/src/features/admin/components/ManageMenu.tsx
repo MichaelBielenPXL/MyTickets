@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 
-import { money } from '@/utils/format'
+import { t } from '@/lib/i18n'
+import { money, tokenPrice } from '@/utils/format'
 
 import { useSummary } from '../api/admin'
 import { ADMIN_SECTIONS, type AdminSection } from '../sections'
@@ -16,6 +17,8 @@ const SUMMARIES: Record<AdminSection, string> = {
   events: 'Parties, tickets and sales',
   memberships: 'Ways to join, prices and discounts',
   members: 'People, roles and requests',
+  cards: 'Issue, write and track cards',
+  tokens: 'Top-up deals and token prices',
   bar: 'Drinks, cups and categories',
   payouts: 'Getting paid to your bank',
   settings: 'Name, logo and sign-up details',
@@ -31,19 +34,23 @@ export function ManageMenu({ slug }: ManageMenuProps) {
 
   return (
     <div className="manage-home">
-      <Link to={`/${slug}/admin?tab=overview`} className="manage-glance" aria-label="Overview: see details">
+      <Link
+        to={`/${slug}/admin?tab=overview`}
+        className="manage-glance"
+        aria-label={t('Overview: see details')}
+      >
         <span className="manage-glance-head">
-          <strong>Overview</strong>
-          <span>Details ›</span>
+          <strong>{t('Overview')}</strong>
+          <span>{t('Details ›')}</span>
         </span>
         <span className="manage-glance-grid">
-          <Stat label="Ticket sales" value={s ? money(s.ticketRevenueCents) : '…'} />
-          <Stat label="Bar sales" value={s ? money(s.barRevenueCents) : '…'} />
-          <Stat label="Members" value={s ? String(s.members) : '…'} />
-          <Stat label="Tokens not spent" value={s ? money(s.creditOutstandingCents) : '…'} />
+          <Stat label={t('Ticket sales')} value={s ? money(s.ticketRevenueCents) : '…'} />
+          <Stat label={t('Bar sales')} value={s ? money(s.barRevenueCents) : '…'} />
+          <Stat label={t('Members')} value={s ? String(s.members) : '…'} />
+          <Stat label={t('Tokens not spent')} value={s ? tokenPrice(s.creditOutstandingCents) : '…'} />
         </span>
       </Link>
-      <nav className="manage-menu" aria-label="Manage sections">
+      <nav className="manage-menu" aria-label={t('Manage sections')}>
         {(Object.keys(ADMIN_SECTIONS) as AdminSection[])
           .filter((key) => key !== 'overview')
           .map((key) => (
@@ -52,8 +59,8 @@ export function ManageMenu({ slug }: ManageMenuProps) {
                 {ICONS[key]}
               </span>
               <span className="manage-menu-text">
-                <strong>{ADMIN_SECTIONS[key]}</strong>
-                <small>{SUMMARIES[key]}</small>
+                <strong>{t(ADMIN_SECTIONS[key])}</strong>
+                <small>{t(SUMMARIES[key])}</small>
               </span>
               <svg
                 className="manage-menu-chevron"
@@ -123,6 +130,18 @@ const ICONS: Record<AdminSection, ReactNode> = {
       <path d="M3.5 19c.8-2.9 3-4.5 5.5-4.5s4.7 1.6 5.5 4.5" />
       <circle cx="16.5" cy="8.5" r="2.3" />
       <path d="M16 13.2c2.2.1 3.9 1.5 4.5 3.8" />
+    </svg>
+  ),
+  cards: (
+    <svg {...glyph}>
+      <rect x="3.5" y="6" width="17" height="12" rx="2.5" />
+      <path d="M15.5 10.2a2.6 2.6 0 0 1 0 3.6M17.6 8.6a5 5 0 0 1 0 6.8M7 14.5h4" />
+    </svg>
+  ),
+  tokens: (
+    <svg {...glyph}>
+      <circle cx="12" cy="12" r="8" />
+      <path d="M9 9h6M12 9v7" />
     </svg>
   ),
   bar: (

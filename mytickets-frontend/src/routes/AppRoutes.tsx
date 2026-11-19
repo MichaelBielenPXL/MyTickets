@@ -2,7 +2,7 @@ import { Navigate, Route, Routes, useParams } from 'react-router-dom'
 
 import { AdminPage } from '@/features/admin'
 import { AuthPage } from '@/features/auth'
-import { CardsPage } from '@/features/cards'
+import { CardLinkPage, CardsPage } from '@/features/cards'
 import { EventPage } from '@/features/events'
 import { HomePage, JoinPage, OrganisationPage, ProfilePage, StartPage } from '@/features/organisations'
 import { CheckoutPage } from '@/features/payments'
@@ -41,6 +41,8 @@ export function AppRoutes() {
         <Route path="*" element={<NotFoundPage />} />
       </Route>
       <Route element={<PublicShell />}>
+        {/* Where a phone lands when a card is held to it: the link written on the chip and printed as its QR. */}
+        <Route path="/c/:code" element={<CardLinkPage />} />
         <Route path="/:slug" element={<OrganisationPage />} />
         <Route path="/:slug/events/:eventId" element={<EventPage />} />
       </Route>

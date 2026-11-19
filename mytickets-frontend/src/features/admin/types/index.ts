@@ -1,3 +1,4 @@
+import type { EventStatus } from '@/features/staff'
 import type { Role, Tier } from '@/types'
 
 /** A picture that was uploaded: `key` is what gets saved, `url` is where to show it from. */
@@ -33,6 +34,10 @@ export interface Summary {
   onlineTopUpsCents: number
   cashTopUpsCents: number
   ticketRevenueCents: number
+  /** What MyTickets kept on tickets paid online (card costs included). Wallet payments carry no fee. */
+  ticketFeesCents: number
+  /** What MyTickets kept on online top-ups. Cash top-ups carry no fee. */
+  topUpFeesCents: number
 }
 
 export interface AdminTier extends Tier {
@@ -71,6 +76,7 @@ export interface AdminEvent {
   imageKey: string | null
   imageUrl: string | null
   ticketTypes: AdminTicketType[]
+  status: EventStatus
 }
 
 export interface EventInput {
@@ -93,6 +99,8 @@ export interface Member extends MemberDetails {
   joinedAt: string
   expiresAt: string | null
   balanceCents: number
+  /** An admin let them link one more card within the year (a lost one). */
+  extraCardAllowed: boolean
 }
 
 /** What a member told the organisation when choosing a membership. Missing when not asked or not given. */
@@ -159,4 +167,29 @@ export interface PayoutSetup {
   /** The platform's share: this percentage of every ticket (or top-up), at most feeMaxCentsPerItem each. */
   feePercent: number
   feeMaxCentsPerItem: number
+}
+
+/** A card the organisation issued, as Manage lists it. */
+export interface AdminCard {
+  id: string
+  /** The number printed on it, e.g. "0042". */
+  number: string
+  /** The code in its link; null for cards linked before cards were issued. */
+  code: string | null
+  /** The link written to the chip and printed as its QR. */
+  url: string | null
+  /** The chip's serial number, once written. */
+  uid: string | null
+  locked: boolean
+  blocked: boolean
+  linkedTo: { name: string } | null
+  createdAt: string
+  writtenAt: string | null
+  linkedAt: string | null
+}
+
+/** Whether cards can be written here: not before the site's real address is set, as it is locked onto each chip. */
+export interface CardWriting {
+  ready: boolean
+  reason: string | null
 }

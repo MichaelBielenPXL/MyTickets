@@ -1,6 +1,7 @@
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 
 import { ErrorNote, QueryResult } from '@/components'
+import { t } from '@/lib/i18n'
 import { dateTime, money } from '@/utils/format'
 
 import { useFinishTestPayment, usePayment } from '../api/payments'
@@ -36,14 +37,21 @@ function Outcome({ payment: p }: { payment: Payment }) {
     return (
       <section className="panel stack outcome" aria-live="polite">
         <span className="outcome-icon waiting" aria-hidden />
-        <h1>Confirming your payment…</h1>
+        <h1>{t('Confirming your payment…')}</h1>
         <p className="muted">
-          Your bank is still confirming the payment of {money(p.amountCents)}. This usually takes a few
-          seconds. You don&apos;t need to pay again.
+          {t(
+            "Your bank is still confirming the payment of {amount}. This usually takes a few seconds. You don't need to pay again.",
+            { amount: money(p.amountCents) },
+          )}
         </p>
         <Summary payment={p} />
         <p className="muted small-print">
-          Closed this page? Your {whatFor(p)} will appear in your account as soon as the payment is confirmed.
+          {t(
+            'Closed this page? Your {what} will appear in your account as soon as the payment is confirmed.',
+            {
+              what: whatFor(p),
+            },
+          )}
         </p>
       </section>
     )
@@ -55,8 +63,8 @@ function Outcome({ payment: p }: { payment: Payment }) {
         <span className="outcome-icon done" aria-hidden>
           ✓
         </span>
-        <h1>Payment received</h1>
-        <p className="muted">Thank you. Your {whatFor(p)} are ready.</p>
+        <h1>{t('Payment received')}</h1>
+        <p className="muted">{t('Thank you. Your {what} are ready.', { what: whatFor(p) })}</p>
         <Summary payment={p} />
         <Link className="btn primary block" to={pageAfter(p)}>
           {nextStep(p)}
@@ -70,14 +78,17 @@ function Outcome({ payment: p }: { payment: Payment }) {
       <span className="outcome-icon failed" aria-hidden>
         ×
       </span>
-      <h1>Payment not completed</h1>
+      <h1>{t('Payment not completed')}</h1>
       <p className="muted">
-        The payment was cancelled, refused by the bank, or took too long. Nothing was charged
-        {p.purpose === 'Tickets' ? ', and the tickets went back on sale' : ''}.
+        {p.purpose === 'Tickets'
+          ? t(
+              'The payment was cancelled, refused by the bank, or took too long. Nothing was charged, and the tickets went back on sale.',
+            )
+          : t('The payment was cancelled, refused by the bank, or took too long. Nothing was charged.')}
       </p>
       <Summary payment={p} />
       <Link className="btn primary block" to={tryAgain(p)}>
-        Try again
+        {t('Try again')}
       </Link>
     </section>
   )
@@ -87,23 +98,23 @@ function Summary({ payment: p }: { payment: Payment }) {
   return (
     <dl className="order-summary">
       <div>
-        <dt>Order</dt>
+        <dt>{t('Order')}</dt>
         <dd>{p.description}</dd>
       </div>
       <div>
-        <dt>Amount</dt>
+        <dt>{t('Amount')}</dt>
         <dd>{money(p.amountCents)}</dd>
       </div>
       <div>
-        <dt>To</dt>
+        <dt>{t('To')}</dt>
         <dd>{p.organisationName}</dd>
       </div>
       <div>
-        <dt>Date</dt>
+        <dt>{t('Date')}</dt>
         <dd>{dateTime(p.completedAt ?? p.createdAt)}</dd>
       </div>
       <div>
-        <dt>Reference</dt>
+        <dt>{t('Reference')}</dt>
         <dd>
           <code>{reference(p)}</code>
         </dd>
@@ -119,14 +130,14 @@ function TestCheckout({ payment: p }: { payment: Payment }) {
 
   return (
     <section className="panel stack">
-      <h1>Checkout</h1>
+      <h1>{t('Checkout')}</h1>
       <div className="spread">
         <span>{p.description}</span>
         <strong>{money(p.amountCents)}</strong>
       </div>
       <p className="muted">To {p.organisationName}</p>
       <p className="note warn-note">
-        Test checkout: no real money is taken. On the live site buyers pay through Stripe instead.
+        {t('Test checkout: no real money is taken. On the live site buyers pay through Stripe instead.')}
       </p>
       <ErrorNote error={finish.error} />
       <button
@@ -134,14 +145,14 @@ function TestCheckout({ payment: p }: { payment: Payment }) {
         disabled={finish.isPending}
         onClick={() => finish.mutate('pay', { onSuccess: done })}
       >
-        Pay {money(p.amountCents)}
+        {t('Pay {price}', { price: money(p.amountCents) })}
       </button>
       <button
         className="btn block"
         disabled={finish.isPending}
         onClick={() => finish.mutate('cancel', { onSuccess: done })}
       >
-        Cancel
+        {t('Cancel')}
       </button>
     </section>
   )
@@ -153,15 +164,15 @@ function reference(payment: Payment) {
 }
 
 function whatFor(payment: Payment) {
-  if (payment.purpose === 'Tickets') return 'tickets'
-  if (payment.purpose === 'TopUp') return 'tokens and history'
-  return 'membership benefits'
+  if (payment.purpose === 'Tickets') return t('tickets')
+  if (payment.purpose === 'TopUp') return t('tokens and history')
+  return t('membership benefits')
 }
 
 function nextStep(payment: Payment) {
-  if (payment.purpose === 'Tickets') return 'View my tickets'
-  if (payment.purpose === 'TopUp') return 'View my tokens'
-  return `Go to ${payment.organisationName}`
+  if (payment.purpose === 'Tickets') return t('View my tickets')
+  if (payment.purpose === 'TopUp') return t('View my tokens')
+  return t('Go to {org}', { org: payment.organisationName })
 }
 
 /** Where the buyer goes next: to what they just paid for. */

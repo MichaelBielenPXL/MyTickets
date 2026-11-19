@@ -1,6 +1,7 @@
 import { type FormEvent, useState } from 'react'
 
 import { ErrorNote, Field } from '@/components'
+import { t } from '@/lib/i18n'
 import { euroInput, fromLocalInput, requireEuro, requireWholeNumber, toLocalInput } from '@/utils/format'
 
 import { useSaveTicketType } from '../api/admin'
@@ -40,53 +41,56 @@ export function TicketTypeForm({ slug, eventId, ticketType, tiers, onDone }: Tic
       const input = {
         name,
         priceCents: requireEuro(price),
-        capacity: requireWholeNumber(capacity, 'the number of tickets'),
-        maxPerUser: requireWholeNumber(maxPerUser, 'tickets per person'),
+        capacity: requireWholeNumber(capacity, t('the number of tickets')),
+        maxPerUser: requireWholeNumber(maxPerUser, t('tickets per person')),
         salesStartAt: fromLocalInput(salesStartAt),
         salesEndAt: fromLocalInput(salesEndAt),
         allowedTierIds,
       }
       save.mutate({ id: ticketType?.id, ticketType: input }, { onSuccess: onDone })
     } catch (error) {
-      setProblem(error instanceof Error ? error.message : 'Check the form.')
+      setProblem(error instanceof Error ? error.message : t('Check the form.'))
     }
   }
 
   return (
     <form onSubmit={submit} className="stack sub-form">
       <div className="grid-2">
-        <Field label="Ticket name">
+        <Field label={t('Ticket name')}>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Regular"
+            placeholder={t('Regular')}
             required
             maxLength={80}
           />
         </Field>
-        <Field label="Price in euro" hint="0 for free">
+        <Field label={t('Price in euro')} hint={t('0 for free')}>
           <input inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} />
         </Field>
-        <Field label="How many tickets" hint={ticketType ? `${ticketType.sold} sold so far` : undefined}>
+        <Field
+          label={t('How many tickets')}
+          hint={ticketType ? t('{count} sold so far', { count: ticketType.sold }) : undefined}
+        >
           <input inputMode="numeric" value={capacity} onChange={(e) => setCapacity(e.target.value)} />
         </Field>
-        <Field label="Most per person">
+        <Field label={t('Most per person')}>
           <input inputMode="numeric" value={maxPerUser} onChange={(e) => setMaxPerUser(e.target.value)} />
         </Field>
-        <Field label="Sales open (optional)">
+        <Field label={t('Sales open (optional)')}>
           <input
             type="datetime-local"
             value={salesStartAt}
             onChange={(e) => setSalesStartAt(e.target.value)}
           />
         </Field>
-        <Field label="Sales close (optional)">
+        <Field label={t('Sales close (optional)')}>
           <input type="datetime-local" value={salesEndAt} onChange={(e) => setSalesEndAt(e.target.value)} />
         </Field>
       </div>
       {openTiers.length > 1 && (
         <fieldset>
-          <legend>Who can buy? Leave all unticked for everyone.</legend>
+          <legend>{t('Who can buy? Leave all unticked for everyone.')}</legend>
           {openTiers.map((tier) => (
             <label key={tier.id} className="check">
               <input
@@ -103,10 +107,10 @@ export function TicketTypeForm({ slug, eventId, ticketType, tiers, onDone }: Tic
       <ErrorNote error={save.error} />
       <div className="row">
         <button className="btn primary" disabled={save.isPending}>
-          Save ticket
+          {t('Save ticket')}
         </button>
         <button type="button" className="btn" onClick={onDone}>
-          Cancel
+          {t('Cancel')}
         </button>
       </div>
     </form>

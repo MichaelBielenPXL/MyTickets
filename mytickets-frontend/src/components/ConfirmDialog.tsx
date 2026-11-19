@@ -1,11 +1,15 @@
 import { useEffect, useId, useRef } from 'react'
 import { createPortal } from 'react-dom'
 
+import { t } from '@/lib/i18n'
+
 type ConfirmDialogProps = {
   open: boolean
   title: string
   message?: string
   confirmLabel: string
+  /** The button that closes it without doing anything; "Cancel" when not given. */
+  cancelLabel?: string
   /** Shows the confirm button in red, for things that can't be undone. */
   destructive?: boolean
   busy?: boolean
@@ -23,6 +27,7 @@ export function ConfirmDialog({
   title,
   message,
   confirmLabel,
+  cancelLabel,
   destructive,
   busy,
   onConfirm,
@@ -87,7 +92,7 @@ export function ConfirmDialog({
         </div>
         <div className="confirm-dialog-actions">
           <button ref={cancel} type="button" onClick={onCancel} disabled={busy}>
-            Cancel
+            {cancelLabel ?? t('Cancel')}
           </button>
           <button
             type="button"
@@ -95,7 +100,7 @@ export function ConfirmDialog({
             onClick={onConfirm}
             disabled={busy}
           >
-            {busy ? 'One moment…' : confirmLabel}
+            {busy ? t('One moment…') : confirmLabel}
           </button>
         </div>
       </div>

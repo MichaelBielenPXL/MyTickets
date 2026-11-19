@@ -170,4 +170,21 @@ describe('SettingsTab', () => {
     await user.type(screen.getByLabelText('Colour code'), '3456')
     expect(screen.getByRole('button', { name: 'Save changes' })).toBeEnabled()
   })
+
+  it('refuses a colour white text cannot be read on, and offers a darker shade of it', async () => {
+    const state = serveSettings()
+    const { user } = renderApp(<SettingsTab slug="night-owls" />)
+
+    await user.type(await screen.findByLabelText('Colour code'), '#f5e663')
+    expect(screen.getByRole('alert')).toHaveTextContent('White text is hard to read on this colour')
+    expect(screen.getByRole('button', { name: 'Save changes' })).toBeDisabled()
+
+    await user.click(screen.getByRole('button', { name: 'use a darker shade of it' }))
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+    await screen.findByText('Saved.')
+    const saved = state.saved[0] as { brandColor: string }
+    expect(saved.brandColor).toMatch(/^#[0-9a-f]{6}$/)
+    expect(saved.brandColor).not.toBe('#f5e663')
+  })
 })

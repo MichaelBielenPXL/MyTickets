@@ -1,6 +1,7 @@
 import { useParams } from 'react-router-dom'
 
 import { ErrorNote, Loading } from '@/components'
+import { t } from '@/lib/i18n'
 
 import { useMyProfile, useSaveProfile } from '../api/organisations'
 import { ProfileFormFields } from '../components/ProfileFormFields'
@@ -14,7 +15,7 @@ export function ProfilePage() {
   return (
     <main className="customer-page join-page">
       <header className="join-heading">
-        <h1>My details</h1>
+        <h1>{t('My details')}</h1>
         {profile.data && <p className="lead">Signed in as {profile.data.email}.</p>}
       </header>
       <div className="panel stack">
@@ -23,7 +24,7 @@ export function ProfilePage() {
             // Starts over from what was saved, once saving is done.
             key={JSON.stringify(profile.data.profile)}
             form={profile.data}
-            submitLabel="Save details"
+            submitLabel={t('Save details')}
             busy={save.isPending}
             error={save.error}
             onSubmit={(values) => save.mutate(values)}
@@ -35,7 +36,7 @@ export function ProfilePage() {
         )}
         {save.isSuccess && (
           <p className="muted" role="status">
-            Saved.
+            {t('Saved.')}
           </p>
         )}
       </div>

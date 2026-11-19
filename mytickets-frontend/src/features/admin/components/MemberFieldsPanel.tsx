@@ -2,6 +2,7 @@ import { type FormEvent, useState } from 'react'
 
 import { ErrorNote, QueryResult } from '@/components'
 import type { FieldMode, ProfileFieldName } from '@/features/organisations'
+import { t } from '@/lib/i18n'
 
 import { useMemberFields, useSaveMemberFields } from '../api/admin'
 
@@ -48,22 +49,22 @@ function MemberFieldsForm({ saved, save }: MemberFieldsFormProps) {
   return (
     <form onSubmit={submit} className="panel stack settings-form">
       <div>
-        <h3 className="panel-title">Information asked from members</h3>
+        <h3 className="panel-title">{t('Information asked from members')}</h3>
         <p className="muted">
-          Asked when someone chooses a membership. First and last name are always asked.
+          {t('Asked when someone chooses a membership. First and last name are always asked.')}
         </p>
       </div>
       <div className="field-modes">
         {FIELDS.map(([field, label]) => (
           <label key={field} className="field-mode">
-            <span>{label}</span>
+            <span>{t(label)}</span>
             <select
               value={modes[field]}
               onChange={(e) => setModes({ ...modes, [field]: e.target.value as FieldMode })}
             >
               {MODES.map(([mode, text]) => (
                 <option key={mode} value={mode}>
-                  {text}
+                  {t(text)}
                 </option>
               ))}
             </select>
@@ -73,11 +74,11 @@ function MemberFieldsForm({ saved, save }: MemberFieldsFormProps) {
       <ErrorNote error={save.error} />
       <div className="row">
         <button className="btn primary" disabled={save.isPending || !changed}>
-          Save
+          {t('Save')}
         </button>
         {save.isSuccess && !changed && (
           <span className="muted" role="status">
-            Saved.
+            {t('Saved.')}
           </span>
         )}
       </div>

@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from 'react'
 
 import { useCardTaps } from '@/components'
 import { ApiError } from '@/lib/api-client'
+import { t } from '@/lib/i18n'
 import { errorText, money } from '@/utils/format'
 
 import { useChargeCard, useLookUpCard } from '../api/staff'
@@ -123,7 +124,7 @@ export function BarMode({ slug, products, categories, onMenuChanged }: BarModePr
           outcome: {
             ok: true,
             title: money(holder.balanceCents),
-            detail: `${holder.name}${holder.membershipActive ? ` · ${holder.tier}` : ' · membership ended'}`,
+            detail: `${holder.name}${holder.membershipActive ? ` · ${holder.tier}` : t(' · membership ended')}`,
           },
         }),
       onError: (error) => setStep({ kind: 'done', outcome: { ok: false, title: errorText(error) } }),
@@ -134,18 +135,18 @@ export function BarMode({ slug, products, categories, onMenuChanged }: BarModePr
   const close = useCallback(() => setStep(null), [])
 
   if (items.length === 0 && deposits.length === 0) {
-    return <p className="muted">No products yet. An admin can add them under Manage › Bar menu.</p>
+    return <p className="muted">{t('No products yet. An admin can add them under Manage › Bar menu.')}</p>
   }
 
   const readerSwitch = reader.supported ? (
     <div className="till-reader">
       {reader.listening ? (
         <span className="till-reader-on">
-          <span className="pulse" /> Card reader on
+          <span className="pulse" /> {t('Card reader on')}
         </span>
       ) : (
         <button className="till-ghost" onClick={reader.start}>
-          Turn on card reader
+          {t('Turn on card reader')}
         </button>
       )}
       {reader.problem && <small className="till-problem">{reader.problem}</small>}
@@ -165,7 +166,7 @@ export function BarMode({ slug, products, categories, onMenuChanged }: BarModePr
         onCups={changeCups}
       />
 
-      <aside className={sheetOpen ? 'till-side open' : 'till-side'} aria-label="Order">
+      <aside className={sheetOpen ? 'till-side open' : 'till-side'} aria-label={t('Order')}>
         <OrderTicket
           bought={bought}
           cupLines={cupLines}
@@ -185,8 +186,8 @@ export function BarMode({ slug, products, categories, onMenuChanged }: BarModePr
       <div className="till-bar">
         <button className="till-bar-summary" onClick={() => setSheetOpen(true)}>
           {empty
-            ? 'Order'
-            : `${itemCount} item${itemCount === 1 ? '' : 's'} · ${money(Math.abs(totalCents))}`}
+            ? t('Order')
+            : `${itemCount === 1 ? t('1 item') : t('{count} items', { count: itemCount })} · ${money(Math.abs(totalCents))}`}
           <span aria-hidden="true">⌃</span>
         </button>
         <button
@@ -216,13 +217,16 @@ function settled(result: ChargeResult): Outcome {
   if (result.totalCents < 0) {
     return {
       ok: true,
-      title: `Gave back ${money(-result.totalCents)}`,
-      detail: `${result.displayName} · ${money(result.balanceCents)} on the card`,
+      title: t('Gave back {amount}', { amount: money(-result.totalCents) }),
+      detail: t('{name} · {amount} on the card', {
+        name: result.displayName,
+        amount: money(result.balanceCents),
+      }),
     }
   }
   return {
     ok: true,
-    title: `Paid ${money(result.totalCents)}`,
-    detail: `${result.displayName} · ${money(result.balanceCents)} left`,
+    title: t('Paid {amount}', { amount: money(result.totalCents) }),
+    detail: t('{name} · {amount} left', { name: result.displayName, amount: money(result.balanceCents) }),
   }
 }

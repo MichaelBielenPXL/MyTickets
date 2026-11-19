@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 
 import { QueryResult } from '@/components'
+import { t } from '@/lib/i18n'
 
 import { useStaffContext } from '../api/staff'
 import { BarMode } from '../components/BarMode'
@@ -36,7 +37,7 @@ export function StaffPage() {
               ‹ {staff.name}
             </Link>
             {modes.length > 1 && (
-              <nav className="tabs" aria-label="Staff mode">
+              <nav className="tabs" aria-label={t('Staff mode')}>
                 {modes.map((key) => (
                   <button
                     key={key}
@@ -44,7 +45,7 @@ export function StaffPage() {
                     aria-current={mode === key ? 'page' : undefined}
                     onClick={() => setChosen(key)}
                   >
-                    {MODES[key]}
+                    {t(MODES[key])}
                   </button>
                 ))}
               </nav>

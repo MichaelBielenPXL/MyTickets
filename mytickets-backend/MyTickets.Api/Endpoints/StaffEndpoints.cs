@@ -13,7 +13,7 @@ public static class StaffEndpoints
     public record ChargeRequest(string? CardUid, List<ChargeItem>? Items, Guid? RequestId);
     public record CashTopUpRequest(string? CardUid, int AmountCents, Guid? RequestId);
 
-    private record Holder(NfcCard Card, Membership Membership, Wallet Wallet);
+    private record Holder(User User, Membership Membership, Wallet Wallet);
 
     public static void MapStaff(this IEndpointRouteBuilder app)
     {
@@ -23,10 +23,11 @@ public static class StaffEndpoints
         staff.MapGet("/context", async (HttpContext http, AppDbContext db, AppCache cache, TimeProvider clock) =>
         {
             var org = http.Org().Org;
-            var since = clock.GetUtcNow().UtcDateTime.AddDays(-1);
-            var events = await db.Events.AsNoTracking()
-                .Where(e => e.OrganisationId == org.Id && e.Published && (e.EndsAt ?? e.StartsAt) > since)
-                .OrderBy(e => e.StartsAt).Select(e => new { e.Id, e.Name, e.StartsAt }).ToListAsync();
+            var now = clock.GetUtcNow().UtcDateTime;
+            var events = (await db.Events.AsNoTracking()
+                .Where(e => e.OrganisationId == org.Id && e.Published).Where(Event.NotClosed(now))
+                .OrderBy(e => e.StartsAt).ToListAsync())
+                .Select(e => new { e.Id, e.Name, e.StartsAt, Status = e.Status(now) });
             // The app shows only the jobs this person does.
             var tasks = StaffTasks.For(http.Org().Membership!.Role).Select(t => t.ToString());
             return Results.Ok(new { org.Name, Tasks = tasks, Events = events, Products = await cache.ActiveProductsAsync(org.Id), Categories = await cache.CategoriesAsync(org.Id) });
@@ -39,12 +40,12 @@ public static class StaffEndpoints
             if (holder is null) return error!;
             var now = clock.GetUtcNow().UtcDateTime;
             var tickets = req.EventId is null ? [] : await db.Tickets.AsNoTracking()
-                .Where(t => t.EventId == req.EventId && t.UserId == holder.Card.UserId &&
+                .Where(t => t.EventId == req.EventId && t.UserId == holder.User.Id &&
                             (t.Status == TicketStatus.Valid || t.Status == TicketStatus.CheckedIn))
                 .Select(t => new { TicketType = t.TicketType.Name, t.Status, t.CheckedInAt }).ToListAsync();
             return Results.Ok(new
             {
-                Name = holder.Card.User.DisplayName, Tier = holder.Membership.Tier.Name,
+                Name = holder.User.DisplayName, Tier = holder.Membership.Tier.Name,
                 MembershipActive = holder.Membership.IsActive(now), holder.Membership.ExpiresAt,
                 holder.Wallet.BalanceCents, Tickets = tickets,
                 DrinkDiscountPercent = holder.Membership.IsActive(now) ? holder.Membership.Tier.DrinkDiscountPercent : 0,
@@ -57,22 +58,38 @@ public static class StaffEndpoints
             var org = http.Org().Org;
             var staffId = http.User.UserId();
             var now = clock.GetUtcNow().UtcDateTime;
-            if (!await db.Events.AnyAsync(e => e.Id == req.EventId && e.OrganisationId == org.Id)) return Http.Error(404, "Event not found.");
+            var ev = await db.Events.AsNoTracking().FirstOrDefaultAsync(e => e.Id == req.EventId && e.OrganisationId == org.Id);
+            if (ev is null) return Http.Error(404, "Event not found.");
+            switch (ev.Status(now))
+            {
+                case EventStatus.Upcoming:
+                    return Http.Error(409, $"The doors of {ev.Name} aren't open yet. Open them to start checking people in.");
+                case EventStatus.Closed:
+                    return Http.Error(409, $"{ev.Name} is closed. Reopen it to check people in.");
+            }
 
             var candidates = db.Tickets.Where(t => t.EventId == req.EventId);
-            if (!string.IsNullOrWhiteSpace(req.Code))
+            if (MemberPasses.Normalise(req.Code) is { } passCode)
+            {
+                // A member's QR code: let them in on their own ticket, as if they tapped their card.
+                var userId = await db.Memberships.AsNoTracking().Where(m => m.PassCode == passCode).Select(m => (Guid?)m.UserId).FirstOrDefaultAsync();
+                if (userId is null) return Http.Error(404, "This member code is not known here.");
+                candidates = candidates.Where(t => t.UserId == userId);
+            }
+            else if (!string.IsNullOrWhiteSpace(req.Code))
             {
                 var code = req.Code.Trim().ToUpperInvariant();
                 candidates = candidates.Where(t => t.Code == code);
             }
             else
             {
-                var uid = Http.NormaliseCardUid(req.CardUid);
-                if (uid is null) return Http.Error(400, "Scan a ticket or tap a card.");
-                var card = await db.NfcCards.AsNoTracking().FirstOrDefaultAsync(c => c.Uid == uid);
-                if (card is null) return Http.Error(404, "This card is not linked to an account.");
+                if (string.IsNullOrWhiteSpace(req.CardUid)) return Http.Error(400, "Scan a ticket or tap a card.");
+                var card = await CardLookup.FindAsync(db, req.CardUid);
+                if (card is null) return Http.Error(404, "This card is not known here.");
+                if (card.Wallet is null) return Http.Error(404, "This card isn't linked to anyone yet.");
                 if (card.Blocked) return Http.Error(403, "This card is blocked.");
-                candidates = candidates.Where(t => t.UserId == card.UserId);
+                var ownerId = card.Wallet.UserId;
+                candidates = candidates.Where(t => t.UserId == ownerId);
             }
 
             var found = await candidates.AsNoTracking()
@@ -93,6 +110,33 @@ public static class StaffEndpoints
             }
             var last = found.Max(t => t.CheckedInAt);
             return Results.Json(new { error = "Already checked in.", found[0].Name, CheckedInAt = last }, statusCode: 409);
+        }).RequireTask(StaffTask.Door);
+
+        // Open the doors now, also before the start time, or open a closed event again. A past end time is
+        // dropped, so the event stays open until it is closed.
+        staff.MapPost("/events/{eventId:guid}/open", async (Guid eventId, HttpContext http, AppDbContext db, TimeProvider clock) =>
+        {
+            var now = clock.GetUtcNow().UtcDateTime;
+            var ev = await db.Events.FirstOrDefaultAsync(e => e.Id == eventId && e.OrganisationId == http.Org().Org.Id);
+            if (ev is null) return Http.Error(404, "Event not found.");
+            ev.ClosedAt = null;
+            if (ev.StartsAt > now || ev.Status(now) == EventStatus.Closed) ev.OpenedAt = now;
+            if (ev.EndsAt <= now) ev.EndsAt = null;
+            // Without an end time it would close a day after its start; a reopened event runs a day from now.
+            if (ev.EndsAt is null && ev.StartsAt + Event.OpenWithoutEndTime <= now) ev.EndsAt = now + Event.OpenWithoutEndTime;
+            await db.SaveChangesAsync();
+            return Results.Ok(new { Status = ev.Status(now) });
+        }).RequireTask(StaffTask.Door);
+
+        // Close the event: the door stops letting people in and ticket sales stop.
+        staff.MapPost("/events/{eventId:guid}/close", async (Guid eventId, HttpContext http, AppDbContext db, TimeProvider clock) =>
+        {
+            var now = clock.GetUtcNow().UtcDateTime;
+            var ev = await db.Events.FirstOrDefaultAsync(e => e.Id == eventId && e.OrganisationId == http.Org().Org.Id);
+            if (ev is null) return Http.Error(404, "Event not found.");
+            ev.ClosedAt ??= now;
+            await db.SaveChangesAsync();
+            return Results.Ok(new { Status = ev.Status(now) });
         }).RequireTask(StaffTask.Door);
 
         staff.MapPost("/charge", async (ChargeRequest req, HttpContext http, AppDbContext db, AppCache cache, WalletService wallets, TimeProvider clock) =>
@@ -137,7 +181,7 @@ public static class StaffEndpoints
 
             await using var tx = await db.Database.BeginTransactionAsync();
             if (await AlreadyProcessedAsync(db, req.RequestId))
-                return Results.Ok(new { TotalCents = total, DepositCents = depositCents, BalanceCents = await wallets.BalanceAsync(holder.Wallet.Id), holder.Card.User.DisplayName, AlreadyProcessed = true });
+                return Results.Ok(new { TotalCents = total, DepositCents = depositCents, BalanceCents = await wallets.BalanceAsync(holder.Wallet.Id), holder.User.DisplayName, AlreadyProcessed = true });
             if (total < 0)
             {
                 // More came back than was bought: the difference goes onto the card.
@@ -149,7 +193,7 @@ public static class StaffEndpoints
                 return Results.Json(new { error = $"Not enough tokens: {Http.Tokens(balance)} on the card, {Http.Tokens(total)} needed.", BalanceCents = balance, TotalCents = total }, statusCode: 402);
             }
             await tx.CommitAsync();
-            return Results.Ok(new { TotalCents = total, DepositCents = depositCents, BalanceCents = await wallets.BalanceAsync(holder.Wallet.Id), holder.Card.User.DisplayName, AlreadyProcessed = false });
+            return Results.Ok(new { TotalCents = total, DepositCents = depositCents, BalanceCents = await wallets.BalanceAsync(holder.Wallet.Id), holder.User.DisplayName, AlreadyProcessed = false });
         }).RequireTask(StaffTask.Bar);
 
         // Someone hands over cash at the event and gets credit on their card.
@@ -166,7 +210,7 @@ public static class StaffEndpoints
             if (!repeated)
                 await wallets.CreditAsync(holder.Wallet.Id, req.AmountCents, WalletTxType.CashTopUp, "Cash top-up", http.User.UserId(), requestId: req.RequestId);
             await tx.CommitAsync();
-            return Results.Ok(new { BalanceCents = await wallets.BalanceAsync(holder.Wallet.Id), holder.Card.User.DisplayName, AlreadyProcessed = repeated });
+            return Results.Ok(new { BalanceCents = await wallets.BalanceAsync(holder.Wallet.Id), holder.User.DisplayName, AlreadyProcessed = repeated });
         }).RequireTask(StaffTask.CashTopUp);
     }
 
@@ -174,18 +218,29 @@ public static class StaffEndpoints
     private static async Task<bool> AlreadyProcessedAsync(AppDbContext db, Guid? requestId) =>
         requestId is { } id && await db.WalletTransactions.AnyAsync(t => t.RequestId == id);
 
+    /// <summary>Whose wallet this is: from a tapped or typed card, or from a scanned or typed member QR code.</summary>
     private static async Task<(Holder?, IResult?)> FindHolderAsync(AppDbContext db, Guid orgId, string? rawUid)
     {
-        var uid = Http.NormaliseCardUid(rawUid);
-        if (uid is null) return (null, Http.Error(400, "Tap a card or enter its number."));
-        var card = await db.NfcCards.AsNoTracking().Include(c => c.User).FirstOrDefaultAsync(c => c.Uid == uid);
-        if (card is null) return (null, Http.Error(404, "This card is not linked to an account."));
+        if (MemberPasses.Normalise(rawUid) is { } passCode)
+        {
+            var member = await db.Memberships.AsNoTracking().Include(m => m.Tier).Include(m => m.User)
+                .FirstOrDefaultAsync(m => m.PassCode == passCode && m.OrganisationId == orgId);
+            if (member is null) return (null, Http.Error(404, "This member code is not known here."));
+            var memberWallet = await db.Wallets.AsNoTracking().FirstOrDefaultAsync(w => w.UserId == member.UserId && w.OrganisationId == orgId);
+            if (memberWallet is null) return (null, Http.Error(404, $"{member.User.DisplayName} has no wallet here."));
+            return (new Holder(member.User, member, memberWallet), null);
+        }
+        if (string.IsNullOrWhiteSpace(rawUid)) return (null, Http.Error(400, "Tap a card, scan a member QR code, or enter its number."));
+        var card = await CardLookup.FindAsync(db, rawUid);
+        if (card is null) return (null, Http.Error(404, "This card is not known here."));
+        if (card.Wallet is null) return (null, Http.Error(404, "This card isn't linked to anyone yet."));
         if (card.Blocked) return (null, Http.Error(403, "This card is blocked."));
+        var wallet = card.Wallet;
+        var owner = await db.Users.AsNoTracking().FirstAsync(u => u.Id == wallet.UserId);
         var membership = await db.Memberships.AsNoTracking().Include(m => m.Tier)
-            .FirstOrDefaultAsync(m => m.UserId == card.UserId && m.OrganisationId == orgId);
-        var wallet = await db.Wallets.AsNoTracking().FirstOrDefaultAsync(w => w.UserId == card.UserId && w.OrganisationId == orgId);
-        if (membership is null || wallet is null)
-            return (null, Http.Error(404, $"{card.User.DisplayName} has not joined this organisation."));
-        return (new Holder(card, membership, wallet), null);
+            .FirstOrDefaultAsync(m => m.UserId == wallet.UserId && m.OrganisationId == orgId);
+        if (membership is null)
+            return (null, Http.Error(404, $"{owner.DisplayName} has not joined this organisation."));
+        return (new Holder(owner, membership, wallet), null);
     }
 }

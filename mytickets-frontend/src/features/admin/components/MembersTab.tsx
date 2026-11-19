@@ -1,10 +1,11 @@
 import { useState } from 'react'
 
 import { ErrorNote, QueryResult } from '@/components'
+import { t } from '@/lib/i18n'
 import type { Role } from '@/types'
-import { lastValidDay, money } from '@/utils/format'
+import { lastValidDay, tokenPrice } from '@/utils/format'
 
-import { useAdminTiers, useMembers, useUpdateMember } from '../api/admin'
+import { useAdminTiers, useAllowExtraCard, useMembers, useUpdateMember } from '../api/admin'
 import type { Member } from '../types'
 import { JoinRequests } from './JoinRequests'
 import { MemberDetailsList } from './MemberDetailsList'
@@ -20,6 +21,7 @@ export function MembersTab({ slug }: MembersTabProps) {
   const members = useMembers(slug)
   const tiers = useAdminTiers(slug).data ?? []
   const update = useUpdateMember(slug)
+  const extraCard = useAllowExtraCard(slug)
 
   function change(member: Member, changes: Partial<Pick<Member, 'role' | 'tierId'>>) {
     update.mutate({
@@ -35,17 +37,18 @@ export function MembersTab({ slug }: MembersTabProps) {
     <div className="stack">
       <JoinRequests slug={slug} />
       <p className="muted">
-        Barmen work the bar, doormen the door, and both can check a card&apos;s tokens. Staff do all of that
-        and take cash top-ups. Admins can also change everything here.
+        {t(
+          "Barmen work the bar, doormen the door, and both can check a card's tokens. Staff do all of that and take cash top-ups. Admins can also change everything here.",
+        )}
       </p>
       <input
         type="search"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        placeholder="Search by name or email"
-        aria-label="Search members"
+        placeholder={t('Search by name or email')}
+        aria-label={t('Search members')}
       />
-      <ErrorNote error={update.error} />
+      <ErrorNote error={update.error ?? extraCard.error} />
       <QueryResult query={members}>
         {(all) => {
           const shown = all.filter((member) => matches(member, search))
@@ -58,8 +61,9 @@ export function MembersTab({ slug }: MembersTabProps) {
                       <strong>{member.displayName}</strong>
                       <p className="muted">{member.email}</p>
                       <p className="muted">
-                        Tokens {money(member.balanceCents)}
-                        {member.expiresAt && ` · until ${lastValidDay(member.expiresAt)}`}
+                        {t('Tokens {amount}', { amount: tokenPrice(member.balanceCents) })}
+                        {member.expiresAt &&
+                          ` · ${t('until {date}', { date: lastValidDay(member.expiresAt) })}`}
                       </p>
                       <MemberDetailsList details={member} />
                     </div>
@@ -67,7 +71,7 @@ export function MembersTab({ slug }: MembersTabProps) {
                       <select
                         value={member.tierId}
                         onChange={(e) => change(member, { tierId: e.target.value })}
-                        aria-label={`Membership of ${member.displayName}`}
+                        aria-label={t('Membership of {name}', { name: member.displayName })}
                       >
                         {tiers.map((tier) => (
                           <option key={tier.id} value={tier.id}>
@@ -78,19 +82,31 @@ export function MembersTab({ slug }: MembersTabProps) {
                       <select
                         value={member.role}
                         onChange={(e) => change(member, { role: e.target.value as Role })}
-                        aria-label={`Role of ${member.displayName}`}
+                        aria-label={t('Role of {name}', { name: member.displayName })}
                       >
                         {ROLES.map((role) => (
                           <option key={role} value={role}>
-                            {role}
+                            {t(role)}
                           </option>
                         ))}
                       </select>
+                      {/* One new card a year; a member who lost theirs can be allowed one more. */}
+                      <button
+                        type="button"
+                        className="btn"
+                        aria-pressed={member.extraCardAllowed}
+                        disabled={extraCard.isPending}
+                        onClick={() =>
+                          extraCard.mutate({ memberId: member.id, allowed: !member.extraCardAllowed })
+                        }
+                      >
+                        {member.extraCardAllowed ? t('Extra card allowed') : t('Allow one extra card')}
+                      </button>
                     </div>
                   </div>
                 ))}
               </div>
-              {shown.length === 0 && <p className="muted">Nobody found.</p>}
+              {shown.length === 0 && <p className="muted">{t('Nobody found.')}</p>}
             </>
           )
         }}

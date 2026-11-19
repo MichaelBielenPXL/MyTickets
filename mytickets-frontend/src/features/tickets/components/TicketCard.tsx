@@ -1,5 +1,6 @@
 import { QRCodeSVG } from 'qrcode.react'
 
+import { t } from '@/lib/i18n'
 import { dateTime } from '@/utils/format'
 
 import type { MyTicket } from '../types'
@@ -35,10 +36,10 @@ export function TicketCard({ ticket, open, onToggle }: TicketCardProps) {
             value={ticket.code}
             size={220}
             marginSize={2}
-            title={`QR code for ${ticket.eventName}`}
+            title={t('QR code for {event}', { event: ticket.eventName })}
           />
           <code>{ticket.code}</code>
-          <p className="muted">Show this at the door, or tap your card.</p>
+          <p className="muted">{t('Show this at the door, or tap your card.')}</p>
         </div>
       )}
     </div>

@@ -1,3 +1,5 @@
+import { getLanguage, locale, t } from '@/lib/i18n'
+
 const euro = new Intl.NumberFormat('nl-BE', { style: 'currency', currency: 'EUR' })
 
 /** All amounts travel as whole cents; this is the only place they become text. */
@@ -17,14 +19,30 @@ export const tokens = (cents: number) =>
 export const tokenAmount = (cents: number) =>
   (cents % 100 === 0 ? wholeTokens : partTokens).format(cents / 100)
 
+/** A member's balance as Entry shows it: "60.00 Tokens". Put "Saldo:" in front where it stands alone. */
+export const tokenBalance = (cents: number) => `${(cents / 100).toFixed(2)} Tokens`
+
+/** Tokens with the token sign in front, as € goes in front of euros: "T 44", "T 12,50". */
+export const tokenPrice = (cents: number) => `T ${tokenAmount(cents)}`
+
 /** "+40 tokens" coming in, "−12,50 tokens" going out. */
 export const signedTokens = (cents: number) => `${cents >= 0 ? '+' : '−'}${tokens(Math.abs(cents))}`
 
-/** "18" and "Nov" for the date block on an event, on Belgian time. */
-const dayNumberFormat = new Intl.DateTimeFormat('en-GB', { day: 'numeric', timeZone: 'Europe/Brussels' })
-const monthShortFormat = new Intl.DateTimeFormat('en-GB', { month: 'short', timeZone: 'Europe/Brussels' })
-export const dayNumber = (iso: string) => dayNumberFormat.format(new Date(iso))
-export const monthShort = (iso: string) => monthShortFormat.format(new Date(iso))
+/** Date formats in the chosen language, made once per language. */
+const formats = new Map<string, Intl.DateTimeFormat>()
+function format(name: string, options: Intl.DateTimeFormatOptions) {
+  const key = `${getLanguage()}:${name}`
+  let found = formats.get(key)
+  if (!found) {
+    found = new Intl.DateTimeFormat(locale(), { ...options, timeZone: 'Europe/Brussels' })
+    formats.set(key, found)
+  }
+  return found
+}
+
+/** "18" and "Nov" ("nov.") for the date block on an event, on Belgian time. */
+export const dayNumber = (iso: string) => format('day', { day: 'numeric' }).format(new Date(iso))
+export const monthShort = (iso: string) => format('month', { month: 'short' }).format(new Date(iso))
 
 /** "12,50" or "12.5" -> 1250. Returns null when it is not an amount. */
 export function parseEuro(text: string): number | null {
@@ -36,12 +54,12 @@ export function parseEuro(text: string): number | null {
 /** Like parseEuro, for forms: throws a message the person can act on. */
 export function requireEuro(text: string): number {
   const cents = parseEuro(text)
-  if (cents === null) throw new Error('Enter prices like 12,50.')
+  if (cents === null) throw new Error(t('Enter prices like 12,50.'))
   return cents
 }
 
 export function requireWholeNumber(text: string, what: string): number {
-  if (!/^\d+$/.test(text.trim())) throw new Error(`Enter a whole number for ${what}.`)
+  if (!/^\d+$/.test(text.trim())) throw new Error(t('Enter a whole number for {what}.', { what }))
   return Number(text)
 }
 
@@ -52,31 +70,19 @@ export const euroInput = (cents: number) => (cents / 100).toFixed(2).replace('.'
  * Dates and times are written the European way (30/06/2027, 22:00) and always on Belgian time, so a
  * party at 22:00 says 22:00 whatever the visitor's computer is set to.
  */
-const ZONE = 'Europe/Brussels'
-const dayFormat = new Intl.DateTimeFormat('en-GB', {
-  day: '2-digit',
-  month: '2-digit',
-  year: 'numeric',
-  timeZone: ZONE,
-})
-const timeFormat = new Intl.DateTimeFormat('en-GB', {
-  hour: '2-digit',
-  minute: '2-digit',
-  hourCycle: 'h23',
-  timeZone: ZONE,
-})
-const weekdayFormat = new Intl.DateTimeFormat('en-GB', { weekday: 'short', timeZone: ZONE })
-
 /** "30/06/2027" */
-export const dateOnly = (iso: string) => dayFormat.format(new Date(iso))
+export const dateOnly = (iso: string) =>
+  format('date', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(iso))
 
 /** "22:14" */
-export const timeOnly = (iso: string) => timeFormat.format(new Date(iso))
+export const timeOnly = (iso: string) => timeFormatter().format(new Date(iso))
+const timeFormatter = () => format('time', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
 
 /** "Sat 05/12/2026 22:00" */
 export const dateTime = (iso: string) => {
   const moment = new Date(iso)
-  return `${weekdayFormat.format(moment)} ${dayFormat.format(moment)} ${timeFormat.format(moment)}`
+  const weekday = format('weekday', { weekday: 'short' }).format(moment)
+  return `${weekday} ${dateOnly(iso)} ${timeOnly(iso)}`
 }
 
 /** A calendar day as chosen, without any time zone: "2027-06-30" -> "30/06/2027". */
@@ -99,4 +105,4 @@ export function toLocalInput(iso: string | null): string {
 export const fromLocalInput = (value: string): string | null => (value ? new Date(value).toISOString() : null)
 
 export const errorText = (error: unknown) =>
-  error instanceof Error ? error.message : 'Something went wrong.'
+  error instanceof Error ? t(error.message) : t('Something went wrong.')

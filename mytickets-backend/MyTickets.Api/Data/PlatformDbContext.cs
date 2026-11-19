@@ -45,12 +45,23 @@ public class TenantOwner
     public Guid UserId { get; set; }
 }
 
+/// <summary>
+/// Which organisation an issued card belongs to, so a card's link (<c>/c/{code}</c>) needs no organisation name and
+/// keeps working after a rename. Holds nothing about people.
+/// </summary>
+public class CardCode
+{
+    public required string Code { get; set; }
+    public Guid TenantId { get; set; }
+}
+
 /// <summary>The small shared database: the list of organisations and their owners. No guest data lives here.</summary>
 public class PlatformDbContext(DbContextOptions<PlatformDbContext> options) : DbContext(options)
 {
     public DbSet<Tenant> Tenants => Set<Tenant>();
     public DbSet<OwnerAccount> OwnerAccounts => Set<OwnerAccount>();
     public DbSet<TenantOwner> TenantOwners => Set<TenantOwner>();
+    public DbSet<CardCode> CardCodes => Set<CardCode>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder b)
     {
@@ -63,6 +74,8 @@ public class PlatformDbContext(DbContextOptions<PlatformDbContext> options) : Db
         b.Entity<OwnerAccount>().HasIndex(x => x.Email).IsUnique();
         b.Entity<TenantOwner>().HasKey(x => new { x.TenantId, x.OwnerAccountId });
         b.Entity<TenantOwner>().HasIndex(x => x.OwnerAccountId);
+        b.Entity<CardCode>().HasKey(x => x.Code);
+        b.Entity<CardCode>().HasIndex(x => x.TenantId);
     }
 }
 

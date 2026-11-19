@@ -10,6 +10,8 @@ public static class AdminEndpoints
         string? InviteCode, int TicketDiscountPercent, int DrinkDiscountPercent, bool Archived, bool RequiresApproval);
     public record MemberRequest(OrgRole Role, Guid TierId, DateTime? ExpiresAt);
     public record EventRequest(string? Name, string? Description, string? Location, DateTime StartsAt, DateTime? EndsAt, bool Published, string? ImageKey);
+    public record TopUpDealRequest(int PriceCents, int TokensCents);
+    public const int MaxTopUpDeals = 8;
     public record OrganisationRequest(string? Name, string? Description, string? LogoKey, string? BrandColor = null);
     public record TicketTypeRequest(string? Name, int PriceCents, int Capacity, int MaxPerUser, DateTime? SalesStartAt,
         DateTime? SalesEndAt, List<Guid>? AllowedTierIds);
@@ -37,12 +39,50 @@ public static class AdminEndpoints
                 // Deposit money is held for guests until their cups come back, so it isn't takings.
                 BarRevenueCents = -await bar.SumAsync(t => t.AmountCents) - depositsHeld,
                 DepositsHeldCents = depositsHeld,
-                OnlineTopUpsCents = await ledger.Where(t => t.Type == WalletTxType.TopUp).SumAsync(t => t.AmountCents),
+                // In euros paid, which with a deal is less than the tokens it gave.
+                OnlineTopUpsCents = await db.Payments.Where(p => p.OrganisationId == org.Id && p.Purpose == PaymentPurpose.TopUp && p.Status == PaymentStatus.Paid)
+                    .SumAsync(p => p.AmountCents),
                 CashTopUpsCents = await ledger.Where(t => t.Type == WalletTxType.CashTopUp).SumAsync(t => t.AmountCents),
+                // What the platform kept on paid online payments (Stripe's cost included). Wallet and cash take no fee.
+                TicketFeesCents = await FeesAsync(db, org.Id, PaymentPurpose.Tickets),
+                TopUpFeesCents = await FeesAsync(db, org.Id, PaymentPurpose.TopUp),
                 TicketRevenueCents = await db.Tickets
                     .Where(t => t.TicketType.Event.OrganisationId == org.Id && (t.Status == TicketStatus.Valid || t.Status == TicketStatus.CheckedIn))
                     .SumAsync(t => t.PricePaidCents),
             });
+        });
+
+        // ---- Top-up deals: the organisation's own prices for tokens ----
+        admin.MapGet("/topup-deals", async (HttpContext http, AppDbContext db) =>
+        {
+            var orgId = http.Org().Org.Id;
+            return Results.Ok(await db.TopUpDeals.AsNoTracking().Where(d => d.OrganisationId == orgId).OrderBy(d => d.SortOrder)
+                .Select(d => new { d.Id, d.PriceCents, d.TokensCents }).ToListAsync());
+        });
+
+        // The whole list at once, in the order members see it. An empty list brings back one token per euro.
+        admin.MapPut("/topup-deals", async (List<TopUpDealRequest> req, HttpContext http, AppDbContext db) =>
+        {
+            var orgId = http.Org().Org.Id;
+            if (req.Count > MaxTopUpDeals) return Http.Error(400, $"Offer at most {MaxTopUpDeals} top-ups.");
+            foreach (var d in req)
+            {
+                if (d.PriceCents is < OrgEndpoints.MinTopUpCents or > OrgEndpoints.MaxTopUpCents)
+                    return Http.Error(400, $"Each top-up costs between {Http.Euro(OrgEndpoints.MinTopUpCents)} and {Http.Euro(OrgEndpoints.MaxTopUpCents)}.");
+                // Generous deals are the point, but a typo shouldn't give away ten times the money.
+                if (d.TokensCents < 100 || d.TokensCents > d.PriceCents * 3)
+                    return Http.Error(400, "Each top-up gives at least 1 token and at most three times its price.");
+            }
+            if (req.Select(d => d.PriceCents).Distinct().Count() != req.Count)
+                return Http.Error(400, "Two top-ups have the same price. Give each its own.");
+
+            await using var tx = await db.Database.BeginTransactionAsync();
+            await db.TopUpDeals.Where(d => d.OrganisationId == orgId).ExecuteDeleteAsync();
+            var deals = req.Select((d, i) => new TopUpDeal { Id = Guid.NewGuid(), OrganisationId = orgId, PriceCents = d.PriceCents, TokensCents = d.TokensCents, SortOrder = i }).ToList();
+            db.TopUpDeals.AddRange(deals);
+            await db.SaveChangesAsync();
+            await tx.CommitAsync();
+            return Results.Ok(deals.Select(d => new { d.Id, d.PriceCents, d.TokensCents }));
         });
 
         // ---- The organisation itself ----
@@ -65,6 +105,8 @@ public static class AdminEndpoints
             if (req.LogoKey is not null && !Images.BelongsTo(req.LogoKey, current.Id)) return Http.Error(400, "Upload the logo again.");
             var brandColor = string.IsNullOrWhiteSpace(req.BrandColor) ? null : req.BrandColor.Trim().ToLowerInvariant();
             if (brandColor is not null && !BrandColors.IsValid(brandColor)) return Http.Error(400, "Pick a colour like #4f46e5.");
+            if (brandColor is not null && !BrandColors.IsReadable(brandColor))
+                return Http.Error(400, "White text is hard to read on this colour. Pick a darker one.");
 
             // Only a real rename moves the page; saving a new description or logo leaves the address alone.
             var slug = current.Slug;
@@ -169,6 +211,7 @@ public static class AdminEndpoints
                 {
                     m.Id, m.User.DisplayName, m.User.Email, m.Role, m.TierId, Tier = m.Tier.Name, m.JoinedAt, m.ExpiresAt,
                     BalanceCents = w == null ? 0 : w.BalanceCents,
+                    ExtraCardAllowed = w != null && w.ExtraCardAllowed,
                     m.User.FirstName, m.User.LastName, m.User.Phone, m.User.Street, m.User.PostalCode, m.User.City,
                     m.User.School, m.User.Faculty, m.User.StudyYear,
                 }).ToListAsync();
@@ -243,8 +286,9 @@ public static class AdminEndpoints
         });
 
         // ---- Events and their tickets ----
-        admin.MapGet("/events", async (HttpContext http, AppDbContext db) =>
+        admin.MapGet("/events", async (HttpContext http, AppDbContext db, TimeProvider clock) =>
         {
+            var now = clock.GetUtcNow().UtcDateTime;
             var orgId = http.Org().Org.Id;
             var checkedIn = await db.Tickets.Where(t => t.TicketType.Event.OrganisationId == orgId && t.Status == TicketStatus.CheckedIn)
                 .GroupBy(t => t.TicketTypeId).Select(g => new { g.Key, Count = g.Count() }).ToDictionaryAsync(g => g.Key, g => g.Count);
@@ -253,6 +297,7 @@ public static class AdminEndpoints
             return Results.Ok(events.Select(e => new
             {
                 e.Id, e.Name, e.Description, e.Location, e.StartsAt, e.EndsAt, e.Published, e.ImageKey, ImageUrl = Images.Url(e.ImageKey),
+                Status = e.Status(now),
                 TicketTypes = e.TicketTypes.OrderBy(t => t.PriceCents).ThenBy(t => t.Name).Select(t => new
                 {
                     t.Id, t.Name, t.PriceCents, t.Capacity, t.Sold, t.MaxPerUser, t.SalesStartAt, t.SalesEndAt, t.AllowedTierIds,
@@ -527,6 +572,10 @@ public static class AdminEndpoints
         foreach (var rest in items.Where(t => !ids.Contains(idOf(t)))) setOrder(rest, ++next);
         return null;
     }
+
+    private static Task<int> FeesAsync(AppDbContext db, Guid orgId, PaymentPurpose purpose) =>
+        db.Payments.Where(p => p.OrganisationId == orgId && p.Purpose == purpose && p.Status == PaymentStatus.Paid)
+            .SumAsync(p => p.PlatformFeeCents ?? 0);
 
     /// <summary>A drink can only come with one of this organisation's deposits, and a deposit drinks come with stays one.</summary>
     private static async Task<IResult?> CheckDepositAsync(AppDbContext db, Product product)

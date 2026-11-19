@@ -1,5 +1,7 @@
 import { type FormEvent, useState } from 'react'
 
+import { t } from '@/lib/i18n'
+
 import { ErrorNote } from './ErrorNote'
 import { useCardTaps } from './useCardTaps'
 
@@ -35,18 +37,18 @@ export function CardReader({ onCard, prompt, disabled }: CardReaderProps) {
         <input
           value={typed}
           onChange={(e) => setTyped(e.target.value)}
-          placeholder={supported ? 'or type the card number' : 'Card number'}
-          aria-label="Card number"
+          placeholder={supported ? t('or type the card number') : t('Card number')}
+          aria-label={t('Card number')}
           autoCapitalize="characters"
           autoComplete="off"
         />
         <button className="btn" disabled={disabled || !typed.trim()}>
-          Use
+          {t('Use')}
         </button>
       </form>
       {!supported && (
         <small className="muted">
-          Tapping cards works in Chrome on an Android phone. Here you can type the number.
+          {t('Tapping cards works in Chrome on an Android phone. Here you can type the number.')}
         </small>
       )}
     </div>
@@ -65,7 +67,7 @@ function TapArea({
   if (!listening) {
     return (
       <button type="button" className="btn primary block" onClick={onStart}>
-        Start card reader
+        {t('Start card reader')}
       </button>
     )
   }

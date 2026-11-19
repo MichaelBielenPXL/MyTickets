@@ -1,6 +1,7 @@
 import { type FormEvent, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
+import { t } from '@/lib/i18n'
 import type { Tier } from '@/types'
 
 import type { Organisation } from '../types'
@@ -19,10 +20,10 @@ export function JoinOptions({ organisation }: JoinOptionsProps) {
   const navigate = useNavigate()
   const { membership } = organisation
   const heading = !membership
-    ? 'Join to buy tickets'
+    ? t('Join to buy tickets')
     : membership.active
-      ? 'Change membership'
-      : 'Renew your membership'
+      ? t('Change membership')
+      : t('Renew your membership')
 
   function choose(query: string) {
     navigate(`/${organisation.slug}/join?${query}`)
@@ -34,10 +35,10 @@ export function JoinOptions({ organisation }: JoinOptionsProps) {
   }
 
   function buttonLabel(tier: Tier) {
-    if (!membership) return 'Join'
-    if (membership.tierId !== tier.id) return 'Switch'
+    if (!membership) return t('Join')
+    if (membership.tierId !== tier.id) return t('Switch')
     // Ran out, and the organisation set a new end date: buying it again makes sense.
-    return membership.active ? 'Current' : 'Renew'
+    return membership.active ? t('Current') : t('Renew')
   }
 
   return (
@@ -59,11 +60,11 @@ export function JoinOptions({ organisation }: JoinOptionsProps) {
           <input
             value={inviteCode}
             onChange={(e) => setInviteCode(e.target.value)}
-            placeholder="Have an invite code?"
-            aria-label="Invite code"
+            placeholder={t('Have an invite code?')}
+            aria-label={t('Invite code')}
           />
           <button className="btn" disabled={!inviteCode.trim()}>
-            Use code
+            {t('Use code')}
           </button>
         </form>
       )}

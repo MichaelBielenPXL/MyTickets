@@ -2,9 +2,10 @@ import type { ReactNode } from 'react'
 import { Link, NavLink, useLocation, useSearchParams } from 'react-router-dom'
 
 import { ADMIN_SECTIONS, type AdminSection, sectionFrom } from '@/features/admin'
+import { t } from '@/lib/i18n'
 import type { Role } from '@/types'
 
-import { CalendarIcon, GearIcon, TicketIcon, TillIcon, WalletIcon } from './navIcons'
+import { DashboardIcon, GearIcon, TicketIcon, TillIcon, WalletIcon } from './navIcons'
 import { workLabel } from './workLabel'
 
 type OrganisationSidebarProps = {
@@ -26,18 +27,18 @@ export function OrganisationSidebar({ slug, hasAccount, role }: OrganisationSide
 
   return (
     <aside className="org-sidebar">
-      <nav aria-label="Organisation sections">
-        <SidebarLink to={`/${slug}`} end icon={<CalendarIcon />}>
-          Events
+      <nav aria-label={t('Organisation sections')}>
+        <SidebarLink to={`/${slug}`} end icon={<DashboardIcon />}>
+          {t('Dashboard')}
         </SidebarLink>
         {hasAccount && (
           <SidebarLink to={`/${slug}/wallet`} icon={<WalletIcon />}>
-            Wallet
+            {t('Wallet')}
           </SidebarLink>
         )}
         {hasAccount && (
           <SidebarLink to={`/${slug}/tickets`} icon={<TicketIcon />}>
-            Tickets
+            {t('Tickets')}
           </SidebarLink>
         )}
         {role && role !== 'Member' && (
@@ -48,7 +49,7 @@ export function OrganisationSidebar({ slug, hasAccount, role }: OrganisationSide
         {role === 'Admin' && (
           <>
             <SidebarLink to={`/${slug}/admin`} icon={<GearIcon />}>
-              Manage
+              {t('Manage')}
             </SidebarLink>
             {inManage && (
               <div className="org-sidebar-sub">
@@ -59,7 +60,7 @@ export function OrganisationSidebar({ slug, hasAccount, role }: OrganisationSide
                     className={key === section ? 'active' : undefined}
                     aria-current={key === section ? 'page' : undefined}
                   >
-                    {ADMIN_SECTIONS[key]}
+                    {t(ADMIN_SECTIONS[key])}
                   </Link>
                 ))}
               </div>

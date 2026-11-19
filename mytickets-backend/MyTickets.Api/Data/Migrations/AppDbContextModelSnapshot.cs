@@ -23,6 +23,9 @@ namespace MyTickets.Api.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT");
 
+                    b.Property<DateTime?>("ClosedAt")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -39,6 +42,9 @@ namespace MyTickets.Api.Data.Migrations
 
                     b.Property<string>("Name")
                         .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("OpenedAt")
                         .HasColumnType("TEXT");
 
                     b.Property<Guid>("OrganisationId")
@@ -72,6 +78,9 @@ namespace MyTickets.Api.Data.Migrations
                     b.Property<Guid>("OrganisationId")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("PassCode")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Role")
                         .IsRequired()
                         .HasMaxLength(32)
@@ -86,6 +95,9 @@ namespace MyTickets.Api.Data.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("OrganisationId");
+
+                    b.HasIndex("PassCode")
+                        .IsUnique();
 
                     b.HasIndex("TierId");
 
@@ -192,26 +204,48 @@ namespace MyTickets.Api.Data.Migrations
                     b.Property<bool>("Blocked")
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("Code")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Label")
                         .IsRequired()
                         .HasColumnType("TEXT");
 
-                    b.Property<DateTime>("LinkedAt")
+                    b.Property<DateTime?>("LinkedAt")
                         .HasColumnType("TEXT");
+
+                    b.Property<bool>("Locked")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Number")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Uid")
-                        .IsRequired()
                         .HasColumnType("TEXT");
 
-                    b.Property<Guid>("UserId")
+                    b.Property<Guid?>("WalletId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("WrittenAt")
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Uid")
+                    b.HasIndex("Code")
+                        .IsUnique()
+                        .HasFilter("\"Code\" IS NOT NULL");
+
+                    b.HasIndex("Number")
                         .IsUnique();
 
-                    b.HasIndex("UserId");
+                    b.HasIndex("Uid")
+                        .IsUnique()
+                        .HasFilter("\"Uid\" IS NOT NULL");
+
+                    b.HasIndex("WalletId");
 
                     b.ToTable("NfcCards");
                 });
@@ -305,6 +339,9 @@ namespace MyTickets.Api.Data.Migrations
 
                     b.Property<Guid?>("TierId")
                         .HasColumnType("TEXT");
+
+                    b.Property<int?>("TokensCents")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("TransferId")
                         .HasColumnType("TEXT");
@@ -513,6 +550,31 @@ namespace MyTickets.Api.Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("MyTickets.Api.Data.TopUpDeal", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("OrganisationId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("PriceCents")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("TokensCents")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrganisationId");
+
+                    b.ToTable("TopUpDeals");
+                });
+
             modelBuilder.Entity("MyTickets.Api.Data.User", b =>
                 {
                     b.Property<Guid>("Id")
@@ -579,6 +641,9 @@ namespace MyTickets.Api.Data.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<int>("BalanceCents")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("ExtraCardAllowed")
                         .HasColumnType("INTEGER");
 
                     b.Property<Guid>("OrganisationId")
@@ -692,13 +757,12 @@ namespace MyTickets.Api.Data.Migrations
 
             modelBuilder.Entity("MyTickets.Api.Data.NfcCard", b =>
                 {
-                    b.HasOne("MyTickets.Api.Data.User", "User")
+                    b.HasOne("MyTickets.Api.Data.Wallet", "Wallet")
                         .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .HasForeignKey("WalletId")
+                        .OnDelete(DeleteBehavior.SetNull);
 
-                    b.Navigation("User");
+                    b.Navigation("Wallet");
                 });
 
             modelBuilder.Entity("MyTickets.Api.Data.Ticket", b =>

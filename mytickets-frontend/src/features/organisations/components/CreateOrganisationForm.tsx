@@ -2,6 +2,7 @@ import { type FormEvent, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { ErrorNote, Field } from '@/components'
+import { t } from '@/lib/i18n'
 
 import { useCreateOrganisation } from '../api/organisations'
 
@@ -22,20 +23,20 @@ export function CreateOrganisationForm({ onCancel }: CreateOrganisationFormProps
 
   return (
     <form onSubmit={submit} className="stack panel">
-      <h2>New organisation</h2>
-      <Field label="Name">
+      <h2>{t('New organisation')}</h2>
+      <Field label={t('Name')}>
         <input value={name} onChange={(e) => setName(e.target.value)} required maxLength={80} />
       </Field>
-      <Field label="Description">
+      <Field label={t('Description')}>
         <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
       </Field>
       <ErrorNote error={create.error} />
       <div className="row">
         <button className="btn primary" disabled={create.isPending}>
-          Create
+          {t('Create')}
         </button>
         <button type="button" className="btn" onClick={onCancel}>
-          Cancel
+          {t('Cancel')}
         </button>
       </div>
     </form>

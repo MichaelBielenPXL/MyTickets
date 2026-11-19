@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 
+import { t } from '@/lib/i18n'
 import { dayNumber, money, monthShort, timeOnly } from '@/utils/format'
 
 import type { UpcomingEvent } from '../types'
@@ -14,10 +15,10 @@ export function UpcomingEvents({ slug, events }: UpcomingEventsProps) {
   return (
     <section className="upcoming-events">
       <div className="section-heading">
-        <h2>Upcoming events</h2>
-        {events.length > 0 && <span className="muted">{events.length} planned</span>}
+        <h2>{t('Upcoming events')}</h2>
+        {events.length > 0 && <span className="muted">{t('{count} planned', { count: events.length })}</span>}
       </div>
-      {events.length === 0 && <p className="muted">No upcoming events yet.</p>}
+      {events.length === 0 && <p className="muted">{t('No upcoming events yet.')}</p>}
       <div className="list">
         {events.map((event) => (
           <Link key={event.id} to={`/${slug}/events/${event.id}`} className="list-item event-row">
@@ -44,8 +45,8 @@ export function UpcomingEvents({ slug, events }: UpcomingEventsProps) {
 }
 
 function priceLabel(event: UpcomingEvent) {
-  if (event.soldOut) return 'Sold out'
-  if (event.fromPriceCents === null) return 'Soon'
-  if (event.fromPriceCents === 0) return 'Free'
-  return `from ${money(event.fromPriceCents)}`
+  if (event.soldOut) return t('Sold out')
+  if (event.fromPriceCents === null) return t('Soon')
+  if (event.fromPriceCents === 0) return t('Free')
+  return t('from {price}', { price: money(event.fromPriceCents) })
 }

@@ -1,3 +1,5 @@
+import { t } from '@/lib/i18n'
+
 import type { Product } from '../types'
 
 type DepositChoiceProps = {
@@ -20,15 +22,15 @@ export function DepositChoice({ deposits, value, onChange, label }: DepositChoic
         aria-label={label}
         disabled={deposits.length === 0}
       >
-        <option value="">No deposit</option>
+        <option value="">{t('No deposit')}</option>
         {deposits.map((d) => (
           <option key={d.id} value={d.id}>
             {d.name}
-            {d.active ? '' : ' (hidden)'}
+            {d.active ? '' : t(' (hidden)')}
           </option>
         ))}
       </select>
-      {deposits.length === 0 && <small>Add a cup under Deposits below to choose it here.</small>}
+      {deposits.length === 0 && <small>{t('Add a cup under Deposits below to choose it here.')}</small>}
     </>
   )
 }

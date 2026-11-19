@@ -17,6 +17,21 @@ namespace MyTickets.Api.Data.PlatformMigrations
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.14");
 
+            modelBuilder.Entity("MyTickets.Api.Data.CardCode", b =>
+                {
+                    b.Property<string>("Code")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Code");
+
+                    b.HasIndex("TenantId");
+
+                    b.ToTable("CardCodes");
+                });
+
             modelBuilder.Entity("MyTickets.Api.Data.OwnerAccount", b =>
                 {
                     b.Property<Guid>("Id")

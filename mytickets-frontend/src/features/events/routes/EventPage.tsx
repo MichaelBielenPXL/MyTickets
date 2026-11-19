@@ -5,6 +5,7 @@ import { ErrorNote, Loading } from '@/components'
 import { useAccount } from '@/features/auth'
 import { useOrganisation, usePublicOrganisation } from '@/features/organisations'
 import { useGoToCheckout } from '@/hooks/useGoToCheckout'
+import { t } from '@/lib/i18n'
 import { dateTime } from '@/utils/format'
 
 import { useEvent, useOrderTickets, usePublicEvent } from '../api/events'
@@ -76,11 +77,16 @@ export function EventPage() {
         </header>
         {event.description && <p className="prose event-description">{event.description}</p>}
 
+        {event.status === 'Closed' && (
+          <p className="note" role="status">
+            {t('This event has ended. Tickets are no longer sold.')}
+          </p>
+        )}
         <section className="content-section event-ticket-section">
           <div className="section-heading">
-            <h2>Choose your tickets</h2>
+            <h2>{t('Choose your tickets')}</h2>
           </div>
-          {event.ticketTypes.length === 0 && <p className="muted">Tickets are not on sale yet.</p>}
+          {event.ticketTypes.length === 0 && <p className="muted">{t('Tickets are not on sale yet.')}</p>}
           <div className="list">
             {event.ticketTypes.map((ticketType) => (
               <TicketTypeRow
@@ -99,14 +105,16 @@ export function EventPage() {
           (me.data ? (
             <p className="note">
               <Link to={`/${slug}`}>
-                {organisation.membership ? 'Renew your membership' : `Join ${organisation.name}`}
+                {organisation.membership
+                  ? t('Renew your membership')
+                  : t('Join {org}', { org: organisation.name })}
               </Link>{' '}
-              to buy tickets.
+              {t('to buy tickets.')}
             </p>
           ) : (
             <p className="note event-auth-note">
-              <Link to={`/${slug}/register`}>Register for {organisation.name}</Link> or{' '}
-              <Link to={`/${slug}/login`}>log in</Link> to join and buy tickets.
+              <Link to={`/${slug}/register`}>{t('Register for {org}', { org: organisation.name })}</Link>{' '}
+              {t('or')} <Link to={`/${slug}/login`}>{t('log in')}</Link> {t('to join and buy tickets.')}
             </p>
           ))}
         {isMember && ticketCount > 0 && (

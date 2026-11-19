@@ -1,9 +1,10 @@
 import type { ReactNode } from 'react'
 import { NavLink } from 'react-router-dom'
 
+import { t } from '@/lib/i18n'
 import type { Role } from '@/types'
 
-import { CalendarIcon, GearIcon, TicketIcon, TillIcon, WalletIcon } from './navIcons'
+import { DashboardIcon, GearIcon, TicketIcon, TillIcon, WalletIcon } from './navIcons'
 import { workLabel } from './workLabel'
 
 type OrganisationTabsProps = {
@@ -20,18 +21,18 @@ type OrganisationTabsProps = {
  */
 export function OrganisationTabs({ slug, hasAccount, role }: OrganisationTabsProps) {
   return (
-    <nav className="tab-bar" aria-label="Organisation">
-      <Tab to={`/${slug}`} end icon={<CalendarIcon />}>
-        Events
+    <nav className="tab-bar" aria-label={t('Organisation')}>
+      <Tab to={`/${slug}`} end icon={<DashboardIcon />}>
+        {t('Dashboard')}
       </Tab>
       {hasAccount && (
         <Tab to={`/${slug}/wallet`} icon={<WalletIcon />}>
-          Wallet
+          {t('Wallet')}
         </Tab>
       )}
       {hasAccount && (
         <Tab to={`/${slug}/tickets`} icon={<TicketIcon />}>
-          Tickets
+          {t('Tickets')}
         </Tab>
       )}
       {role && role !== 'Member' && (
@@ -41,7 +42,7 @@ export function OrganisationTabs({ slug, hasAccount, role }: OrganisationTabsPro
       )}
       {role === 'Admin' && (
         <Tab to={`/${slug}/admin`} icon={<GearIcon />}>
-          Manage
+          {t('Manage')}
         </Tab>
       )}
     </nav>

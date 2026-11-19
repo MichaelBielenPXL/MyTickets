@@ -1,6 +1,7 @@
 import { type ChangeEvent, useId, useState } from 'react'
 
 import { ErrorNote } from '@/components'
+import { t } from '@/lib/i18n'
 
 import { useUploadImage } from '../api/admin'
 import type { StoredImage } from '../types'
@@ -30,8 +31,8 @@ export function ImageField({ slug, label, hint, shape, value, onChange }: ImageF
     // Let the same file be chosen again after a failed attempt.
     event.target.value = ''
     if (!file) return
-    if (!ACCEPTED.includes(file.type)) return setProblem('Choose a PNG, JPEG or WebP picture.')
-    if (file.size > MAX_BYTES) return setProblem('That picture is larger than 4 MB. Choose a smaller one.')
+    if (!ACCEPTED.includes(file.type)) return setProblem(t('Choose a PNG, JPEG or WebP picture.'))
+    if (file.size > MAX_BYTES) return setProblem(t('That picture is larger than 4 MB. Choose a smaller one.'))
     setProblem('')
     upload.mutate(file, { onSuccess: onChange })
   }
@@ -41,13 +42,13 @@ export function ImageField({ slug, label, hint, shape, value, onChange }: ImageF
       <span id={`${inputId}-label`}>{label}</span>
       <div className={`image-field ${shape}`}>
         {value ? (
-          <img src={value.url} alt={`Current ${label.toLowerCase()}`} />
+          <img src={value.url} alt={t('Current {thing}', { thing: label.toLowerCase() })} />
         ) : (
-          <div className="image-empty">No picture</div>
+          <div className="image-empty">{t('No picture')}</div>
         )}
         <div className="row wrap">
           <label className={upload.isPending ? 'btn small disabled' : 'btn small'} htmlFor={inputId}>
-            {upload.isPending ? 'Uploading…' : value ? 'Replace' : 'Upload picture'}
+            {upload.isPending ? t('Uploading…') : value ? t('Replace') : t('Upload picture')}
           </label>
           <input
             id={inputId}
@@ -60,7 +61,7 @@ export function ImageField({ slug, label, hint, shape, value, onChange }: ImageF
           />
           {value && (
             <button type="button" className="btn small ghost" onClick={() => onChange(null)}>
-              Remove
+              {t('Remove')}
             </button>
           )}
         </div>

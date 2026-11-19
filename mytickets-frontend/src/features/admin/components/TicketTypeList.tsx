@@ -1,5 +1,6 @@
 import { useState } from 'react'
 
+import { t } from '@/lib/i18n'
 import { money } from '@/utils/format'
 
 import type { AdminEvent, AdminTicketType, AdminTier } from '../types'
@@ -18,21 +19,25 @@ export function TicketTypeList({ slug, event, tiers }: TicketTypeListProps) {
   return (
     <div className="stack">
       {event.ticketTypes.length === 0 && !editing && (
-        <p className="warn">No tickets yet: add one so people can buy.</p>
+        <p className="warn">{t('No tickets yet: add one so people can buy.')}</p>
       )}
       {event.ticketTypes.map((ticketType) => (
         <div key={ticketType.id} className="spread sub-row">
           <div>
             <strong>{ticketType.name}</strong> ·{' '}
-            {ticketType.priceCents === 0 ? 'Free' : money(ticketType.priceCents)}
-            {ticketType.allowedTierIds.length > 0 && <span className="tag">Members only</span>}
+            {ticketType.priceCents === 0 ? t('Free') : money(ticketType.priceCents)}
+            {ticketType.allowedTierIds.length > 0 && <span className="tag">{t('Members only')}</span>}
             <SalesMeter sold={ticketType.sold} capacity={ticketType.capacity} />
             <p className="muted">
-              {ticketType.sold} of {ticketType.capacity} sold · {ticketType.checkedIn} checked in
+              {t('{sold} of {capacity} sold · {checkedIn} checked in', {
+                sold: ticketType.sold,
+                capacity: ticketType.capacity,
+                checkedIn: ticketType.checkedIn,
+              })}
             </p>
           </div>
           <button className="btn small" onClick={() => setEditing(ticketType)}>
-            Edit
+            {t('Edit')}
           </button>
         </div>
       ))}
@@ -48,7 +53,7 @@ export function TicketTypeList({ slug, event, tiers }: TicketTypeListProps) {
         />
       ) : (
         <button className="btn" onClick={() => setEditing('new')}>
-          Add ticket
+          {t('Add ticket')}
         </button>
       )}
     </div>

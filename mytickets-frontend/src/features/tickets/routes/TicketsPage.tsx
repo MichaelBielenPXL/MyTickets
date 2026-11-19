@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 
 import { QueryResult } from '@/components'
+import { t } from '@/lib/i18n'
 
 import { useMyTickets } from '../api/tickets'
 import { TicketCard } from '../components/TicketCard'
@@ -31,8 +32,8 @@ export function TicketsPage() {
     <main className="customer-page tickets-page">
       <header className="page-heading">
         <div>
-          <h1>Your tickets</h1>
-          <p className="lead">Everything you need for the door, all in one place.</p>
+          <h1>{t('Your tickets')}</h1>
+          <p className="lead">{t('Everything you need for the door, all in one place.')}</p>
         </div>
       </header>
       <QueryResult query={tickets}>
@@ -44,13 +45,13 @@ export function TicketsPage() {
             <>
               {all.length === 0 && (
                 <p className="muted empty-state">
-                  No tickets yet. <Link to={`/${slug}`}>Find an event</Link>.
+                  {t('No tickets yet.')} <Link to={`/${slug}`}>{t('Find an event')}</Link>.
                 </p>
               )}
               {upcoming.length > 0 && (
                 <section className="content-section">
                   <div className="section-heading">
-                    <h2>Upcoming</h2>
+                    <h2>{t('Upcoming')}</h2>
                     <span className="muted">{upcoming.length}</span>
                   </div>
                   <div className="list">{renderList(upcoming)}</div>
@@ -59,7 +60,7 @@ export function TicketsPage() {
               {past.length > 0 && (
                 <>
                   <div className="section-heading">
-                    <h2>Past</h2>
+                    <h2>{t('Past')}</h2>
                   </div>
                   <div className="list faded">{renderList(past)}</div>
                 </>

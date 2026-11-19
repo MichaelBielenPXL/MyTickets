@@ -1,4 +1,5 @@
 import { ErrorNote } from '@/components'
+import { Trans, t } from '@/lib/i18n'
 import { dateTime, money } from '@/utils/format'
 
 import { useDecideRequest, useJoinRequests } from '../api/admin'
@@ -26,11 +27,12 @@ export function JoinRequests({ slug }: { slug: string }) {
             <div>
               <strong>{request.displayName}</strong>
               <p className="muted">
-                {request.email} · asked {dateTime(request.createdAt)}
+                {request.email} · {t('asked {when}', { when: dateTime(request.createdAt) })}
               </p>
               <p>
-                Wants <strong>{request.tier}</strong>
-                {request.priceCents > 0 && ` (${money(request.priceCents)}, paid after approval)`}
+                <Trans text="Wants {tier}" values={{ tier: <strong>{request.tier}</strong> }} />
+                {request.priceCents > 0 &&
+                  ` (${t('{price}, paid after approval', { price: money(request.priceCents) })})`}
               </p>
             </div>
           </div>
@@ -41,21 +43,23 @@ export function JoinRequests({ slug }: { slug: string }) {
               disabled={decide.isPending}
               onClick={() => decide.mutate({ id: request.id, decision: 'approve' })}
             >
-              Approve
+              {t('Approve')}
             </button>
             <button
               className="btn small"
               disabled={decide.isPending}
               onClick={() => decide.mutate({ id: request.id, decision: 'reject' })}
             >
-              Reject
+              {t('Reject')}
             </button>
           </div>
         </div>
       ))}
       {approved.length > 0 && (
         <p className="muted">
-          Approved, waiting for payment: {approved.map((r) => `${r.displayName} (${r.tier})`).join(', ')}
+          {t('Approved, waiting for payment: {names}', {
+            names: approved.map((r) => `${r.displayName} (${r.tier})`).join(', '),
+          })}
         </p>
       )}
     </section>

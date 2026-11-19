@@ -111,6 +111,8 @@ public class Membership
     public OrgRole Role { get; set; }
     public DateTime JoinedAt { get; set; }
     public DateTime? ExpiresAt { get; set; }
+    /// <summary>What the member's QR code (on the home page and in Apple or Google Wallet) holds. Made the first time it is shown.</summary>
+    public string? PassCode { get; set; }
 
     public bool IsActive(DateTime now) => ExpiresAt is null || ExpiresAt > now;
 }
@@ -121,6 +123,8 @@ public class Wallet
     public Guid UserId { get; set; }
     public Guid OrganisationId { get; set; }
     public int BalanceCents { get; set; }
+    /// <summary>An admin let this member link one more card within the year (a lost card); used up by that link.</summary>
+    public bool ExtraCardAllowed { get; set; }
 }
 
 public class WalletTransaction
@@ -143,16 +147,29 @@ public class WalletTransaction
     public DateTime CreatedAt { get; set; }
 }
 
+/// <summary>
+/// A card the organisation issued: made in Manage, written to a chip, then claimed by a member, whose wallet it
+/// pays from. Cards linked before cards were issued have no link code.
+/// </summary>
 public class NfcCard
 {
     public Guid Id { get; set; }
-    /// <summary>Card serial number, upper-case hex without separators.</summary>
-    public required string Uid { get; set; }
-    public Guid UserId { get; set; }
-    public User User { get; set; } = null!;
+    /// <summary>The number printed on the card, 1, 2, 3… within the organisation; shown as 0042.</summary>
+    public int Number { get; set; }
+    /// <summary>The code in the card's link and printed QR; see <see cref="Services.CardCodes"/>.</summary>
+    public string? Code { get; set; }
+    /// <summary>The chip's serial number, upper-case hex without separators; null until the card is written.</summary>
+    public string? Uid { get; set; }
+    /// <summary>The wallet the card pays from; null while nobody has claimed it.</summary>
+    public Guid? WalletId { get; set; }
+    public Wallet? Wallet { get; set; }
     public string Label { get; set; } = "";
     public bool Blocked { get; set; }
-    public DateTime LinkedAt { get; set; }
+    /// <summary>The chip was made read-only after writing, so its link can't be changed.</summary>
+    public bool Locked { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime? WrittenAt { get; set; }
+    public DateTime? LinkedAt { get; set; }
 }
 
 public class Event
@@ -166,8 +183,33 @@ public class Event
     public DateTime StartsAt { get; set; }
     public DateTime? EndsAt { get; set; }
     public bool Published { get; set; }
+    /// <summary>Set when staff open the doors before the start time.</summary>
+    public DateTime? OpenedAt { get; set; }
+    /// <summary>Set when staff close the event: no more check-ins or ticket sales.</summary>
+    public DateTime? ClosedAt { get; set; }
     public List<TicketType> TicketTypes { get; set; } = [];
+
+    /// <summary>
+    /// An event without an end time stays open until someone closes it, but never longer than this after its
+    /// start: a forgotten event shouldn't sell tickets for ever.
+    /// </summary>
+    public static readonly TimeSpan OpenWithoutEndTime = TimeSpan.FromHours(24);
+
+    /// <summary>Upcoming until it starts (or is opened early), open until it ends (or is closed), then closed.</summary>
+    public EventStatus Status(DateTime now) =>
+        ClosedAt is not null || (EndsAt ?? StartsAt + OpenWithoutEndTime) <= now ? EventStatus.Closed
+        : OpenedAt is not null || StartsAt <= now ? EventStatus.Open
+        : EventStatus.Upcoming;
+
+    /// <summary><see cref="Status"/> is not Closed, written so the database can do the filtering.</summary>
+    public static System.Linq.Expressions.Expression<Func<Event, bool>> NotClosed(DateTime now)
+    {
+        var startedLongAgo = now - OpenWithoutEndTime;
+        return e => e.ClosedAt == null && (e.EndsAt != null ? e.EndsAt > now : e.StartsAt > startedLongAgo);
+    }
 }
+
+public enum EventStatus { Upcoming, Open, Closed }
 
 public class TicketType
 {
@@ -236,6 +278,20 @@ public static class ProductColors
     public static readonly string[] All = ["grey", "red", "orange", "yellow", "green", "teal", "blue", "indigo", "purple", "pink"];
 }
 
+/// <summary>
+/// A top-up an organisation offers at its own price: pay €5, get 6 tokens. Members see these as the
+/// buttons to top up with; any other amount still gives one token per euro.
+/// </summary>
+public class TopUpDeal
+{
+    public Guid Id { get; set; }
+    public Guid OrganisationId { get; set; }
+    public int PriceCents { get; set; }
+    /// <summary>Tokens credited, in cents like every amount (600 = 6 tokens).</summary>
+    public int TokensCents { get; set; }
+    public int SortOrder { get; set; }
+}
+
 public class Payment
 {
     public Guid Id { get; set; }
@@ -247,6 +303,8 @@ public class Payment
     public string Description { get; set; } = "";
     /// <summary>For membership payments: the tier being bought.</summary>
     public Guid? TierId { get; set; }
+    /// <summary>For top-ups: the tokens credited once paid, when a deal gives more than one per euro. Null means AmountCents.</summary>
+    public int? TokensCents { get; set; }
     public string Provider { get; set; } = "";
     public string? ProviderReference { get; set; }
     public DateTime CreatedAt { get; set; }

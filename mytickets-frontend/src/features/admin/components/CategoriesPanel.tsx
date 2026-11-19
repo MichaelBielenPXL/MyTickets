@@ -1,6 +1,7 @@
 import { type FormEvent, useState } from 'react'
 
 import { ErrorNote, SortableList } from '@/components'
+import { t } from '@/lib/i18n'
 
 import { useDeleteCategory, useReorderCategories, useSaveCategory } from '../api/admin'
 import type { Category } from '../types'
@@ -24,10 +25,11 @@ export function CategoriesPanel({ slug, categories }: CategoriesPanelProps) {
   return (
     <section className="panel stack">
       <div>
-        <h2>Categories</h2>
+        <h2>{t('Categories')}</h2>
         <p className="muted">
-          Tabs across the top of the till, such as Beer, Soft drinks and Food. Drag them into the order you
-          want.
+          {t(
+            'Tabs across the top of the till, such as Beer, Soft drinks and Food. Drag them into the order you want.',
+          )}
         </p>
       </div>
       {categories.length > 0 && (
@@ -43,13 +45,13 @@ export function CategoriesPanel({ slug, categories }: CategoriesPanelProps) {
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="Beer"
-          aria-label="New category"
+          placeholder={t('Beer')}
+          aria-label={t('New category')}
           required
           maxLength={80}
         />
         <button className="btn" disabled={add.isPending}>
-          Add category
+          {t('Add category')}
         </button>
       </form>
       <ErrorNote error={add.error} />
@@ -84,15 +86,15 @@ function CategoryRow({ slug, category, handle }: CategoryRowProps) {
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              aria-label={`Name of ${category.name}`}
+              aria-label={t('Name of {name}', { name: category.name })}
               required
               maxLength={80}
             />
             <button className="btn primary small" disabled={save.isPending}>
-              Save
+              {t('Save')}
             </button>
             <button type="button" className="btn small" onClick={() => setEditing(false)}>
-              Cancel
+              {t('Cancel')}
             </button>
           </form>
         ) : (
@@ -100,17 +102,19 @@ function CategoryRow({ slug, category, handle }: CategoryRowProps) {
         )}
         {confirming && (
           <div className="confirm-delete">
-            <span>Delete {category.name}? Its items stay on the menu, under Other.</span>
+            <span>
+              {t('Delete {name}? Its items stay on the menu, under Other.', { name: category.name })}
+            </span>
             <div className="row">
               <button
                 className="btn danger small"
                 disabled={remove.isPending}
                 onClick={() => remove.mutate(category.id)}
               >
-                Delete
+                {t('Delete')}
               </button>
               <button className="btn small" onClick={() => setConfirming(false)}>
-                Keep it
+                {t('Keep it')}
               </button>
             </div>
           </div>
@@ -122,16 +126,16 @@ function CategoryRow({ slug, category, handle }: CategoryRowProps) {
           <button
             className="btn small"
             onClick={() => setEditing(true)}
-            aria-label={`Rename ${category.name}`}
+            aria-label={t('Rename {name}', { name: category.name })}
           >
-            Rename
+            {t('Rename')}
           </button>
           <button
             className="btn link danger-text small"
             onClick={() => setConfirming(true)}
-            aria-label={`Delete ${category.name}`}
+            aria-label={t('Delete {name}', { name: category.name })}
           >
-            Delete
+            {t('Delete')}
           </button>
         </div>
       )}

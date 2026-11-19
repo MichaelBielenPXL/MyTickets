@@ -3,7 +3,15 @@ import { useNavigate } from 'react-router-dom'
 
 import { ErrorNote, Field, QueryResult } from '@/components'
 import { useMe } from '@/features/auth'
-import { BRAND_PRESETS, MemberCard, brandStyle, isBrandColor } from '@/features/organisations'
+import {
+  BRAND_PRESETS,
+  MemberCard,
+  brandStyle,
+  isBrandColor,
+  isReadable,
+  readableShade,
+} from '@/features/organisations'
+import { Trans, t } from '@/lib/i18n'
 
 import { useOrganisationSettings, useUpdateOrganisation } from '../api/admin'
 import type { OrganisationSettings, StoredImage } from '../types'
@@ -44,9 +52,11 @@ function SettingsForm({ slug, saved, update }: SettingsFormProps) {
   )
   const [brandColor, setBrandColor] = useState(saved.brandColor ?? '')
   const navigate = useNavigate()
-  const displayName = useMe().data?.displayName ?? 'Your name'
+  const displayName = useMe().data?.displayName ?? t('Your name')
 
   const colorToSave = brandColor === '' ? null : brandColor.toLowerCase()
+  // White text has to read on the colour; a lighter one can't be saved.
+  const colorTooLight = colorToSave !== null && !isReadable(colorToSave)
   const changed =
     name !== saved.name ||
     description !== saved.description ||
@@ -70,16 +80,16 @@ function SettingsForm({ slug, saved, update }: SettingsFormProps) {
     <form onSubmit={submit} className="panel stack settings-form">
       <ImageField
         slug={slug}
-        label="Logo"
-        hint="Shown next to your organisation's name. Square, PNG, JPEG or WebP, up to 4 MB."
+        label={t('Logo')}
+        hint={t("Shown next to your organisation's name. Square, PNG, JPEG or WebP, up to 4 MB.")}
         shape="square"
         value={logo}
         onChange={setLogo}
       />
-      <Field label="Name">
+      <Field label={t('Name')}>
         <input value={name} onChange={(e) => setName(e.target.value)} required minLength={2} maxLength={80} />
       </Field>
-      <Field label="Description" hint="A line or two about who you are. Shown on your public page.">
+      <Field label={t('Description')} hint={t('A line or two about who you are. Shown on your public page.')}>
         <textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}
@@ -98,19 +108,17 @@ function SettingsForm({ slug, saved, update }: SettingsFormProps) {
             tier="Member"
             expiresAt={null}
             active
-            balanceCents={4400}
-            cardUid={null}
           />
         }
       />
       <ErrorNote error={update.error} />
       <div className="row">
-        <button className="btn primary" disabled={update.isPending || !changed}>
-          {update.isPending ? 'Saving…' : 'Save changes'}
+        <button className="btn primary" disabled={update.isPending || !changed || colorTooLight}>
+          {update.isPending ? t('Saving…') : t('Save changes')}
         </button>
         {update.isSuccess && !changed && (
           <span className="muted" role="status">
-            Saved.
+            {t('Saved.')}
           </span>
         )}
       </div>
@@ -129,6 +137,7 @@ type BrandColorFieldProps = {
 function BrandColorField({ value, onChange, preview }: BrandColorFieldProps) {
   const [typed, setTyped] = useState(value)
   const shown = isBrandColor(value) ? value.toLowerCase() : null
+  const tooLight = shown !== null && !isReadable(shown)
 
   function choose(color: string) {
     setTyped(color)
@@ -137,11 +146,13 @@ function BrandColorField({ value, onChange, preview }: BrandColorFieldProps) {
 
   return (
     <fieldset className="brand-color-field">
-      <legend>Colour</legend>
-      <p className="muted">Fills your members&apos; cards and accents your pages. Match it to your crest.</p>
+      <legend>{t('Colour')}</legend>
+      <p className="muted">
+        {t("Fills your members' cards and accents your pages. Match it to your crest.")}
+      </p>
       <div className="brand-color-layout">
         <div className="stack">
-          <div className="swatches" role="radiogroup" aria-label="Ready-made colours">
+          <div className="swatches" role="radiogroup" aria-label={t('Ready-made colours')}>
             {BRAND_PRESETS.map((color) => (
               <label key={color} className="swatch" style={{ background: color }} title={color}>
                 <input
@@ -158,13 +169,13 @@ function BrandColorField({ value, onChange, preview }: BrandColorFieldProps) {
           <div className="brand-color-custom">
             <input
               type="color"
-              aria-label="Pick any colour"
+              aria-label={t('Pick any colour')}
               value={shown ?? '#1c1c1e'}
               onChange={(e) => choose(e.target.value)}
             />
             <input
-              aria-label="Colour code"
-              placeholder="#1c1c1e"
+              aria-label={t('Colour code')}
+              placeholder={t('#1c1c1e')}
               value={typed}
               maxLength={7}
               spellCheck={false}
@@ -177,10 +188,24 @@ function BrandColorField({ value, onChange, preview }: BrandColorFieldProps) {
             />
             {value !== '' && (
               <button type="button" className="btn link" onClick={() => choose('')}>
-                Use the default
+                {t('Use the default')}
               </button>
             )}
           </div>
+          {tooLight && shown && (
+            <p className="brand-color-warning" role="alert">
+              <Trans
+                text="White text is hard to read on this colour. Pick a darker one, or {fix}."
+                values={{
+                  fix: (
+                    <button type="button" className="btn link" onClick={() => choose(readableShade(shown))}>
+                      {t('use a darker shade of it')}
+                    </button>
+                  ),
+                }}
+              />
+            </p>
+          )}
         </div>
         <div className="brand-color-preview organisation-page" style={brandStyle(shown)} aria-hidden="true">
           {preview}

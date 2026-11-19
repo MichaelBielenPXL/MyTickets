@@ -4,6 +4,8 @@ import userEvent from '@testing-library/user-event'
 import type { ReactElement } from 'react'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 
+import { LanguageProvider } from '@/lib/i18n'
+
 type RenderOptions = {
   /** The address the visitor is on, e.g. "/night-owls/events/e1". */
   at?: string
@@ -14,7 +16,7 @@ type RenderOptions = {
 }
 
 /**
- * Renders a page the way the app does: with the server-data cache and a router around it.
+ * Renders a page the way the app does: with the server-data cache, a router and the language around it.
  * Any other address shows "Now at <address>", so tests can check where the visitor was sent.
  */
 export function renderApp(ui: ReactElement, { at = '/', path = '/', state }: RenderOptions = {}) {
@@ -26,10 +28,12 @@ export function renderApp(ui: ReactElement, { at = '/', path = '/', state }: Ren
   const view = render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={[{ ...parseAddress(at), state }]}>
-        <Routes>
-          <Route path={path} element={ui} />
-          <Route path="*" element={<CurrentAddress />} />
-        </Routes>
+        <LanguageProvider>
+          <Routes>
+            <Route path={path} element={ui} />
+            <Route path="*" element={<CurrentAddress />} />
+          </Routes>
+        </LanguageProvider>
       </MemoryRouter>
     </QueryClientProvider>,
   )

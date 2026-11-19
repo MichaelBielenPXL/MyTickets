@@ -88,3 +88,12 @@ export interface JoinResult {
   pending: boolean
   checkoutUrl: string | null
 }
+
+/** What the member's QR code holds; staff scan it like a tap of their card. */
+export interface MemberPass {
+  code: string
+  /** The code split into groups, for reading out or typing. */
+  display: string
+  appleWallet: boolean
+  googleWallet: boolean
+}

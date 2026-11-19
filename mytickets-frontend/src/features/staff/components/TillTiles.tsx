@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 
+import { t } from '@/lib/i18n'
 import { money } from '@/utils/format'
 import { tileFill } from '@/utils/tileColors'
 
@@ -37,7 +38,7 @@ export function TillTiles({
   const tabs = [
     ...categories.filter((c) => items.some((p) => p.categoryId === c.id)),
     ...(items.some((p) => !categories.some((c) => c.id === p.categoryId)) && categories.length > 0
-      ? [{ id: 'other', name: 'Other' }]
+      ? [{ id: 'other', name: t('Other') }]
       : []),
   ]
   const [tab, setTab] = useState<string | null>(null)
@@ -51,7 +52,7 @@ export function TillTiles({
   return (
     <div className="till-menu">
       {tabs.length > 1 && (
-        <div className="till-tabs" role="tablist" aria-label="Categories">
+        <div className="till-tabs" role="tablist" aria-label={t('Categories')}>
           {tabs.map((t) => {
             const inOrder = items
               .filter((p) =>
@@ -74,24 +75,30 @@ export function TillTiles({
         </div>
       )}
       {deposits.length > 0 && (
-        <div className="till-cups" aria-label="Cups">
+        <div className="till-cups" aria-label={t('Cups')}>
           {deposits.map((d) => {
             const adjusted = cups[d.id] ?? 0
             return (
               <div key={d.id} className="till-cup-pair">
-                <button className="till-cup" onClick={() => onCups(d.id, 1)} aria-label={`Buy ${d.name}`}>
+                <button
+                  className="till-cup"
+                  onClick={() => onCups(d.id, 1)}
+                  aria-label={t('Buy {name}', { name: d.name })}
+                >
                   <strong>{d.name}</strong>
                   <span>+{money(d.priceCents)}</span>
-                  {adjusted > 0 && <em aria-label={`${adjusted} bought`}>{adjusted}</em>}
+                  {adjusted > 0 && <em aria-label={t('{count} bought', { count: adjusted })}>{adjusted}</em>}
                 </button>
                 <button
                   className="till-cup return"
                   onClick={() => onCups(d.id, -1)}
-                  aria-label={`Return ${d.name}`}
+                  aria-label={t('Return {name}', { name: d.name })}
                 >
-                  <strong>↩ Return {d.name}</strong>
+                  <strong>↩ {t('Return {name}', { name: d.name })}</strong>
                   <span>−{money(d.priceCents)}</span>
-                  {adjusted < 0 && <em aria-label={`${-adjusted} returned`}>{-adjusted}</em>}
+                  {adjusted < 0 && (
+                    <em aria-label={t('{count} returned', { count: -adjusted })}>{-adjusted}</em>
+                  )}
                 </button>
               </div>
             )
@@ -157,7 +164,7 @@ function Tile({ product, count, onAdd, onRemove }: TileProps) {
     >
       <strong>{product.name}</strong>
       <span>{money(product.priceCents)}</span>
-      {count > 0 && <em aria-label={`${count} in order`}>{count}</em>}
+      {count > 0 && <em aria-label={t('{count} in order', { count })}>{count}</em>}
     </button>
   )
 }

@@ -1,3 +1,4 @@
+import { t } from '@/lib/i18n'
 import { TILE_COLORS } from '@/utils/tileColors'
 
 type ColourPickerProps = {
@@ -10,7 +11,7 @@ export function ColourPicker({ value, onChange }: ColourPickerProps) {
   const chosen = value ?? 'grey'
   return (
     <fieldset className="colour-picker">
-      <legend>Tile colour</legend>
+      <legend>{t('Tile colour')}</legend>
       <div className="swatches">
         {TILE_COLORS.map((c) => (
           <label key={c.key} className="swatch" style={{ background: c.fill }} title={c.label}>

@@ -38,6 +38,8 @@ builder.Services.AddScoped<AppCache>();
 builder.Services.AddScoped<WalletService>();
 builder.Services.AddScoped<MembershipService>();
 builder.Services.AddScoped<PaymentService>();
+builder.Services.AddSingleton<AppleWalletPasses>();
+builder.Services.AddSingleton<GoogleWalletPasses>();
 builder.Services.AddHostedService<PaymentExpiryWorker>();
 
 // Payments go through Stripe Connect with the platform's key (Stripe:SecretKey). Without it, buyers get the
@@ -129,6 +131,7 @@ app.MapMe();
 app.MapOrgs();
 app.MapAdmin();
 app.MapStaff();
+app.MapCards();
 app.MapImages();
 app.MapStripe();
 

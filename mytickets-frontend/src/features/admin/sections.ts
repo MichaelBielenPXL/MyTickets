@@ -4,6 +4,8 @@ export const ADMIN_SECTIONS = {
   events: 'Events',
   memberships: 'Memberships',
   members: 'Members',
+  cards: 'Cards',
+  tokens: 'Token prices',
   bar: 'Bar menu',
   payouts: 'Payouts',
   settings: 'Settings',

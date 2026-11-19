@@ -1,9 +1,10 @@
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 
 import { ErrorNote, Loading } from '@/components'
-import { CardsSummary } from '@/features/cards'
+import { CardsSummary, LinkCardDialog } from '@/features/cards'
 import { useOrganisation } from '@/features/organisations'
-import { tokens } from '@/utils/format'
+import { t } from '@/lib/i18n'
+import { tokenBalance } from '@/utils/format'
 
 import { useWallet } from '../api/wallet'
 import { TopUpForm } from '../components/TopUpForm'
@@ -12,6 +13,9 @@ import { TransactionList } from '../components/TransactionList'
 /** "My wallet": tokens at this organisation, topping up, the cards that pay with it, and what happened. */
 export function WalletPage() {
   const { slug = '' } = useParams()
+  // ?link=<code>: a card was just tapped (or scanned) that nobody has claimed yet.
+  const [params, setParams] = useSearchParams()
+  const linkCode = params.get('link')
   const organisationQuery = useOrganisation(slug)
   const organisation = organisationQuery.data
   // There is only a wallet once someone has a membership; their cards can be linked before that.
@@ -24,7 +28,7 @@ export function WalletPage() {
     return (
       <main className="customer-page wallet-page">
         <Link to={`/${slug}`} className="back">
-          ‹ Back
+          {t('‹ Back')}
         </Link>
         {error ? <ErrorNote error={error} /> : <Loading />}
       </main>
@@ -36,23 +40,33 @@ export function WalletPage() {
       <Link to={`/${slug}`} className="back">
         ‹ {organisation.name}
       </Link>
+      {linkCode && (
+        <LinkCardDialog slug={slug} code={linkCode} onDone={() => setParams({}, { replace: true })} />
+      )}
       {wallet ? (
         <>
           <header className="wallet-hero">
-            <h1>Your tokens at {organisation.name}</h1>
-            <p className="wallet-balance">{tokens(wallet.balanceCents)}</p>
+            <h1>{t('Saldo at {org}', { org: organisation.name })}</h1>
+            <p className="wallet-balance">{tokenBalance(wallet.balanceCents)}</p>
             <p className="wallet-hero-note">
-              One token is one euro. Spend them on tickets, or at the bar with your card.
+              {wallet.deals?.length
+                ? t('Spend them on tickets, or at the bar with your card.')
+                : t('One token is one euro. Spend them on tickets, or at the bar with your card.')}
             </p>
           </header>
-          <TopUpForm slug={slug} minCents={wallet.minTopUpCents} maxCents={wallet.maxTopUpCents} />
+          <TopUpForm
+            slug={slug}
+            minCents={wallet.minTopUpCents}
+            maxCents={wallet.maxTopUpCents}
+            deals={wallet.deals ?? []}
+          />
         </>
       ) : (
         <section className="panel stack">
-          <h1 className="panel-title">No tokens yet</h1>
+          <h1 className="panel-title">{t('No tokens yet')}</h1>
           <p className="muted">You get a wallet at {organisation.name} as soon as you choose a membership.</p>
           <Link className="btn primary" to={`/${slug}/join`}>
-            Choose a membership
+            {t('Choose a membership')}
           </Link>
         </section>
       )}
@@ -60,7 +74,7 @@ export function WalletPage() {
       {wallet && (
         <section className="content-section">
           <div className="section-heading">
-            <h2>Recent activity</h2>
+            <h2>{t('Recent activity')}</h2>
           </div>
           <TransactionList transactions={wallet.transactions} />
         </section>

@@ -1,6 +1,7 @@
 import { type FormEvent, useState } from 'react'
 
 import { ErrorNote, Field } from '@/components'
+import { t } from '@/lib/i18n'
 import { fromLocalInput, toLocalInput } from '@/utils/format'
 
 import { useSaveEvent } from '../api/admin'
@@ -42,26 +43,26 @@ export function EventForm({ slug, event, onDone }: EventFormProps) {
 
   return (
     <form onSubmit={submit} className="panel stack">
-      <h2>{event ? 'Edit event' : 'New event'}</h2>
-      <Field label="Name">
+      <h2>{event ? t('Edit event') : t('New event')}</h2>
+      <Field label={t('Name')}>
         <input value={name} onChange={(e) => setName(e.target.value)} required maxLength={80} />
       </Field>
-      <Field label="Description">
+      <Field label={t('Description')}>
         <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} />
       </Field>
       <ImageField
         slug={slug}
-        label="Picture"
-        hint="Shown at the top of the event page. A wide picture works best."
+        label={t('Picture')}
+        hint={t('Shown at the top of the event page. A wide picture works best.')}
         shape="wide"
         value={image}
         onChange={setImage}
       />
-      <Field label="Location">
+      <Field label={t('Location')}>
         <input value={location} onChange={(e) => setLocation(e.target.value)} />
       </Field>
       <div className="grid-2">
-        <Field label="Starts">
+        <Field label={t('Starts')}>
           <input
             type="datetime-local"
             value={startsAt}
@@ -69,21 +70,21 @@ export function EventForm({ slug, event, onDone }: EventFormProps) {
             required
           />
         </Field>
-        <Field label="Ends (optional)">
+        <Field label={t('Ends (optional)')}>
           <input type="datetime-local" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} />
         </Field>
       </div>
       <label className="check">
         <input type="checkbox" checked={published} onChange={(e) => setPublished(e.target.checked)} />
-        Published: members can see it and buy tickets
+        {t('Published: members can see it and buy tickets')}
       </label>
       <ErrorNote error={save.error} />
       <div className="row">
         <button className="btn primary" disabled={save.isPending}>
-          Save
+          {t('Save')}
         </button>
         <button type="button" className="btn" onClick={onDone}>
-          Cancel
+          {t('Cancel')}
         </button>
       </div>
     </form>

@@ -81,12 +81,70 @@ describe('OrganisationPage', () => {
       'href',
       '/night-owls/join',
     )
-    // Their card shows who they are, their membership and their tokens (20 euro = 20 tokens).
+    // Their card shows who they are and their membership; the balance lives in the wallet.
     const card = within(await screen.findByRole('group', { name: 'Night Owls membership card' }))
     expect(card.getByText('Premium')).toBeInTheDocument()
-    expect(card.getByText('20')).toBeInTheDocument()
+    expect(card.queryByText(/Saldo/)).not.toBeInTheDocument()
     expect(screen.getByText('50% off tickets')).toBeInTheDocument()
     // The options themselves are not on the organisation's page for someone who already has a membership.
     expect(screen.queryByRole('heading', { name: 'Join to buy tickets' })).not.toBeInTheDocument()
+  })
+
+  describe("the member's QR code", () => {
+    const passReply = {
+      code: 'MTABCD2345WXYZ',
+      display: 'MT-ABCD-2345-WXYZ',
+      appleWallet: true,
+      googleWallet: true,
+    }
+    const realAgent = navigator.userAgent
+
+    function on(userAgent: string) {
+      Object.defineProperty(navigator, 'userAgent', { value: userAgent, configurable: true })
+    }
+
+    beforeEach(() => {
+      server.use(
+        http.get(apiUrl('/orgs/night-owls'), () => HttpResponse.json(anOrganisation())),
+        http.get(apiUrl('/orgs/night-owls/me/pass'), () => HttpResponse.json(passReply)),
+      )
+    })
+    afterEach(() => on(realAgent))
+
+    async function findPass() {
+      renderApp(<OrganisationPage />, page)
+      return within(await screen.findByRole('region', { name: 'Your member QR code' }))
+    }
+
+    it('shows the code, and no wallet button on a computer', async () => {
+      on('Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/130.0')
+      const pass = await findPass()
+
+      expect(pass.getByTitle('Night Owls member QR code')).toBeInTheDocument()
+      expect(pass.getByText('MT-ABCD-2345-WXYZ')).toBeInTheDocument()
+      expect(pass.queryByRole('link', { name: /Wallet/ })).not.toBeInTheDocument()
+    })
+
+    it('offers Apple Wallet on an iPhone', async () => {
+      on('Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) Mobile/15E148 Safari/604.1')
+      const pass = await findPass()
+
+      expect(pass.getByRole('link', { name: 'Add to Apple Wallet' })).toHaveAttribute(
+        'href',
+        '/api/orgs/night-owls/me/pass/apple',
+      )
+      expect(pass.queryByRole('link', { name: 'Add to Google Wallet' })).not.toBeInTheDocument()
+    })
+
+    it('offers Google Wallet on Android', async () => {
+      on('Mozilla/5.0 (Linux; Android 15; Pixel 9) Chrome/130.0 Mobile Safari/537.36')
+      const pass = await findPass()
+
+      expect(pass.getByRole('link', { name: 'Add to Google Wallet' })).toHaveAttribute(
+        'href',
+        '/api/orgs/night-owls/me/pass/google',
+      )
+      expect(pass.queryByRole('link', { name: 'Add to Apple Wallet' })).not.toBeInTheDocument()
+    })
   })
 })

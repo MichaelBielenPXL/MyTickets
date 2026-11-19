@@ -1,3 +1,5 @@
+import { t } from '@/lib/i18n'
+
 import type { MemberDetails } from '../types'
 
 /** The details a member gave, as a compact list; nothing shown for what wasn't asked or given. */
@@ -18,7 +20,7 @@ export function MemberDetailsList({ details }: { details: MemberDetails }) {
     <dl className="member-details">
       {given.map(([label, value]) => (
         <div key={label}>
-          <dt>{label}</dt>
+          <dt>{t(label)}</dt>
           <dd>{value}</dd>
         </div>
       ))}

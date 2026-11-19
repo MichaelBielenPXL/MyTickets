@@ -6,6 +6,13 @@ import { server } from '@/test/server'
 
 import { BarMode } from './BarMode'
 
+// The camera is not there in tests: the stand-in "scans" the member code shown in the app.
+vi.mock('@/components/QrScanner', () => ({
+  QrScanner: ({ onScan }: { onScan: (code: string) => void }) => (
+    <button onClick={() => onScan('MTABCD2345WXYZ')}>Fake camera</button>
+  ),
+}))
+
 const beers = { id: 'beers', name: 'Beers' }
 const softs = { id: 'softs', name: 'Soft drinks' }
 const products = [
@@ -136,6 +143,22 @@ describe('BarMode', () => {
     })
     await user.click(screen.getByRole('button', { name: 'Next order' }))
     expect(ticket().getByText('Tap items to start an order.')).toBeInTheDocument()
+  })
+
+  it("charges the member's QR code, from the app or the wallet, like a card", async () => {
+    const sales = answerSales(() =>
+      HttpResponse.json({ totalCents: 350, depositCents: 100, balanceCents: 650, displayName: 'Gijs Guest' }),
+    )
+    const { user } = renderBar([])
+
+    await user.click(screen.getByRole('button', { name: /^Beer/ }))
+    await user.click(ticket().getByRole('button', { name: /^Charge/ }))
+    const step = within(screen.getByRole('dialog', { name: 'Tap card' }))
+    await user.click(step.getByRole('button', { name: 'Scan QR code' }))
+    await user.click(step.getByRole('button', { name: 'Fake camera' }))
+
+    expect(await screen.findByRole('status')).toHaveTextContent('Paid € 3,50')
+    expect(sales[0].cardUid).toBe('MTABCD2345WXYZ')
   })
 
   it('changes quantities on the ticket, and holding a tile takes one off', async () => {

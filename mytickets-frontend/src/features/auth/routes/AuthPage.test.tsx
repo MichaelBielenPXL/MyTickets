@@ -160,6 +160,25 @@ describe('AuthPage', () => {
     })
   })
 
+  it('goes back to the tapped card after signing in at its organisation', async () => {
+    server.use(
+      http.get(apiUrl('/public/orgs/night-owls'), () =>
+        HttpResponse.json({ slug: 'night-owls', name: 'Night Owls', description: '', tiers: [], events: [] }),
+      ),
+      http.post(apiUrl('/auth/login'), () => HttpResponse.json({ id: 'u3' })),
+    )
+    const { user } = renderApp(<AuthPage mode="login" />, {
+      at: '/night-owls/login?next=/c/ABCDEFGHJK',
+      path: '/:slug/login',
+      state: { email: 'gijs@example.com' },
+    })
+
+    await user.type(screen.getByLabelText('Password'), 'correct horse')
+    await user.click(screen.getByRole('button', { name: 'Sign in' }))
+
+    expect(await screen.findByText('Now at /c/ABCDEFGHJK')).toBeInTheDocument()
+  })
+
   it('asks only for an email address first when signing in at an organisation', async () => {
     server.use(
       http.get(apiUrl('/public/orgs/night-owls'), () =>

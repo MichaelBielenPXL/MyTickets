@@ -1,5 +1,7 @@
 import { Link } from 'react-router-dom'
 
+import { t } from '@/lib/i18n'
+
 import { useCards } from '../api/cards'
 
 type CardsSummaryProps = {
@@ -12,13 +14,14 @@ export function CardsSummary({ slug }: CardsSummaryProps) {
   const working = cards.data?.filter((c) => !c.blocked).length ?? 0
   const blocked = (cards.data?.length ?? 0) - working
 
-  let status = 'Loading…'
-  if (cards.isError) status = "Couldn't load your cards."
+  let status = t('Loading…')
+  if (cards.isError) status = t("Couldn't load your cards.")
   else if (cards.data)
     status =
       working === 0
-        ? 'No card linked yet'
-        : `${working} card${working === 1 ? '' : 's'} linked` + (blocked ? ` · ${blocked} blocked` : '')
+        ? t('No card linked yet')
+        : (working === 1 ? t('1 card linked') : t('{count} cards linked', { count: working })) +
+          (blocked ? ' · ' + t('{count} blocked', { count: blocked }) : '')
 
   return (
     <section className="panel cards-summary">
@@ -29,11 +32,11 @@ export function CardsSummary({ slug }: CardsSummaryProps) {
         </svg>
       </span>
       <div className="cards-summary-text">
-        <h2>Cards</h2>
+        <h2>{t('Cards')}</h2>
         <p className="muted">{status}</p>
       </div>
       <Link className="btn" to={`/${slug}/wallet/cards`}>
-        Manage cards
+        {t('Manage cards')}
       </Link>
     </section>
   )

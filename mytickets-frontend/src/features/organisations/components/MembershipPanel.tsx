@@ -2,10 +2,12 @@ import { Link } from 'react-router-dom'
 
 import { useAccount } from '@/features/auth'
 import { useCards } from '@/features/cards'
+import { t } from '@/lib/i18n'
 import { lastValidDay } from '@/utils/format'
 
 import type { Organisation } from '../types'
 import { MemberCard } from './MemberCard'
+import { MemberPassPanel } from './MemberPassPanel'
 
 type MembershipPanelProps = {
   organisation: Organisation
@@ -23,12 +25,14 @@ export function MembershipPanel({ organisation }: MembershipPanelProps) {
 
   const payingCard = cards?.find((card) => !card.blocked) ?? null
   const perks = [
-    membership.ticketDiscountPercent > 0 && `${membership.ticketDiscountPercent}% off tickets`,
-    membership.drinkDiscountPercent > 0 && `${membership.drinkDiscountPercent}% off at the bar`,
+    membership.ticketDiscountPercent > 0 &&
+      t('{percent}% off tickets', { percent: membership.ticketDiscountPercent }),
+    membership.drinkDiscountPercent > 0 &&
+      t('{percent}% off at the bar', { percent: membership.drinkDiscountPercent }),
   ].filter((perk): perk is string => Boolean(perk))
 
   return (
-    <section className="member-home" aria-label="Your membership">
+    <section className="member-home" aria-label={t('Your membership')}>
       <MemberCard
         organisationName={organisation.name}
         logoUrl={organisation.logoUrl}
@@ -36,8 +40,7 @@ export function MembershipPanel({ organisation }: MembershipPanelProps) {
         tier={membership.tier}
         expiresAt={membership.expiresAt}
         active={membership.active}
-        balanceCents={organisation.balanceCents ?? 0}
-        cardUid={payingCard?.uid ?? null}
+        pass={<MemberPassPanel slug={slug} organisationName={organisation.name} />}
       />
 
       <div className="member-side">
@@ -49,10 +52,10 @@ export function MembershipPanel({ organisation }: MembershipPanelProps) {
 
         <div className="member-actions">
           <Link className="btn brand" to={`/${slug}/wallet`}>
-            Top up tokens
+            {t('Top up tokens')}
           </Link>
           <Link className="btn" to={`/${slug}/tickets`}>
-            My tickets
+            {t('My tickets')}
           </Link>
         </div>
 
@@ -67,9 +70,18 @@ export function MembershipPanel({ organisation }: MembershipPanelProps) {
           </ul>
         )}
 
+        {payingCard && (
+          <p className="member-paying-card">
+            <span>{t('Paying card')}</span>
+            <strong>{t('Card {number}', { number: payingCard.number })}</strong>
+          </p>
+        )}
+
         <p className="member-links">
-          {cards && !payingCard && <Link to={`/${slug}/wallet/cards`}>Link a card to pay with a tap</Link>}
-          {membership.active && <Link to={`/${slug}/join`}>Change membership</Link>}
+          {cards && !payingCard && (
+            <Link to={`/${slug}/wallet/cards`}>{t('Link a card to pay with a tap')}</Link>
+          )}
+          {membership.active && <Link to={`/${slug}/join`}>{t('Change membership')}</Link>}
         </p>
       </div>
     </section>

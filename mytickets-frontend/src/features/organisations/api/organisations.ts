@@ -3,7 +3,14 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { meQueryKey } from '@/features/auth'
 import { api } from '@/lib/api-client'
 
-import type { JoinResult, Organisation, OrganisationSummary, ProfileForm, ProfileValues } from '../types'
+import type {
+  JoinResult,
+  MemberPass,
+  Organisation,
+  OrganisationSummary,
+  ProfileForm,
+  ProfileValues,
+} from '../types'
 
 export const organisationKeys = {
   profile: (slug: string) => ['profile', slug] as const,
@@ -105,5 +112,15 @@ export function useSaveProfile(slug: string) {
         // Their name shows in the header and account menu.
         queryClient.invalidateQueries({ queryKey: meQueryKey }),
       ]),
+  })
+}
+
+/** The member's QR code, and which wallet apps this server can save it to. */
+export function useMemberPass(slug: string, enabled = true) {
+  return useQuery({
+    queryKey: ['member-pass', slug] as const,
+    queryFn: () => api.get<MemberPass>(`/orgs/${slug}/me/pass`),
+    enabled: enabled && slug.length > 0,
+    staleTime: Infinity,
   })
 }

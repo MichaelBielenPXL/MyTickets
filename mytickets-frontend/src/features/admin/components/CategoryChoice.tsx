@@ -1,3 +1,5 @@
+import { t } from '@/lib/i18n'
+
 import type { Category } from '../types'
 
 type CategoryChoiceProps = {
@@ -10,7 +12,7 @@ type CategoryChoiceProps = {
 export function CategoryChoice({ categories, value, onChange }: CategoryChoiceProps) {
   return (
     <select value={value ?? ''} onChange={(e) => onChange(e.target.value || null)}>
-      <option value="">Other</option>
+      <option value="">{t('Other')}</option>
       {categories.map((c) => (
         <option key={c.id} value={c.id}>
           {c.name}

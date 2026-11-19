@@ -1,6 +1,9 @@
 import { type FormEvent, useEffect, useState } from 'react'
 
+import { QrScanner } from '@/components/QrScanner'
+import { t } from '@/lib/i18n'
 import { money } from '@/utils/format'
+import { cardIdFromQr } from '@/utils/qr'
 
 import type { Outcome } from '../types'
 
@@ -11,8 +14,9 @@ export type ChargeStep =
 
 type ChargeScreenProps = {
   step: ChargeStep
-  /** Whether cards held to the phone are being read; otherwise only typing the number works. */
+  /** Whether cards held to the phone are being read; otherwise scanning or typing works. */
   listening: boolean
+  /** A tapped or typed card number, or a scanned member QR code (app or wallet) or card QR. */
   onCard: (uid: string) => void
   onClose: () => void
   /** After a refused charge: try the same order again. */
@@ -21,9 +25,15 @@ type ChargeScreenProps = {
 
 const SUCCESS_SHOWN_MS = 2600
 
-/** The full-screen step after Charge: hold the card here, then a big ✓ or ✗ readable across the bar. */
+/**
+ * The full-screen step after Charge: hold the card here, or scan the member's QR code (in the app, in
+ * Apple or Google Wallet, or printed on the card), then a big ✓ or ✗ readable across the bar.
+ */
 export function ChargeScreen({ step, listening, onCard, onClose, onRetry }: ChargeScreenProps) {
   const [typed, setTyped] = useState('')
+  // Off while the order is being sent; on again for "Try another card".
+  const [cameraOn, setCameraOn] = useState(false)
+  const [cameraProblem, setCameraProblem] = useState('')
 
   // A good result goes away by itself, ready for the next guest.
   useEffect(() => {
@@ -55,15 +65,15 @@ export function ChargeScreen({ step, listening, onCard, onClose, onRetry }: Char
         </div>
         {outcome.ok ? (
           <button className="till-charge light" onClick={onClose}>
-            Next order
+            {t('Next order')}
           </button>
         ) : (
           <div className="charge-actions">
             <button className="till-charge light" onClick={onRetry}>
-              Try another card
+              {t('Try another card')}
             </button>
             <button className="till-ghost" onClick={onClose}>
-              Back to the order
+              {t('Back to the order')}
             </button>
           </div>
         )}
@@ -73,42 +83,69 @@ export function ChargeScreen({ step, listening, onCard, onClose, onRetry }: Char
 
   const waiting = step.kind === 'waiting' ? step : null
   return (
-    <div className="charge-screen" role="dialog" aria-label="Tap card">
+    <div className="charge-screen" role="dialog" aria-label={t('Tap card')}>
       <div className="charge-prompt">
         {waiting?.purpose === 'charge' && (
           <>
-            <span className="charge-label">{waiting.totalCents < 0 ? 'Give back' : 'To pay'}</span>
+            <span className="charge-label">{waiting.totalCents < 0 ? t('Give back') : t('To pay')}</span>
             <strong className="charge-amount">{money(Math.abs(waiting.totalCents))}</strong>
           </>
         )}
-        {waiting?.purpose === 'credit' && <strong className="charge-amount small">Check tokens</strong>}
-        <div className={step.kind === 'busy' ? 'charge-card busy' : 'charge-card'} aria-hidden="true">
-          <span />
-        </div>
+        {waiting?.purpose === 'credit' && (
+          <strong className="charge-amount small">{t('Check tokens')}</strong>
+        )}
+        {cameraOn && step.kind === 'waiting' ? (
+          <QrScanner
+            onScan={(payload) => onCard(cardIdFromQr(payload))}
+            onError={() => {
+              setCameraOn(false)
+              setCameraProblem(
+                t('The camera could not start. Allow camera access for this site, or type the card number.'),
+              )
+            }}
+          />
+        ) : (
+          <div className={step.kind === 'busy' ? 'charge-card busy' : 'charge-card'} aria-hidden="true">
+            <span />
+          </div>
+        )}
         <p>
           {step.kind === 'busy'
-            ? 'One moment…'
-            : listening
-              ? 'Hold the card to the back of the phone'
-              : 'Type the card number'}
+            ? t('One moment…')
+            : cameraOn
+              ? t('Hold the QR code in front of the camera')
+              : listening
+                ? t('Hold the card to the back of the phone')
+                : t('Type the card number')}
         </p>
+        {cameraProblem && <p className="charge-problem">{cameraProblem}</p>}
       </div>
+      <button
+        className="till-ghost"
+        onClick={() => {
+          setCameraProblem('')
+          setCameraOn((on) => !on)
+        }}
+        disabled={step.kind === 'busy'}
+      >
+        {cameraOn ? t('Stop camera') : t('Scan QR code')}
+      </button>
       <form onSubmit={submit} className="charge-typed">
         <input
           value={typed}
           onChange={(e) => setTyped(e.target.value)}
-          placeholder="Card number"
-          aria-label="Card number"
+          placeholder={t('Card number')}
+          aria-label={t('Card number')}
           autoCapitalize="characters"
           autoComplete="off"
           disabled={step.kind === 'busy'}
         />
         <button className="till-ghost" disabled={step.kind === 'busy' || !typed.trim()}>
-          Use
+          {t('Use')}
         </button>
       </form>
       <button className="till-ghost" onClick={onClose} disabled={step.kind === 'busy'}>
-        Cancel
+        {t('Cancel')}
       </button>
     </div>
   )

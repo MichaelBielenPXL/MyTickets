@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 
 import { type Me, type Membership, useSignOut } from '@/features/auth'
 import { useDismiss } from '@/hooks/useDismiss'
+import { t } from '@/lib/i18n'
 
 type UserMenuProps = {
   me: Me
@@ -29,7 +30,7 @@ export function UserMenu({ me, account }: UserMenuProps) {
         type="button"
         className="user-button"
         aria-expanded={open}
-        aria-label="Account menu"
+        aria-label={t('Account menu')}
         onClick={() => setOpen(!open)}
       >
         {initials(name)}
@@ -44,18 +45,18 @@ export function UserMenu({ me, account }: UserMenuProps) {
           {account && (
             <>
               <Link to={`/${account.slug}/tickets`} className="menu-item" onClick={close}>
-                My tickets
+                {t('My tickets')}
               </Link>
               <Link to={`/${account.slug}/wallet`} className="menu-item" onClick={close}>
-                My wallet
+                {t('My wallet')}
               </Link>
               <Link to={`/${account.slug}/profile`} className="menu-item" onClick={close}>
-                My details
+                {t('My details')}
               </Link>
             </>
           )}
           <Link to="/discover" className="menu-item" onClick={close}>
-            Browse organisations
+            {t('Browse organisations')}
           </Link>
 
           <div className="menu-separator" />
@@ -66,7 +67,7 @@ export function UserMenu({ me, account }: UserMenuProps) {
               onClick={() => signOut.mutate(account.slug)}
               disabled={signOut.isPending}
             >
-              Sign out of {account.name}
+              {t('Sign out of {org}', { org: account.name })}
             </button>
           )}
           <button
@@ -75,7 +76,7 @@ export function UserMenu({ me, account }: UserMenuProps) {
             onClick={() => signOut.mutate(undefined)}
             disabled={signOut.isPending}
           >
-            {signedInElsewhere ? 'Sign out everywhere' : 'Sign out'}
+            {signedInElsewhere ? t('Sign out everywhere') : t('Sign out')}
           </button>
         </div>
       )}

@@ -33,6 +33,8 @@ public class FlowTests : IClassFixture<TestApp>
         {
             name = "Regular", priceCents, capacity, maxPerUser = 10, allowedTierIds,
         });
+        // A week away, so open the doors early: these tests check people in today.
+        await org.Admin.PostOkAsync($"{org.Url}/staff/events/{ev.Str("id")}/open", new { });
         return (ev.Str("id"), type.Str("id"));
     }
 
@@ -43,10 +45,13 @@ public class FlowTests : IClassFixture<TestApp>
         return user;
     }
 
-    private static async Task<string> LinkCardAsync(HttpClient user, Org org)
+    /// <summary>The organisation issues and writes a card, the member taps it to claim it; returns the chip's serial.</summary>
+    private static async Task<string> LinkCardAsync(HttpClient user, Org org, string? uid = null)
     {
-        var uid = Convert.ToHexString(Guid.NewGuid().ToByteArray())[..14];
-        await user.PostOkAsync($"{org.Url}/me/cards", new { uid, label = "My card" });
+        uid ??= Convert.ToHexString(Guid.NewGuid().ToByteArray())[..14];
+        var card = (await org.Admin.PostOkAsync($"{org.Url}/admin/cards", new { count = 1 }))[0]!;
+        await org.Admin.PostOkAsync($"{org.Url}/admin/cards/{card.Str("id")}/written", new { uid, locked = true });
+        await user.PostOkAsync($"{org.Url}/cards/{card.Str("code")}/link", new { });
         return uid;
     }
 
@@ -229,6 +234,41 @@ public class FlowTests : IClassFixture<TestApp>
         Assert.Equal("Guest Tester", checkedIn.Str("name"));
         var again = await org.Admin.PostAsJsonAsync($"{org.Url}/staff/checkin", new { eventId, cardUid = card });
         Assert.Equal(HttpStatusCode.Conflict, again.StatusCode);
+    }
+
+    [Fact]
+    public async Task Doors_open_at_the_start_or_earlier_by_hand_and_a_closed_event_stops_check_ins_and_sales()
+    {
+        var org = await NewOrgAsync();
+        var ev = await org.Admin.PostOkAsync($"{org.Url}/admin/events", new { name = "Open end", description = "", location = "Hall", startsAt = DateTime.UtcNow.AddHours(2), published = true });
+        var eventId = ev.Str("id");
+        var typeId = (await org.Admin.PostOkAsync($"{org.Url}/admin/events/{eventId}/ticket-types", new { name = "Regular", priceCents = 0, capacity = 10, maxPerUser = 10 })).Str("id");
+        var guest = await NewMemberAsync(org);
+        await guest.PostOkAsync($"{org.Url}/events/{eventId}/order", new { items = new[] { new { ticketTypeId = typeId, quantity = 2 } } });
+        var code = (await guest.GetOkAsync($"{org.Url}/me/tickets"))[0]!.Str("code");
+
+        // Two hours before the start the door says it isn't open yet.
+        var early = await org.Admin.PostAsJsonAsync($"{org.Url}/staff/checkin", new { eventId, code });
+        Assert.Equal(HttpStatusCode.Conflict, early.StatusCode);
+        Assert.Contains("aren't open yet", await early.Content.ReadAsStringAsync());
+        Assert.Equal("Upcoming", (await org.Admin.GetOkAsync($"{org.Url}/staff/context"))["events"]![0]!.Str("status"));
+
+        // Opened early by hand: people get in.
+        Assert.Equal("Open", (await org.Admin.PostOkAsync($"{org.Url}/staff/events/{eventId}/open", new { })).Str("status"));
+        await org.Admin.PostOkAsync($"{org.Url}/staff/checkin", new { eventId, code });
+
+        // Closed (it has no end time): no more check-ins, no more sales, and it leaves the lists.
+        Assert.Equal("Closed", (await org.Admin.PostOkAsync($"{org.Url}/staff/events/{eventId}/close", new { })).Str("status"));
+        var second = (await guest.GetOkAsync($"{org.Url}/me/tickets")).AsArray().First(t => t!.Str("status") == "Valid")!.Str("code");
+        Assert.Equal(HttpStatusCode.Conflict, (await org.Admin.PostAsJsonAsync($"{org.Url}/staff/checkin", new { eventId, code = second })).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await guest.PostAsJsonAsync($"{org.Url}/events/{eventId}/order", new { items = new[] { new { ticketTypeId = typeId, quantity = 1 } } })).StatusCode);
+        Assert.Empty((await guest.GetOkAsync(org.Url))["events"]!.AsArray());
+        Assert.Empty((await org.Admin.GetOkAsync($"{org.Url}/staff/context"))["events"]!.AsArray());
+        Assert.Equal("Closed", (await org.Admin.GetOkAsync($"{org.Url}/admin/events"))[0]!.Str("status"));
+
+        // Reopened, it works again.
+        await org.Admin.PostOkAsync($"{org.Url}/staff/events/{eventId}/open", new { });
+        await org.Admin.PostOkAsync($"{org.Url}/staff/checkin", new { eventId, code = second });
     }
 
     [Fact]
@@ -450,6 +490,45 @@ public class FlowTests : IClassFixture<TestApp>
     }
 
     [Fact]
+    public async Task Organisations_sell_tokens_at_their_own_price_with_top_up_deals()
+    {
+        var org = await NewOrgAsync();
+        // A typo that would give away far too much, and two deals at the same price, are refused.
+        Assert.Equal(HttpStatusCode.BadRequest, (await org.Admin.PutAsJsonAsync($"{org.Url}/admin/topup-deals", new[] { new { priceCents = 500, tokensCents = 6000 } })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await org.Admin.PutAsJsonAsync($"{org.Url}/admin/topup-deals",
+            new[] { new { priceCents = 500, tokensCents = 600 }, new { priceCents = 500, tokensCents = 700 } })).StatusCode);
+
+        var saved = await org.Admin.PutAsJsonAsync($"{org.Url}/admin/topup-deals",
+            new[] { new { priceCents = 500, tokensCents = 600 }, new { priceCents = 2000, tokensCents = 2500 } });
+        saved.EnsureSuccessStatusCode();
+
+        var guest = await NewMemberAsync(org);
+        var deals = (await guest.GetOkAsync($"{org.Url}/wallet"))["deals"]!.AsArray();
+        Assert.Equal([500, 2000], deals.Select(d => d!.Int("priceCents")));
+        var fiveForSix = deals[0]!.Str("id");
+
+        // Pay €5, get 6 tokens. The overview counts the €5 that came in.
+        await guest.PayAsync(await guest.PostOkAsync($"{org.Url}/wallet/topup", new { amountCents = 0, dealId = fiveForSix }));
+        Assert.Equal(600, await BalanceAsync(guest, org));
+        Assert.Equal(500, (await org.Admin.GetOkAsync($"{org.Url}/admin/summary")).Int("onlineTopUpsCents"));
+
+        // With deals on offer, an amount of your own is not allowed.
+        var ownAmount = await guest.PostAsJsonAsync($"{org.Url}/wallet/topup", new { amountCents = 700 });
+        Assert.Equal(HttpStatusCode.Conflict, ownAmount.StatusCode);
+        Assert.Equal(600, await BalanceAsync(guest, org));
+
+        // A deal taken away in the meantime can't be bought.
+        await org.Admin.PutAsJsonAsync($"{org.Url}/admin/topup-deals", Array.Empty<object>());
+        var gone = await guest.PostAsJsonAsync($"{org.Url}/wallet/topup", new { amountCents = 0, dealId = fiveForSix });
+        Assert.Equal(HttpStatusCode.Conflict, gone.StatusCode);
+        Assert.Empty((await guest.GetOkAsync($"{org.Url}/wallet"))["deals"]!.AsArray());
+
+        // Without deals, any amount gives one token per euro again.
+        await TopUpAsync(guest, org, 700);
+        Assert.Equal(1300, await BalanceAsync(guest, org));
+    }
+
+    [Fact]
     public async Task Online_top_ups_start_at_five_euro_so_the_card_fee_stays_small()
     {
         var org = await NewOrgAsync();
@@ -643,7 +722,7 @@ public class FlowTests : IClassFixture<TestApp>
         // The card linked at the first organisation is unknown at the second, until it is linked there as well.
         var charge = new { cardUid = card, items = new[] { new { productId = beer, quantity = 1 } } };
         Assert.Equal(HttpStatusCode.NotFound, (await second.Admin.PostAsJsonAsync($"{second.Url}/staff/charge", charge)).StatusCode);
-        await atFirst.PostOkAsync($"{second.Url}/me/cards", new { uid = card, label = "Same card" });
+        await LinkCardAsync(atFirst, second, card);
         Assert.Equal(HttpStatusCode.PaymentRequired, (await second.Admin.PostAsJsonAsync($"{second.Url}/staff/charge", charge)).StatusCode);
 
         // The browser is now signed in to both, with a different account at each.
@@ -873,6 +952,10 @@ public class ImageAndSettingsTests : IClassFixture<TestApp>
         // Anything but a "#rrggbb" colour is refused and changes nothing.
         Assert.Equal(HttpStatusCode.BadRequest, (await admin.PutAsJsonAsync($"{url}/admin/organisation", new { name, brandColor = "red" })).StatusCode);
         Assert.Null((await admin.GetOkAsync(url))["brandColor"]);
+        // White text has to read on it: a pale yellow is refused.
+        var pale = await admin.PutAsJsonAsync($"{url}/admin/organisation", new { name, brandColor = "#f5e663" });
+        Assert.Equal(HttpStatusCode.BadRequest, pale.StatusCode);
+        Assert.Contains("hard to read", await pale.Content.ReadAsStringAsync());
 
         await admin.PutAsJsonAsync($"{url}/admin/organisation", new { name, brandColor = "#9F1239" });
         Assert.Equal("#9f1239", (await admin.GetOkAsync($"{url}/admin/organisation")).Str("brandColor"));

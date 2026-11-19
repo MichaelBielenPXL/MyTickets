@@ -1,7 +1,11 @@
+/** Upcoming until it starts or is opened early, open until it ends or is closed. Only open events let people in. */
+export type EventStatus = 'Upcoming' | 'Open' | 'Closed'
+
 export interface StaffEvent {
   id: string
   name: string
   startsAt: string
+  status: EventStatus
 }
 
 export interface MenuProduct {

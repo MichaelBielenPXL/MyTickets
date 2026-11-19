@@ -24,7 +24,12 @@ public class TestApp : WebApplicationFactory<Program>
         builder.UseSetting("RateLimits:AuthPerMinute", "100000");
         builder.UseSetting("Storage:Endpoint", "");
         builder.UseSetting("Storage:Folder", _dbPath + "-images");
+        // Where issued cards' links point; writing cards is refused without it.
+        builder.UseSetting("App:PublicUrl", PublicUrl);
     }
+
+    /// <summary>The site's public address in tests; empty to test what happens before it is set.</summary>
+    protected virtual string PublicUrl => "https://tickets.test";
 
     protected override void Dispose(bool disposing)
     {

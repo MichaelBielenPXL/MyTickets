@@ -19,7 +19,10 @@ export function useWallet(slug: string, enabled = true) {
 /** Starts an online top-up; the credit arrives once the payment at `checkoutUrl` goes through. */
 export function useStartTopUp(slug: string) {
   return useMutation({
-    mutationFn: (amountCents: number) =>
-      api.post<{ checkoutUrl: string }>(`/orgs/${slug}/wallet/topup`, { amountCents }),
+    mutationFn: (topUp: { amountCents: number } | { dealId: string }) =>
+      api.post<{ checkoutUrl: string }>(
+        `/orgs/${slug}/wallet/topup`,
+        'dealId' in topUp ? { amountCents: 0, dealId: topUp.dealId } : topUp,
+      ),
   })
 }

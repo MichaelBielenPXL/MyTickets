@@ -140,6 +140,12 @@ public class StripeTests : IClassFixture<StripeTestApp>
         Assert.Equal("1188", transfer["amount"]);
         Assert.Equal(accountId, transfer["destination"]);
         Assert.Equal($"ch_{sessionId}", transfer["source_transaction"]);
+
+        // The admin overview shows what the platform kept on top-ups, and nothing on tickets yet.
+        var summary = await shop.Admin.GetOkAsync($"{shop.Url}/admin/summary");
+        Assert.Equal(1250, summary.Int("onlineTopUpsCents"));
+        Assert.Equal(62, summary.Int("topUpFeesCents"));
+        Assert.Equal(0, summary.Int("ticketFeesCents"));
     }
 
     [Fact]

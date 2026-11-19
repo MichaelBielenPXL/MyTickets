@@ -78,6 +78,21 @@ describe('JoinPage', () => {
     expect(await screen.findByText('Now at /night-owls')).toBeInTheDocument()
   })
 
+  it('goes back to a tapped card once the membership has started', async () => {
+    sessionStorage.setItem('mytickets.pendingCard', 'ABCDEFGHJK')
+    const { joined } = serve()
+    answerJoin({ joined: true, pending: false, checkoutUrl: null }, joined)
+    const { user } = renderApp(<JoinPage />, { at: '/night-owls/join', path })
+
+    await user.click((await screen.findAllByRole('button', { name: 'Choose' }))[0])
+    await user.type(await screen.findByLabelText('First name'), 'Gijs')
+    await user.type(screen.getByLabelText('Last name'), 'Janssens')
+    await user.click(screen.getByRole('button', { name: 'Continue' }))
+
+    expect(await screen.findByText('Now at /c/ABCDEFGHJK')).toBeInTheDocument()
+    expect(sessionStorage.getItem('mytickets.pendingCard')).toBeNull()
+  })
+
   it('asks the details after choosing, then starts a free membership', async () => {
     const { saved, joined } = serve()
     answerJoin({ joined: true, pending: false, checkoutUrl: null }, joined)

@@ -1,6 +1,7 @@
 import { type FormEvent, type ReactNode, useState } from 'react'
 
 import { ErrorNote, Field } from '@/components'
+import { t } from '@/lib/i18n'
 import { euroInput, money, parseEuro } from '@/utils/format'
 import { tileFill } from '@/utils/tileColors'
 
@@ -36,7 +37,6 @@ export function ProductRow({ slug, product, deposits, categories, handle }: Prod
         onDone={() => setEditing(false)}
       />
     )
-
   return (
     <div className={product.active ? 'list-item product-row' : 'list-item product-row faded'}>
       {handle}
@@ -51,7 +51,7 @@ export function ProductRow({ slug, product, deposits, categories, handle }: Prod
             + {money(deposit.priceCents)} {deposit.name}
           </span>
         )}
-        {!product.active && <span className="tag">Hidden</span>}
+        {!product.active && <span className="tag">{t('Hidden')}</span>}
         <ErrorNote error={save.error} />
       </div>
       <div className="row">
@@ -63,10 +63,10 @@ export function ProductRow({ slug, product, deposits, categories, handle }: Prod
             save.mutate({ id, product: { ...current, active: !product.active } })
           }}
         >
-          {product.active ? 'Hide' : 'Show'}
+          {product.active ? t('Hide') : t('Show')}
         </button>
         <button className="btn small" onClick={() => setEditing(true)}>
-          Edit
+          {t('Edit')}
         </button>
       </div>
     </div>
@@ -95,7 +95,7 @@ function ProductEditor({ slug, product, deposits, categories, onDone }: ProductE
   function submit(event: FormEvent) {
     event.preventDefault()
     const priceCents = parseEuro(price)
-    if (priceCents === null) return setProblem('Enter prices like 12,50.')
+    if (priceCents === null) return setProblem(t('Enter prices like 12,50.'))
     setProblem('')
     const { id, ...current } = product
     save.mutate(
@@ -117,18 +117,18 @@ function ProductEditor({ slug, product, deposits, categories, onDone }: ProductE
   return (
     <form onSubmit={submit} className="list-item product-editor stack" aria-label={`Edit ${product.name}`}>
       <div className="grid-2">
-        <Field label="Name">
+        <Field label={t('Name')}>
           <input value={name} onChange={(e) => setName(e.target.value)} required maxLength={80} />
         </Field>
-        <Field label={product.isDeposit ? 'Deposit in euro' : 'Price in euro'}>
+        <Field label={product.isDeposit ? t('Deposit in euro') : t('Price in euro')}>
           <input inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} required />
         </Field>
         {!product.isDeposit && (
           <>
-            <Field label="Category">
+            <Field label={t('Category')}>
               <CategoryChoice categories={categories} value={categoryId} onChange={setCategoryId} />
             </Field>
-            <Field label="Comes with">
+            <Field label={t('Comes with')}>
               <DepositChoice deposits={deposits} value={depositId} onChange={setDepositId} />
             </Field>
           </>
@@ -140,8 +140,8 @@ function ProductEditor({ slug, product, deposits, categories, onDone }: ProductE
       {confirmingDelete ? (
         <div className="confirm-delete">
           <span>
-            Delete {product.name}? Past sales keep their history.
-            {product.isDeposit && ' Cups still out can no longer be handed back for it.'}
+            {t('Delete {name}? Past sales keep their history.', { name: product.name })}
+            {product.isDeposit && ' ' + t('Cups still out can no longer be handed back for it.')}
           </span>
           <div className="row">
             <button
@@ -150,10 +150,10 @@ function ProductEditor({ slug, product, deposits, categories, onDone }: ProductE
               disabled={remove.isPending}
               onClick={() => remove.mutate(product.id)}
             >
-              Delete
+              {t('Delete')}
             </button>
             <button type="button" className="btn small" onClick={() => setConfirmingDelete(false)}>
-              Keep it
+              {t('Keep it')}
             </button>
           </div>
         </div>
@@ -161,10 +161,10 @@ function ProductEditor({ slug, product, deposits, categories, onDone }: ProductE
         <div className="spread">
           <div className="row">
             <button className="btn primary small" disabled={save.isPending}>
-              Save
+              {t('Save')}
             </button>
             <button type="button" className="btn small" onClick={onDone}>
-              Cancel
+              {t('Cancel')}
             </button>
           </div>
           <button
@@ -172,7 +172,7 @@ function ProductEditor({ slug, product, deposits, categories, onDone }: ProductE
             className="btn link danger-text small"
             onClick={() => setConfirmingDelete(true)}
           >
-            Delete
+            {t('Delete')}
           </button>
         </div>
       )}

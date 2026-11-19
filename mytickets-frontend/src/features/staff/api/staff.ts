@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { api } from '@/lib/api-client'
 
@@ -9,6 +9,7 @@ import type {
   ChargeResult,
   CheckInRequest,
   CheckInResult,
+  EventStatus,
   StaffContext,
 } from '../types'
 
@@ -44,5 +45,20 @@ export function useCashTopUp(slug: string) {
   return useMutation({
     mutationFn: (request: CashTopUpRequest) =>
       api.post<{ balanceCents: number; displayName: string }>(`/orgs/${slug}/staff/topup`, request),
+  })
+}
+
+/** Opens the doors now (also before the start time, or again after closing), or closes the event. */
+export function useEventDoors(slug: string, eventId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (action: 'open' | 'close') =>
+      api.post<{ status: EventStatus }>(`/orgs/${slug}/staff/events/${eventId}/${action}`),
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: staffKeys.context(slug) }),
+        // The admin's event list shows the status too.
+        queryClient.invalidateQueries({ queryKey: ['admin', slug, 'events'] }),
+      ]),
   })
 }

@@ -18,6 +18,8 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import type { ReactNode } from 'react'
 
+import { t } from '@/lib/i18n'
+
 type SortableListProps<T extends { id: string }> = {
   items: T[]
   /** Called with every id in the new order after something is dropped somewhere else. */
@@ -84,7 +86,7 @@ function SortableRow({ id, name, disabled, children }: SortableRowProps) {
       type="button"
       ref={setActivatorNodeRef}
       className="drag-handle"
-      aria-label={`Move ${name}`}
+      aria-label={t('Move {name}', { name })}
       {...attributes}
       {...listeners}
     >

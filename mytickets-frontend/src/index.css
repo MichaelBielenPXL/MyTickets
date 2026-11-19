@@ -1799,7 +1799,7 @@ input[type='checkbox']:focus-visible {
   width: 100%;
 }
 
-/* ---------- Choosing a membership: white cards on a dark panel, so the options stand out ---------- */
+/* ---------- Choosing a membership: white cards on the organisation's colour, like its member card ---------- */
 .tier-picker {
   display: flex;
   flex-direction: column;
@@ -1808,8 +1808,8 @@ input[type='checkbox']:focus-visible {
   border-radius: 16px;
   background:
     radial-gradient(120% 140% at 100% 0%, rgb(255 255 255 / 10%), transparent 55%),
-    linear-gradient(160deg, #262626, #0a0a0a);
-  box-shadow: 0 16px 40px -16px rgb(0 0 0 / 35%);
+    linear-gradient(160deg, var(--brand), var(--brand-deep));
+  box-shadow: 0 16px 40px -16px color-mix(in oklab, var(--brand-deep) 70%, transparent);
   color: #ffffff;
 }
 .tier-picker h2 {
@@ -1817,7 +1817,7 @@ input[type='checkbox']:focus-visible {
   color: #ffffff;
 }
 .tier-picker > .muted {
-  color: #a3a3a3;
+  color: rgb(255 255 255 / 75%);
 }
 .tier-picker .list-item {
   border-color: transparent;
@@ -1827,12 +1827,12 @@ input[type='checkbox']:focus-visible {
   margin-top: 4px;
 }
 .tier-picker .invite input {
-  border-color: #404040;
-  background: #1f1f1f;
+  border-color: rgb(255 255 255 / 30%);
+  background: rgb(0 0 0 / 20%);
   color: #ffffff;
 }
 .tier-picker .invite input::placeholder {
-  color: #a3a3a3;
+  color: rgb(255 255 255 / 70%);
 }
 .tier-picker .invite .btn {
   border-color: #ffffff;
@@ -2387,6 +2387,15 @@ main.staff.till-mode {
   .charge-card {
     animation: none;
   }
+}
+.charge-screen .scanner {
+  width: min(360px, 100%);
+  max-height: 40vh;
+  aspect-ratio: 1;
+}
+.charge-prompt .charge-problem {
+  max-width: 360px;
+  color: #fca5a5;
 }
 .charge-typed {
   display: flex;
@@ -3650,11 +3659,21 @@ body:has(.till) .tab-bar-item {
 /* ---------- An organisation's own colour ----------
    Set as --brand (and --brand-ink, the text that reads on it) on the organisation's pages. It is spent
    sparingly: the member card, one button, a soft glow behind the logo. The rest stays house-neutral. */
-.organisation-page {
+:root {
   --brand: #1c1c1e;
   --brand-ink: #ffffff;
+}
+/* Worked out wherever --brand is set, so they follow it: on the page root and on an organisation's pages. */
+:root,
+.organisation-page,
+.join-page {
   --brand-deep: color-mix(in oklab, var(--brand), black 34%);
   --brand-soft: color-mix(in oklab, var(--brand) 9%, transparent);
+  /* A pastel of the colour for a selected tab, with a deep shade of it to read on top. */
+  --brand-pastel: color-mix(in oklab, var(--brand) 24%, white);
+  --brand-pastel-ink: color-mix(in oklab, var(--brand), black 42%);
+}
+.organisation-page {
   position: relative;
   isolation: isolate;
 }
@@ -3762,203 +3781,6 @@ body:has(.till) .tab-bar-item {
   color: var(--text);
 }
 
-/* ---------- The member card ----------
-   Credit-card proportions, lit from the top left, with a fine engraved pattern like security print.
-   It leans toward the pointer and a highlight follows it; touch and reduced motion keep it still. */
-.member-card-stage {
-  perspective: 1100px;
-}
-.member-card {
-  --tilt-x: 0deg;
-  --tilt-y: 0deg;
-  --light-x: 22%;
-  --light-y: 8%;
-  --ink-soft: color-mix(in srgb, var(--brand-ink) 72%, transparent);
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  aspect-ratio: 1.586;
-  container-type: inline-size;
-  overflow: hidden;
-  padding: clamp(18px, 6cqi, 26px);
-  border-radius: clamp(16px, 5cqi, 22px);
-  color: var(--brand-ink);
-  background:
-    radial-gradient(110% 80% at 0% 0%, color-mix(in oklab, var(--brand), white 20%), transparent 62%),
-    linear-gradient(
-      155deg,
-      color-mix(in oklab, var(--brand), white 6%) 0%,
-      var(--brand) 42%,
-      var(--brand-deep) 100%
-    );
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 22%),
-    inset 0 0 0 1px rgb(255 255 255 / 8%),
-    0 2px 4px rgb(0 0 0 / 8%),
-    0 28px 56px -22px color-mix(in oklab, var(--brand-deep) 75%, transparent);
-  transform: rotateX(var(--tilt-x)) rotateY(var(--tilt-y));
-  transform-style: preserve-3d;
-  transition:
-    transform 700ms cubic-bezier(0.16, 1, 0.3, 1),
-    box-shadow 700ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-.member-card[data-leaning] {
-  transition:
-    transform 120ms linear,
-    box-shadow 300ms ease-out;
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 22%),
-    inset 0 0 0 1px rgb(255 255 255 / 8%),
-    0 2px 4px rgb(0 0 0 / 8%),
-    0 40px 70px -26px color-mix(in oklab, var(--brand-deep) 85%, transparent);
-}
-/* Engraving: concentric fine lines, faint enough to read as texture rather than pattern. */
-.member-card::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: repeating-radial-gradient(
-    circle at 110% 120%,
-    rgb(255 255 255 / 7%) 0 1px,
-    transparent 1px 7px
-  );
-  mask-image: linear-gradient(200deg, black 10%, transparent 75%);
-  pointer-events: none;
-}
-/* The sheen that follows the pointer. */
-.member-card::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(
-    circle at var(--light-x) var(--light-y),
-    rgb(255 255 255 / 32%),
-    rgb(255 255 255 / 6%) 32%,
-    transparent 58%
-  );
-  mix-blend-mode: soft-light;
-  pointer-events: none;
-}
-.member-card > * {
-  position: relative;
-  z-index: 1;
-}
-.member-card.expired {
-  filter: saturate(0.35);
-}
-.member-card-top {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.member-card-logo {
-  display: grid;
-  flex: none;
-  place-items: center;
-  width: 46px;
-  height: 46px;
-  overflow: hidden;
-  border-radius: 12px;
-  background: #ffffff;
-  box-shadow: 0 2px 8px rgb(0 0 0 / 18%);
-}
-.member-card-logo .org-avatar {
-  width: 38px !important;
-  height: 38px !important;
-  border: 0;
-  border-radius: 8px;
-  object-fit: contain;
-  background-color: transparent;
-}
-.member-card-logo span.org-avatar {
-  width: 46px !important;
-  height: 46px !important;
-  border-radius: 0;
-}
-.member-card-org {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  line-height: 1.2;
-}
-.member-card-org strong {
-  overflow: hidden;
-  font-size: clamp(0.95rem, 4.4cqi, 1.1rem);
-  font-weight: 650;
-  letter-spacing: -0.015em;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.member-card-org span {
-  overflow: hidden;
-  color: var(--ink-soft);
-  font-size: 0.85rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.member-card-contactless {
-  flex: none;
-  width: 26px;
-  height: 26px;
-  margin-left: auto;
-  fill: none;
-  stroke: var(--ink-soft);
-  stroke-width: 1.8;
-  stroke-linecap: round;
-}
-.member-card-name {
-  margin: auto 0 0;
-  padding-bottom: clamp(10px, 4cqi, 18px);
-  overflow: hidden;
-  font-size: clamp(1.15rem, 6.4cqi, 1.6rem);
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  line-height: 1.15;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.member-card-facts {
-  display: flex;
-  align-items: flex-end;
-  gap: clamp(16px, 7cqi, 32px);
-  margin: 0;
-}
-.member-card-facts dt {
-  color: var(--ink-soft);
-  font-size: 0.72rem;
-  font-weight: 500;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-.member-card-facts dd {
-  margin: 2px 0 0;
-  font-size: 0.95rem;
-  font-weight: 500;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-.member-card-balance {
-  margin-right: auto;
-}
-.member-card-balance dd {
-  font-size: clamp(1.6rem, 10cqi, 2.3rem);
-  font-weight: 650;
-  letter-spacing: -0.03em;
-  line-height: 1;
-}
-@container (max-width: 330px) {
-  .member-card-facts > div:nth-child(3) {
-    display: none;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .member-card,
-  .member-card[data-leaning] {
-    transform: none;
-    transition: none;
-  }
-}
-
 /* ---------- Events, each with its date set like a ticket stub ---------- */
 .upcoming-events .list-item.event-row {
   justify-content: flex-start;
@@ -4006,9 +3828,6 @@ body:has(.till) .tab-bar-item {
     grid-template-columns: minmax(0, 1fr);
     gap: 24px;
     margin-top: 0;
-  }
-  .member-card-stage {
-    max-width: 440px;
   }
   .member-side h1 {
     font-size: 1.6rem;
@@ -4069,11 +3888,383 @@ body:has(.till) .tab-bar-item {
 .brand-color-preview.organisation-page::before {
   display: none;
 }
-.brand-color-preview .member-card {
-  transition: none;
-}
 @media (max-width: 640px) {
   .brand-color-layout {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+/* ---------- The organisation's colour across its pages ----------
+   While you are inside an organisation (data-org-brand on the page root) its main buttons and the
+   selected tab take its colour. Admin screens stay house-neutral. */
+:root[data-org-brand] .customer-page .btn.primary,
+:root[data-org-brand] .customer-page .btn.chosen {
+  border-color: var(--brand);
+  background: var(--brand);
+  color: var(--brand-ink);
+}
+:root[data-org-brand] .customer-page .btn.primary:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--brand), black 12%);
+}
+:root[data-org-brand] .wallet-hero {
+  background:
+    radial-gradient(120% 140% at 100% 0%, color-mix(in oklab, var(--brand), white 22%), transparent 58%),
+    linear-gradient(160deg, var(--brand), var(--brand-deep));
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 10%),
+    0 16px 40px -12px color-mix(in oklab, var(--brand-deep) 70%, transparent);
+  color: var(--brand-ink);
+}
+:root[data-org-brand] .wallet-hero h1,
+:root[data-org-brand] .wallet-hero-note {
+  color: color-mix(in srgb, var(--brand-ink) 72%, transparent);
+}
+:root[data-org-brand] .tab-bar-item.active {
+  background: var(--brand-pastel);
+  color: var(--brand-pastel-ink);
+  opacity: 1;
+}
+:root[data-org-brand] .org-sidebar-link.active {
+  background: color-mix(in oklab, var(--brand) 14%, white);
+  color: var(--brand-pastel-ink);
+}
+
+.brand-color-warning {
+  margin: 0;
+  color: #b42318;
+  font-size: 0.875rem;
+}
+.brand-color-warning .btn.link {
+  display: inline;
+  min-height: 0;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+}
+
+/* ---------- The member card ----------
+   A pass in the organisation's colour, as Entry shows it: who, which membership, until when, the QR
+   code on a white tile in the middle, and the balance in a white pill at the bottom. */
+.member-card {
+  display: grid;
+  gap: 22px;
+  padding: 26px 24px 24px;
+  border-radius: 24px;
+  background:
+    radial-gradient(120% 70% at 0% 0%, color-mix(in oklab, var(--brand), white 12%), transparent 60%),
+    var(--brand);
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 12%),
+    0 24px 48px -24px color-mix(in oklab, var(--brand-deep) 80%, transparent);
+  color: var(--brand-ink);
+}
+.member-card.expired {
+  filter: saturate(0.35);
+}
+.member-card-top {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+.member-card-logo {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  background: #ffffff;
+  overflow: hidden;
+}
+.member-card-org {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.member-card-org strong {
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+}
+.member-card-org span {
+  color: color-mix(in srgb, var(--brand-ink) 78%, transparent);
+  font-size: 0.95rem;
+}
+.member-card-facts {
+  display: grid;
+  gap: 16px;
+  margin: 0;
+}
+.member-card-facts dt {
+  margin-bottom: 4px;
+  color: color-mix(in srgb, var(--brand-ink) 75%, transparent);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.member-card-facts dd {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.member-card-facts dd.member-card-date {
+  font-weight: 500;
+}
+.member-card-foot {
+  padding-top: 20px;
+  border-top: 1px solid color-mix(in srgb, var(--brand-ink) 25%, transparent);
+}
+.member-card-balance {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  margin: 0;
+  padding: 0 20px;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #1d1d1f;
+  font-size: 1.05rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+a.member-card-balance:hover {
+  background: #f2f2f2;
+}
+.member-card-balance svg {
+  width: 20px;
+  height: 20px;
+  fill: #34c759;
+  stroke: #ffffff;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+.member-card-balance svg circle {
+  stroke: none;
+}
+
+/* The QR code, on a white tile so any scanner reads it whatever the card's colour. */
+.member-pass {
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+}
+.member-pass-qr {
+  padding: 12px;
+  border-radius: 14px;
+  background: #ffffff;
+}
+/* Big enough for a door scanner at arm's length, small enough to leave the card readable. */
+.member-pass-qr svg {
+  display: block;
+  width: 132px;
+  height: 132px;
+}
+.member-pass-code {
+  color: color-mix(in srgb, var(--brand-ink) 80%, transparent);
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+}
+.wallet-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+.wallet-button {
+  display: inline-flex;
+  gap: 7px;
+  align-items: center;
+  min-height: 38px;
+  padding: 0 16px 0 12px;
+  border-radius: 999px;
+  background: #000000;
+  color: #ffffff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.wallet-button:hover {
+  background: #2c2c2e;
+}
+.wallet-button svg {
+  width: 20px;
+  height: 20px;
+}
+.wallet-button[aria-disabled='true'] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.member-paying-card {
+  display: grid;
+  gap: 2px;
+  margin: 18px 0 0;
+}
+.member-paying-card span {
+  color: var(--muted, #6e6e73);
+  font-size: 0.8rem;
+}
+
+/* "10 Tokens" needs more room than "€10": two per row on a phone, four when there is space. */
+.amount-choices {
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+}
+.amount-choices .btn {
+  white-space: nowrap;
+}
+/* The tall pass card sets the height; what to do next starts at its top. */
+.member-home {
+  align-items: start;
+}
+.member-side {
+  padding-top: 8px;
+}
+
+/* A top-up deal: the tokens big, the price under it, and what comes free. */
+.amount-choices .btn.deal {
+  display: grid;
+  gap: 1px;
+  justify-items: center;
+  min-height: 64px;
+  padding: 8px 10px;
+  line-height: 1.2;
+}
+.btn.deal strong {
+  font-size: 1rem;
+}
+.btn.deal span {
+  font-size: 0.8rem;
+  opacity: 0.75;
+}
+.deal-bonus {
+  color: #248a3d;
+  font-size: 0.72rem;
+  font-style: normal;
+  font-weight: 600;
+}
+.btn.deal.chosen .deal-bonus {
+  color: inherit;
+}
+
+/* ---------- Token prices: the organisation's own top-ups ---------- */
+.topup-deals-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.topup-deal-row {
+  display: grid;
+  grid-template-columns: minmax(0, 120px) auto minmax(0, 120px) minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+  padding: 12px;
+  border: 1px solid var(--line, rgb(0 0 0 / 8%));
+  border-radius: 14px;
+}
+.topup-deal-row label {
+  display: grid;
+  gap: 4px;
+  font-size: 0.8rem;
+  color: var(--muted, #6e6e73);
+}
+.topup-deal-row input {
+  width: 100%;
+}
+.topup-deal-arrow {
+  padding-bottom: 10px;
+  color: var(--muted, #6e6e73);
+}
+.topup-deal-note {
+  padding-bottom: 10px;
+  color: #248a3d;
+  font-size: 0.85rem;
+}
+.topup-deals-empty {
+  margin: 0;
+  padding: 14px;
+  border-radius: 12px;
+  background: var(--fill, #f2f2f7);
+  font-size: 0.9rem;
+}
+@media (max-width: 640px) {
+  .topup-deal-row {
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  }
+  .topup-deal-note,
+  .topup-deal-row .btn {
+    grid-column: 1 / -1;
+    padding-bottom: 0;
+  }
+}
+
+/* ---------- Doors: whether an event lets people in, and the button to change it ---------- */
+.event-doors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+}
+.event-status.open {
+  background: rgb(52 199 89 / 14%);
+  color: #1f7a37;
+}
+.event-status.upcoming {
+  background: rgb(0 122 255 / 10%);
+  color: #0058b9;
+}
+.event-status.closed {
+  background: var(--fill, #f2f2f7);
+  color: var(--muted, #6e6e73);
+}
+
+/* ---------- Language: "🌐 NL ⌄" in the header, a real select on top ---------- */
+.language-picker {
+  position: relative;
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 8px;
+  border-radius: 999px;
+  color: var(--text, #1d1d1f);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.language-picker:hover {
+  background: var(--fill, #f2f2f7);
+}
+.language-picker svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.75;
+}
+.language-picker .language-picker-chevron {
+  width: 14px;
+  height: 14px;
+}
+.language-picker select {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+.language-picker:focus-within {
+  outline: 2px solid var(--accent, #171717);
+  outline-offset: 2px;
 }

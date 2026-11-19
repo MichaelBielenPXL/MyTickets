@@ -1,26 +1,30 @@
 import { type FormEvent, useState } from 'react'
 
-import { CardReader, ErrorNote, Field } from '@/components'
+import { CardReader, Field } from '@/components'
 import { ApiError } from '@/lib/api-client'
+import { t } from '@/lib/i18n'
 import { dateTime, errorText, timeOnly } from '@/utils/format'
+import { readStaffQr } from '@/utils/qr'
 
 import { useCheckIn } from '../api/staff'
 import type { CheckInRequest, CheckInResult, Outcome, StaffEvent } from '../types'
+import { EventDoors } from './EventDoors'
 import { OutcomeBanner } from './OutcomeBanner'
-import { QrScanner } from './QrScanner'
+import { ScanQrButton } from './ScanQrButton'
 
 type DoorModeProps = {
   slug: string
   events: StaffEvent[]
 }
 
-/** Let people in: scan the ticket's QR code, tap their card, or type the ticket code. */
+/**
+ * Let people in: scan a QR code (the ticket, the member code from the app or wallet, or the one printed
+ * on a card), tap their card, or type the ticket code.
+ */
 export function DoorMode({ slug, events }: DoorModeProps) {
   const [eventId, setEventId] = useState(events[0]?.id ?? '')
   const [outcome, setOutcome] = useState<Outcome | null>(null)
   const [checkedInCount, setCheckedInCount] = useState(0)
-  const [cameraOn, setCameraOn] = useState(false)
-  const [cameraProblem, setCameraProblem] = useState('')
   const [typedCode, setTypedCode] = useState('')
   const checkIn = useCheckIn(slug)
 
@@ -54,19 +58,15 @@ export function DoorMode({ slug, events }: DoorModeProps) {
     setTypedCode('')
   }
 
-  function cameraFailed() {
-    setCameraProblem(
-      'The camera could not start. Allow camera access for this site, or type the ticket code.',
-    )
-    setCameraOn(false)
-  }
+  const current = events.find((e) => e.id === eventId) ?? null
+  const open = current?.status === 'Open'
 
   if (events.length === 0) {
-    return <p className="muted">There is no published event to check people in for.</p>
+    return <p className="muted">{t('There is no published event to check people in for.')}</p>
   }
   return (
     <div className="stack">
-      <Field label="Event">
+      <Field label={t('Event')}>
         <select value={eventId} onChange={(e) => changeEvent(e.target.value)}>
           {events.map((event) => (
             <option key={event.id} value={event.id}>
@@ -75,51 +75,49 @@ export function DoorMode({ slug, events }: DoorModeProps) {
           ))}
         </select>
       </Field>
-      <OutcomeBanner outcome={outcome} />
-      <p className="muted">{checkedInCount} checked in on this phone</p>
-
-      {cameraOn ? (
+      {current && <EventDoors slug={slug} event={current} />}
+      {!open && <p className="muted">{t('Open the doors to start checking people in.')}</p>}
+      {open && (
         <>
-          <QrScanner onScan={(code) => admit({ code })} onError={cameraFailed} />
-          <button className="btn" onClick={() => setCameraOn(false)}>
-            Stop camera
-          </button>
+          <OutcomeBanner outcome={outcome} />
+          <p className="muted">{t('{count} checked in on this phone', { count: checkedInCount })}</p>
+
+          <ScanQrButton
+            onScan={(payload) => admit(readStaffQr(payload))}
+            cameraProblem={t(
+              'The camera could not start. Allow camera access for this site, or type the ticket code.',
+            )}
+          />
+          <CardReader
+            prompt={t('Ready. Hold a card against the back of the phone.')}
+            onCard={(cardUid) => admit({ cardUid })}
+          />
+          <form onSubmit={submitTypedCode} className="row">
+            <input
+              value={typedCode}
+              onChange={(e) => setTypedCode(e.target.value)}
+              placeholder={t('or type the ticket code')}
+              aria-label={t('Ticket code')}
+              autoComplete="off"
+            />
+            <button className="btn" disabled={!typedCode.trim()}>
+              {t('Check in')}
+            </button>
+          </form>
         </>
-      ) : (
-        <button
-          className="btn primary block"
-          onClick={() => {
-            setCameraProblem('')
-            setCameraOn(true)
-          }}
-        >
-          Scan ticket QR code
-        </button>
       )}
-      <ErrorNote>{cameraProblem}</ErrorNote>
-      <CardReader
-        prompt="Ready. Hold a card against the back of the phone."
-        onCard={(cardUid) => admit({ cardUid })}
-      />
-      <form onSubmit={submitTypedCode} className="row">
-        <input
-          value={typedCode}
-          onChange={(e) => setTypedCode(e.target.value)}
-          placeholder="or type the ticket code"
-          aria-label="Ticket code"
-          autoComplete="off"
-        />
-        <button className="btn" disabled={!typedCode.trim()}>
-          Check in
-        </button>
-      </form>
     </div>
   )
 }
 
 function welcome(result: CheckInResult): Outcome {
   const more = result.remaining
-  const others = more > 0 ? ` · ${more} more ticket${more > 1 ? 's' : ''} on this account` : ''
+  const others =
+    more === 1
+      ? ` · ${t('1 more ticket on this account')}`
+      : more > 1
+        ? ` · ${t('{count} more tickets on this account', { count: more })}`
+        : ''
   return { ok: true, title: result.name, detail: result.ticketType + others }
 }
 
@@ -129,5 +127,5 @@ function refusal(error: unknown): Outcome {
   if (typeof body.checkedInAt !== 'string') return { ok: false, title: errorText(error) }
   const who = typeof body.name === 'string' ? `${body.name} · ` : ''
   const when = timeOnly(body.checkedInAt)
-  return { ok: false, title: errorText(error), detail: `${who}checked in at ${when}` }
+  return { ok: false, title: errorText(error), detail: who + t('checked in at {time}', { time: when }) }
 }

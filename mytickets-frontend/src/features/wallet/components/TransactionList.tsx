@@ -1,3 +1,4 @@
+import { t } from '@/lib/i18n'
 import { dateTime, signedTokens } from '@/utils/format'
 
 import type { WalletTransaction, WalletTransactionType } from '../types'
@@ -16,13 +17,13 @@ const TYPE_LABELS: Record<WalletTransactionType, string> = {
 }
 
 export function TransactionList({ transactions }: TransactionListProps) {
-  if (transactions.length === 0) return <p className="muted">Nothing yet.</p>
+  if (transactions.length === 0) return <p className="muted">{t('Nothing yet.')}</p>
   return (
     <div className="list">
       {transactions.map((transaction) => (
         <div key={transaction.id} className="list-item">
           <div>
-            <strong>{TYPE_LABELS[transaction.type] ?? transaction.type}</strong>
+            <strong>{t(TYPE_LABELS[transaction.type] ?? transaction.type)}</strong>
             <p className="muted">
               {transaction.description} · {dateTime(transaction.createdAt)}
             </p>

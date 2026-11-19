@@ -30,7 +30,16 @@ describe('ManageMenu', () => {
 
     const menu = within(screen.getByRole('navigation', { name: 'Manage sections' }))
     const names = menu.getAllByRole('link').map((link) => link.querySelector('strong')?.textContent)
-    expect(names).toEqual(['Events', 'Memberships', 'Members', 'Bar menu', 'Payouts', 'Settings'])
+    expect(names).toEqual([
+      'Events',
+      'Memberships',
+      'Members',
+      'Cards',
+      'Token prices',
+      'Bar menu',
+      'Payouts',
+      'Settings',
+    ])
     expect(menu.getByRole('link', { name: /Bar menu/ })).toHaveAttribute('href', '/night-owls/admin?tab=bar')
   })
 })
