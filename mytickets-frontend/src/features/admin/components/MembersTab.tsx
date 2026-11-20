@@ -93,7 +93,7 @@ export function MembersTab({ slug }: MembersTabProps) {
                       {/* One new card a year; a member who lost theirs can be allowed one more. */}
                       <button
                         type="button"
-                        className="btn"
+                        className="btn ghost small"
                         aria-pressed={member.extraCardAllowed}
                         disabled={extraCard.isPending}
                         onClick={() =>

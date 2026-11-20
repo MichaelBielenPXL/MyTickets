@@ -259,6 +259,10 @@ namespace MyTickets.Api.Data.Migrations
                     b.Property<string>("BrandColor")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("CardDesignJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("TEXT");
 

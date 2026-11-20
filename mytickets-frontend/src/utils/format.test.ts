@@ -1,4 +1,12 @@
-import { money, parseEuro, requireEuro, requireWholeNumber, signedTokens, tokens } from './format'
+import {
+  money,
+  parseEuro,
+  requireEuro,
+  requireWholeNumber,
+  signedTokens,
+  tokenBalance,
+  tokens,
+} from './format'
 
 describe('parseEuro', () => {
   it.each([
@@ -51,5 +59,13 @@ describe('tokens', () => {
   it('signs amounts coming in and going out', () => {
     expect(signedTokens(4000)).toBe('+40 tokens')
     expect(signedTokens(-1250)).toBe('−12,50 tokens')
+  })
+})
+
+describe('tokenBalance', () => {
+  it('writes a balance the way tokens are written everywhere else', () => {
+    expect(tokenBalance(6000)).toBe('60 tokens')
+    expect(tokenBalance(1250)).toBe('12,50 tokens')
+    expect(tokenBalance(0)).toBe('0 tokens')
   })
 })

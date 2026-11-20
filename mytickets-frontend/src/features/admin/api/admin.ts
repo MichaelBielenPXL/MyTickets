@@ -10,6 +10,7 @@ import type {
   AdminCard,
   AdminEvent,
   AdminTier,
+  CardDesign,
   CardWriting,
   Category,
   EventInput,
@@ -41,6 +42,7 @@ export const adminKeys = {
   topUpDeals: (slug: string) => ['admin', slug, 'topup-deals'] as const,
   cards: (slug: string) => ['admin', slug, 'cards'] as const,
   cardWriting: (slug: string) => ['admin', slug, 'card-writing'] as const,
+  cardDesign: (slug: string) => ['admin', slug, 'card-design'] as const,
 }
 
 const base = (slug: string) => `/orgs/${slug}/admin`
@@ -347,5 +349,20 @@ export function useAllowExtraCard(slug: string) {
     mutationFn: ({ memberId, allowed }: { memberId: string; allowed: boolean }) =>
       api.put<void>(`${base(slug)}/members/${memberId}/extra-card`, { allowed }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: adminKeys.members(slug) }),
+  })
+}
+
+export function useCardDesign(slug: string) {
+  return useQuery({
+    queryKey: adminKeys.cardDesign(slug),
+    queryFn: () => api.get<CardDesign>(`${base(slug)}/cards/design`),
+  })
+}
+
+export function useSaveCardDesign(slug: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (design: CardDesign) => api.put<void>(`${base(slug)}/cards/design`, design),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: adminKeys.cardDesign(slug) }),
   })
 }

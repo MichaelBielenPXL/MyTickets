@@ -29,7 +29,7 @@ export function MemberCard(props: MemberCardProps) {
   const { organisationName, logoUrl, memberName, tier, expiresAt, active, balanceCents, pass, topUpHref } =
     props
   const balance =
-    balanceCents === undefined ? null : t('Saldo: {balance}', { balance: tokenBalance(balanceCents) })
+    balanceCents === undefined ? null : t('Balance: {balance}', { balance: tokenBalance(balanceCents) })
 
   return (
     <div

@@ -297,6 +297,56 @@ public class CardTests : IClassFixture<TestApp>
         Assert.Equal(HttpStatusCode.PaymentRequired, await ChargeAsync(org, uid));
         Assert.Single((await member.GetOkAsync($"{org.Url}/me/cards")).AsArray());
     }
+
+    [Fact]
+    public async Task Admin_designs_the_front_and_back_of_the_printed_card()
+    {
+        var org = await NewOrgAsync(_app);
+        var url = $"{org.Url}/admin/cards/design";
+
+        // Until something is chosen: the brand colour on both sides, with the logo.
+        var start = await org.Admin.GetOkAsync(url);
+        Assert.Equal("brand", start["front"]!.Str("background"));
+        Assert.Equal("brand", start["back"]!.Str("background"));
+        Assert.True(start["front"]!["showLogo"]!.GetValue<bool>());
+
+        var design = new
+        {
+            front = new { background = "colour", colour = "#0B3D2E", imageKey = (string?)null, showLogo = true, tagline = " Lidkaart 2026–2027 " },
+            back = new { background = "brand", colour = (string?)null, imageKey = (string?)null, showLogo = false, tagline = "" },
+        };
+        (await org.Admin.PutAsJsonAsync(url, design)).EnsureSuccessStatusCode();
+        var saved = await org.Admin.GetOkAsync(url);
+        Assert.Equal("colour", saved["front"]!.Str("background"));
+        Assert.Equal("#0b3d2e", saved["front"]!.Str("colour"));
+        Assert.Equal("Lidkaart 2026–2027", saved["front"]!.Str("tagline"));
+        Assert.False(saved["back"]!["showLogo"]!.GetValue<bool>());
+
+        var plain = new { background = "brand", showLogo = true, tagline = "" };
+        Assert.Equal(HttpStatusCode.BadRequest, (await org.Admin.PutAsJsonAsync(url, new { front = new { background = "colour", colour = "green", showLogo = true, tagline = "" }, back = plain })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await org.Admin.PutAsJsonAsync(url, new { front = plain, back = new { background = "image", imageKey = "orgs/someone-else/x.png", showLogo = true, tagline = "" } })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await org.Admin.PutAsJsonAsync(url, new { front = new { background = "brand", showLogo = true, tagline = new string('x', 41) }, back = plain })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await org.Admin.PutAsJsonAsync(url, new { front = plain })).StatusCode);
+
+        var guest = await MemberAsync(org);
+        Assert.Equal(HttpStatusCode.Forbidden, (await guest.PutAsJsonAsync(url, design)).StatusCode);
+    }
+
+    [Fact]
+    public void A_design_saved_before_there_were_two_sides_becomes_the_back()
+    {
+        var organisation = new MyTickets.Api.Data.Organisation
+        {
+            Name = "Club", Slug = "club",
+            CardDesignJson = """{"Background":"colour","Colour":"#0b3d2e","ImageKey":null,"ShowLogo":false,"Tagline":"Lidkaart"}""",
+        };
+
+        var design = CardDesigns.Load(organisation);
+
+        Assert.Equal("colour", design.Back.Background);
+        Assert.Equal("Lidkaart", design.Back.Tagline);
+        Assert.Equal("brand", design.Front.Background);
+    }
 }
 
 /// <summary>A site whose public address isn't set yet: cards can be made but not written.</summary>

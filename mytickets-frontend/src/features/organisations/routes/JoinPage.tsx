@@ -130,14 +130,16 @@ function Choose({
           <Link className="btn" to={`/${org.slug}`}>
             {t('Cancel')}
           </Link>
-          <p className="muted">Your {membership!.tier} membership stays as it is.</p>
+          <p className="muted">{t('Your {tier} membership stays as it is.', { tier: membership!.tier })}</p>
         </div>
       ) : (
         <div className="decide-later">
           <Link className="btn ghost" to={`/${org.slug}`}>
             {t('Decide later')}
           </Link>
-          <p className="muted">You can choose a membership any time from {org.name}&apos;s page.</p>
+          <p className="muted">
+            {t("You can choose a membership any time from {org}'s page.", { org: org.name })}
+          </p>
         </div>
       )}
     </section>

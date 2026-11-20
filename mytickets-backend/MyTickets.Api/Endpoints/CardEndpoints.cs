@@ -114,6 +114,25 @@ public static class CardEndpoints
             return Results.File(System.Text.Encoding.UTF8.GetBytes(csv), "text/csv", "cards.csv");
         });
 
+        admin.MapGet("/design", async (HttpContext http, AppDbContext db) =>
+        {
+            var organisation = await db.Organisations.AsNoTracking().FirstAsync(o => o.Id == http.Org().Org.Id);
+            var design = CardDesigns.Load(organisation);
+            static object Side(CardSide side) =>
+                new { side.Background, side.Colour, side.ImageKey, ImageUrl = Images.Url(side.ImageKey), side.ShowLogo, side.Tagline };
+            return Results.Ok(new { Front = Side(design.Front), Back = Side(design.Back) });
+        });
+
+        admin.MapPut("/design", async (CardDesign req, HttpContext http, AppDbContext db) =>
+        {
+            var orgId = http.Org().Org.Id;
+            var (design, problem) = CardDesigns.Check(req, orgId);
+            if (design is null) return Http.Error(400, problem!);
+            var json = System.Text.Json.JsonSerializer.Serialize(design);
+            await db.Organisations.Where(o => o.Id == orgId).ExecuteUpdateAsync(s => s.SetProperty(o => o.CardDesignJson, json));
+            return Results.NoContent();
+        });
+
         admin.MapGet("/writing", (IConfiguration config) =>
         {
             var reason = WritingProblem(config);

@@ -15,5 +15,12 @@ export { useBrandTheme } from './hooks/useBrandTheme'
 export { StartPage } from './routes/StartPage'
 export type { FieldMode, MemberPass, Organisation, ProfileFieldName } from './types'
 export { tierTerms } from './utils/tier-terms'
-export { BRAND_PRESETS, brandStyle, isBrandColor, isReadable, readableShade } from './utils/brand'
+export {
+  BRAND_PRESETS,
+  HOUSE_COLOR,
+  brandStyle,
+  isBrandColor,
+  isReadable,
+  readableShade,
+} from './utils/brand'
 export { MemberCard } from './components/MemberCard'

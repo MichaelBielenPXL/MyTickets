@@ -66,6 +66,8 @@ public class Organisation
     public DateTime CreatedAt { get; set; }
     /// <summary>Which details are asked from members, see <see cref="Services.ProfileFields"/>. Empty: the defaults.</summary>
     public string ProfileFieldsJson { get; set; } = "";
+    /// <summary>How its printed cards look, see <see cref="Services.CardDesigns"/>. Empty: the defaults.</summary>
+    public string CardDesignJson { get; set; } = "";
 }
 
 /// <summary>A way of belonging to an organisation: free or paid, open to everyone or invite-only.</summary>

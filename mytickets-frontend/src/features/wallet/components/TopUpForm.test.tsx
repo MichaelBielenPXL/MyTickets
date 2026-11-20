@@ -32,7 +32,7 @@ describe('TopUpForm', () => {
     )
     const { user } = renderForm()
 
-    await user.click(screen.getByRole('button', { name: '40 Tokens' }))
+    await user.click(screen.getByRole('button', { name: '40 tokens' }))
     await user.clear(screen.getByLabelText('Amount in euro'))
     await user.type(screen.getByLabelText('Amount in euro'), '12,50')
     await user.click(screen.getByRole('button', { name: /^Pay €\s12,50 for 12,50 tokens$/ }))

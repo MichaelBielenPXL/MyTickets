@@ -5,7 +5,14 @@ import { HttpResponse, apiUrl, http } from '@/test/data'
 import { renderApp } from '@/test/render'
 import { server } from '@/test/server'
 
+import type { AdminCard } from '../types'
 import { WriteCards } from './WriteCards'
+import { useCardWriter } from './useCardWriter'
+
+/** The panel as Manage › Cards shows it, with its own writer. */
+function Panel({ cards }: { cards: AdminCard[] }) {
+  return <WriteCards writer={useCardWriter('night-owls')} cards={cards} />
+}
 
 vi.mock('@/lib/nfc', () => ({ nfcSupported: true, writeCard: vi.fn() }))
 // The camera is not there in tests: the stand-in "scans" the QR printed on card 0042.
@@ -53,7 +60,7 @@ describe('WriteCards', () => {
   it('writes a printed card after scanning its QR code, and records the chip', async () => {
     const reports = serve()
     vi.mocked(writeCard).mockResolvedValue({ serialNumber: '04:a2:b9:1c' })
-    const { user } = renderApp(<WriteCards slug="night-owls" cards={[printed]} />)
+    const { user } = renderApp(<Panel cards={[printed]} />)
 
     expect(
       await screen.findByText("Cards are locked after writing and can't be changed."),
@@ -69,7 +76,7 @@ describe('WriteCards', () => {
   it('writes a blank card as a new card', async () => {
     const reports = serve()
     vi.mocked(writeCard).mockResolvedValue({ serialNumber: '04:a2:b9:1d' })
-    const { user } = renderApp(<WriteCards slug="night-owls" cards={[]} />)
+    const { user } = renderApp(<Panel cards={[]} />)
 
     await user.click(await screen.findByRole('button', { name: 'Write a blank card' }))
 
@@ -81,7 +88,7 @@ describe('WriteCards', () => {
   it('only sends the chip again when recording it failed', async () => {
     const reports = serve({ failFirstReport: true })
     vi.mocked(writeCard).mockResolvedValue({ serialNumber: '04:a2:b9:1c' })
-    const { user } = renderApp(<WriteCards slug="night-owls" cards={[printed]} />)
+    const { user } = renderApp(<Panel cards={[printed]} />)
 
     await user.click(await screen.findByRole('button', { name: 'Write a printed card' }))
     await user.click(screen.getByRole('button', { name: 'Fake camera' }))
@@ -92,9 +99,31 @@ describe('WriteCards', () => {
     expect(reports).toHaveLength(2)
   })
 
+  it('offers to reuse a blocked card nobody has when its QR is scanned', async () => {
+    serve()
+    const unblocked: unknown[] = []
+    server.use(
+      http.put(apiUrl('/orgs/night-owls/admin/cards/c42/blocked'), async ({ request }) => {
+        unblocked.push(await request.json())
+        return new HttpResponse(null, { status: 204 })
+      }),
+    )
+    const blocked = { ...printed, uid: '04A2B91C', blocked: true }
+    const { user } = renderApp(<Panel cards={[blocked]} />)
+
+    await user.click(await screen.findByRole('button', { name: 'Write a printed card' }))
+    await user.click(screen.getByRole('button', { name: 'Fake camera' }))
+    expect(screen.getByText('Card 0042 is blocked and nobody has it.')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Reuse as a new card' }))
+
+    expect(await screen.findByRole('status')).toHaveTextContent('Card 0042 is ready to be linked again.')
+    expect(unblocked).toEqual([{ blocked: false }])
+    expect(writeCard).not.toHaveBeenCalled()
+  })
+
   it('says why when a scanned QR is not one of these cards', async () => {
     serve()
-    const { user } = renderApp(<WriteCards slug="night-owls" cards={[]} />)
+    const { user } = renderApp(<Panel cards={[]} />)
 
     await user.click(await screen.findByRole('button', { name: 'Write a printed card' }))
     await user.click(screen.getByRole('button', { name: 'Fake camera' }))

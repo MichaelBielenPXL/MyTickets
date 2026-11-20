@@ -133,15 +133,19 @@ const ICONS: Record<AdminSection, ReactNode> = {
     </svg>
   ),
   cards: (
+    // A card with its chip, and the contactless waves of a tap.
     <svg {...glyph}>
-      <rect x="3.5" y="6" width="17" height="12" rx="2.5" />
-      <path d="M15.5 10.2a2.6 2.6 0 0 1 0 3.6M17.6 8.6a5 5 0 0 1 0 6.8M7 14.5h4" />
+      <rect x="2.5" y="6" width="13" height="12" rx="2.2" />
+      <rect x="5.2" y="9" width="3.6" height="3" rx="0.8" />
+      <path d="M18.2 9.3a3.8 3.8 0 0 1 0 5.4M20.6 7a7 7 0 0 1 0 10" />
     </svg>
   ),
   tokens: (
+    // Two coins, the front one marked T for tokens.
     <svg {...glyph}>
-      <circle cx="12" cy="12" r="8" />
-      <path d="M9 9h6M12 9v7" />
+      <path d="M8.8 14.9A5.6 5.6 0 1 1 14.9 8.8" />
+      <circle cx="14.6" cy="14.6" r="5.6" />
+      <path d="M12.5 12.7h4.2M14.6 12.7v4.4" />
     </svg>
   ),
   bar: (

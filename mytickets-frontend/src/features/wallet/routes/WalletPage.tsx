@@ -46,7 +46,7 @@ export function WalletPage() {
       {wallet ? (
         <>
           <header className="wallet-hero">
-            <h1>{t('Saldo at {org}', { org: organisation.name })}</h1>
+            <h1>{t('Balance at {org}', { org: organisation.name })}</h1>
             <p className="wallet-balance">{tokenBalance(wallet.balanceCents)}</p>
             <p className="wallet-hero-note">
               {wallet.deals?.length
@@ -64,7 +64,9 @@ export function WalletPage() {
       ) : (
         <section className="panel stack">
           <h1 className="panel-title">{t('No tokens yet')}</h1>
-          <p className="muted">You get a wallet at {organisation.name} as soon as you choose a membership.</p>
+          <p className="muted">
+            {t('You get a wallet at {org} as soon as you choose a membership.', { org: organisation.name })}
+          </p>
           <Link className="btn primary" to={`/${slug}/join`}>
             {t('Choose a membership')}
           </Link>

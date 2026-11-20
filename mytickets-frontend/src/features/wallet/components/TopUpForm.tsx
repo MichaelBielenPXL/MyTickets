@@ -3,7 +3,7 @@ import { type FormEvent, useState } from 'react'
 import { ErrorNote, Field } from '@/components'
 import { useGoToCheckout } from '@/hooks/useGoToCheckout'
 import { t } from '@/lib/i18n'
-import { money, parseEuro, tokenAmount, tokens } from '@/utils/format'
+import { money, parseEuro, tokens } from '@/utils/format'
 
 import { useStartTopUp } from '../api/wallet'
 import type { TopUpDeal } from '../types'
@@ -64,7 +64,7 @@ export function TopUpForm({ slug, minCents, maxCents, deals = [] }: TopUpFormPro
                 })}
                 onClick={() => setDealId(d.id)}
               >
-                <strong>{tokenAmount(d.tokensCents)} Tokens</strong>
+                <strong>{tokens(d.tokensCents)}</strong>
                 <span>{money(d.priceCents)}</span>
                 {d.tokensCents > d.priceCents && (
                   <em className="deal-bonus">
@@ -81,7 +81,7 @@ export function TopUpForm({ slug, minCents, maxCents, deals = [] }: TopUpFormPro
                 aria-pressed={amount === String(euros)}
                 onClick={() => setAmount(String(euros))}
               >
-                {euros} Tokens
+                {tokens(euros * 100)}
               </button>
             ))}
       </div>

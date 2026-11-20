@@ -343,7 +343,7 @@ export const nl: Record<string, string> = {
   Renew: 'Vernieuwen',
   'Have an invite code?': 'Heb je een uitnodigingscode?',
   'Use code': 'Code gebruiken',
-  'Saldo: {balance}': 'Saldo: {balance}',
+  'Balance: {balance}': 'Saldo: {balance}',
   '{org} membership card': 'Lidkaart van {org}',
   '{tier} membership': '{tier} lidmaatschap',
   Member: 'Lid',
@@ -547,7 +547,7 @@ export const nl: Record<string, string> = {
   'Pay {price} for {tokens}': 'Betaal {price} voor {tokens}',
   'Nothing yet.': 'Nog niets.',
   '‹ Back': '‹ Terug',
-  'Saldo at {org}': 'Saldo bij {org}',
+  'Balance at {org}': 'Saldo bij {org}',
   'Spend them on tickets, or at the bar with your card.':
     'Gebruik ze voor tickets, of aan de bar met je kaart.',
   'One token is one euro. Spend them on tickets, or at the bar with your card.':
@@ -824,4 +824,75 @@ export const nl: Record<string, string> = {
   "The site's public address points at this computer. Set the real address before writing cards.":
     'Het publieke adres van de site wijst naar deze computer. Stel het echte adres in voor je kaarten schrijft.',
   'This chip is already another card.': 'Deze chip is al een andere kaart.',
+  'Show blocked cards nobody has': 'Geblokkeerde kaarten zonder eigenaar tonen',
+  'Reuse as a new card': 'Opnieuw gebruiken als nieuwe kaart',
+  'Card {number} is blocked and nobody has it.': 'Kaart {number} is geblokkeerd en niemand heeft ze.',
+  'Card {number} is ready to be linked again.': 'Kaart {number} kan opnieuw gekoppeld worden.',
+  'Writing cards needs Chrome on an Android phone. Open Manage › Cards there to write them.':
+    'Kaarten schrijven kan alleen met Chrome op een Android-telefoon. Open daar Beheer › Kaarten om ze te schrijven.',
+  'Hold the chip to the back of the phone.': 'Houd de chip tegen de achterkant van de telefoon.',
+  'Write to chip': 'Naar chip schrijven',
+  'Create {count} cards?': '{count} kaarten aanmaken?',
+  'They get the numbers {first} to {last}.': 'Ze krijgen de nummers {first} tot {last}.',
+  'Block card {number}?': 'Kaart {number} blokkeren?',
+  'It stops working at the door and the bar straight away.':
+    'Ze werkt meteen niet meer aan de deur en de bar.',
+  'Unlink card {number}?': 'Kaart {number} loskoppelen?',
+  'It no longer pays from {name}’s tokens. They find out when they tap it.':
+    'Ze betaalt niet meer met de tokens van {name}. Die merkt het pas bij het tikken.',
+  'Delete card {number}?': 'Kaart {number} verwijderen?',
+  'Its number and link are gone for good. Only cards that were never written can be deleted.':
+    'Het nummer en de link zijn definitief weg. Alleen kaarten die nooit geschreven werden, kunnen verwijderd worden.',
+  'Actions for card {number}': 'Acties voor kaart {number}',
+  'Your {tier} membership stays as it is.': 'Je lidmaatschap {tier} blijft zoals het is.',
+  "You can choose a membership any time from {org}'s page.":
+    'Je kunt altijd een lidmaatschap kiezen op de pagina van {org}.',
+  'Expired on {date}': 'Verlopen op {date}',
+  '{tier} perks': 'Voordelen van {tier}',
+  'You get a wallet at {org} as soon as you choose a membership.':
+    'Je krijgt een wallet bij {org} zodra je een lidmaatschap kiest.',
+  '‹ Cards': '‹ Kaarten',
+  'Each card is its own page, the size of a bank card. Choose your card printer, or save as PDF.':
+    'Elke kaart is een eigen pagina op bankkaartformaat. Kies je kaartprinter, of bewaar als PDF.',
+  'Print {count} cards': '{count} kaarten printen',
+  'Every card is already written.': 'Alle kaarten zijn al geschreven.',
+  'QR code for card {number}': 'QR-code van kaart {number}',
+  'Print cards with QR codes': 'Kaarten printen met QR-code',
+  'Card design': 'Kaartontwerp',
+  'The QR code, the card number and your name are always on the card, in the same place, so it always scans.':
+    'De QR-code, het kaartnummer en jullie naam staan altijd op de kaart, op dezelfde plek, zodat ze altijd scant.',
+  'Card preview': 'Voorbeeld van de kaart',
+  Background: 'Achtergrond',
+  'Brand colour': 'Merkkleur',
+  'Another colour': 'Andere kleur',
+  'Pick a colour': 'Kies een kleur',
+  'Landscape, at least 1012 × 638 pixels. The left side stays readable with a soft shade.':
+    'Liggend, minstens 1012 × 638 pixels. De linkerkant krijgt een zachte schaduw zodat de tekst leesbaar blijft.',
+  'Show our logo': 'Ons logo tonen',
+  'Show our logo (add one under Settings first)': 'Ons logo tonen (voeg er eerst een toe bij Instellingen)',
+  'Line on the card (optional)': 'Regel op de kaart (optioneel)',
+  'Up to 40 characters, like "Member card 2026–2027".': 'Tot 40 tekens, zoals "Lidkaart 2026–2027".',
+  'Save card design': 'Kaartontwerp bewaren',
+  'Give the colour as a code like #0b3d2e.': 'Geef de kleur als code, zoals #0b3d2e.',
+  'Upload a picture for the card first.': 'Laad eerst een afbeelding op voor de kaart.',
+  'Choose a background for the card.': 'Kies een achtergrond voor de kaart.',
+  'Keep the line on the card to 40 characters.': 'Houd de regel op de kaart op maximaal 40 tekens.',
+  'Choose a colour for the card.': 'Kies een kleur voor de kaart.',
+  'Upload the picture for the card again.': 'Laad de afbeelding voor de kaart opnieuw op.',
+  Front: 'Voorkant',
+  Back: 'Achterkant',
+  'Side of the card': 'Kant van de kaart',
+  '{side}: give the colour as a code like #0b3d2e.': '{side}: geef de kleur als code, zoals #0b3d2e.',
+  '{side}: upload a picture first.': '{side}: laad eerst een afbeelding op.',
+  'Design the front and the back. The back always has the QR code, the card number and your name, in the same place, so it always scans.':
+    'Ontwerp de voor- en achterkant. Op de achterkant staan altijd de QR-code, het kaartnummer en jullie naam, op dezelfde plek, zodat ze altijd scant.',
+  'Landscape, at least 1012 × 638 pixels. Text on it gets a soft shade so it stays readable.':
+    'Liggend, minstens 1012 × 638 pixels. Tekst erop krijgt een zachte schaduw zodat ze leesbaar blijft.',
+  'Both sides': 'Beide kanten',
+  'Fronts only': 'Alleen voorkanten',
+  'Backs only': 'Alleen achterkanten',
+  'Sides to print': 'Te printen kanten',
+  'Each side is its own page, the size of a bank card. Choose your card printer, or save as PDF.':
+    'Elke kant is een eigen pagina op bankkaartformaat. Kies je kaartprinter, of bewaar als PDF.',
+  'Design both sides of the card.': 'Ontwerp beide kanten van de kaart.',
 }

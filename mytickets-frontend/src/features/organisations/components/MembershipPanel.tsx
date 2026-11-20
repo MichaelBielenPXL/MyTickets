@@ -47,7 +47,9 @@ export function MembershipPanel({ organisation }: MembershipPanelProps) {
         <h1>{organisation.name}</h1>
         {organisation.description && <p className="lead">{organisation.description}</p>}
         {!membership.active && membership.expiresAt && (
-          <p className="member-status bad">Expired on {lastValidDay(membership.expiresAt)}</p>
+          <p className="member-status bad">
+            {t('Expired on {date}', { date: lastValidDay(membership.expiresAt) })}
+          </p>
         )}
 
         <div className="member-actions">
@@ -60,7 +62,7 @@ export function MembershipPanel({ organisation }: MembershipPanelProps) {
         </div>
 
         {perks.length > 0 && (
-          <ul className="member-perks" aria-label={`${membership.tier} perks`}>
+          <ul className="member-perks" aria-label={t('{tier} perks', { tier: membership.tier })}>
             {perks.map((perk) => (
               <li key={perk}>
                 <CheckMark />

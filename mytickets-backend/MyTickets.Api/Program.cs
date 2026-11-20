@@ -1,6 +1,8 @@
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using MyTickets.Api.Data;
@@ -51,6 +53,27 @@ builder.Services.AddHttpClient<StripeClient>(client =>
     client.Timeout = TimeSpan.FromSeconds(20);
 });
 
+// The keys that sign the sign-in cookie live with the data, so a restart or a new container keeps everyone signed in.
+var dataFolder = builder.Configuration["Data:Folder"] ?? Path.Combine(builder.Environment.ContentRootPath, "data");
+builder.Services.AddDataProtection()
+    .SetApplicationName("MyTickets")
+    .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(dataFolder, "keys")));
+
+// Live, requests pass through proxies first (Vercel for the site's /api, then the server's own). Proxy:ForwardedHops
+// says how many, so the visitor's own address is used for the sign-in limit and https is recognised.
+var forwardedHops = builder.Configuration.GetValue("Proxy:ForwardedHops", 0);
+if (forwardedHops > 0)
+{
+    builder.Services.Configure<ForwardedHeadersOptions>(options =>
+    {
+        options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+        options.ForwardLimit = forwardedHops;
+        // The proxies are on the server's private network and at Vercel, whose addresses change: trust the hops counted.
+        options.KnownIPNetworks.Clear();
+        options.KnownProxies.Clear();
+    });
+}
+
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme).AddCookie(options =>
 {
     options.Cookie.Name = "mytickets";
@@ -83,6 +106,8 @@ using (var scope = app.Services.CreateScope())
     await platform.Database.MigrateAsync();
     await platform.Database.ExecuteSqlRawAsync("PRAGMA journal_mode=WAL;");
 }
+
+if (forwardedHops > 0) app.UseForwardedHeaders();
 
 // A payment that can't be started is the buyer's business to know about, not an error page.
 app.Use(async (http, next) =>

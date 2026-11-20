@@ -19,8 +19,8 @@ export const tokens = (cents: number) =>
 export const tokenAmount = (cents: number) =>
   (cents % 100 === 0 ? wholeTokens : partTokens).format(cents / 100)
 
-/** A member's balance as Entry shows it: "60.00 Tokens". Put "Saldo:" in front where it stands alone. */
-export const tokenBalance = (cents: number) => `${(cents / 100).toFixed(2)} Tokens`
+/** A member's balance, written as tokens are everywhere members see them: "60 tokens", "12,50 tokens". */
+export const tokenBalance = (cents: number) => tokens(cents)
 
 /** Tokens with the token sign in front, as € goes in front of euros: "T 44", "T 12,50". */
 export const tokenPrice = (cents: number) => `T ${tokenAmount(cents)}`

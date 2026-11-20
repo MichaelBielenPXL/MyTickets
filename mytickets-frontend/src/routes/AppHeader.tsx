@@ -39,7 +39,8 @@ export function AppHeader() {
   return (
     <>
       <header className="app-header">
-        <div className="header-bar">
+        {/* On a phone the organisation's name needs the room: the MyTickets mark steps aside there. */}
+        <div className={current ? 'header-bar has-organisation' : 'header-bar'}>
           <Link to="/" className="logo" aria-label={t('MyTickets home')}>
             <LogoMark />
             {!me && !slugInAddress && <span className="logo-text">{t('MyTickets')}</span>}

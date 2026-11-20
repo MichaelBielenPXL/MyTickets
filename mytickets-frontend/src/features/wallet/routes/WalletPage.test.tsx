@@ -26,7 +26,7 @@ describe('WalletPage', () => {
     )
     renderApp(<WalletPage />, page)
 
-    expect(await screen.findByText('12.50 Tokens')).toBeInTheDocument()
+    expect(await screen.findByText('12,50 tokens')).toBeInTheDocument()
     expect(await screen.findByText('1 card linked')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Manage cards' })).toHaveAttribute(
       'href',

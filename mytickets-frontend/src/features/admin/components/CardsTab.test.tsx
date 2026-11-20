@@ -46,6 +46,10 @@ function serve(initial: object[]) {
       calls.push(`unlink ${params.id}`)
       return new HttpResponse(null, { status: 204 })
     }),
+    http.delete(apiUrl('/orgs/night-owls/admin/cards/:id'), ({ params }) => {
+      calls.push(`delete ${params.id}`)
+      return new HttpResponse(null, { status: 204 })
+    }),
   )
   return calls
 }
@@ -58,6 +62,10 @@ describe('CardsTab', () => {
     await user.clear(await screen.findByLabelText('How many cards'))
     await user.type(screen.getByLabelText('How many cards'), '3')
     await user.click(screen.getByRole('button', { name: 'Create cards' }))
+    // Many numbered cards at once is hard to undo, so it asks first.
+    const ask = screen.getByRole('alertdialog', { name: 'Create 3 cards?' })
+    expect(within(ask).getByText('They get the numbers 0001 to 0003.')).toBeInTheDocument()
+    await user.click(within(ask).getByRole('button', { name: 'Create' }))
 
     expect(await screen.findByText('0003')).toBeInTheDocument()
     expect(within(screen.getByRole('list')).getAllByText('Not written')).toHaveLength(3)
@@ -77,8 +85,21 @@ describe('CardsTab', () => {
 
     const linked = (await screen.findByText('0001')).closest('li')!
     expect(within(linked).getByText('Gijs Guest')).toBeInTheDocument()
+    // The actions wait behind one button per card, and each asks before it acts.
+    await user.click(within(linked).getByRole('button', { name: 'Actions for card 0001' }))
     await user.click(within(linked).getByRole('button', { name: 'Block' }))
+    await user.click(
+      within(screen.getByRole('alertdialog', { name: 'Block card 0001?' })).getByRole('button', {
+        name: 'Block',
+      }),
+    )
+    await user.click(within(linked).getByRole('button', { name: 'Actions for card 0001' }))
     await user.click(within(linked).getByRole('button', { name: 'Unlink' }))
+    await user.click(
+      within(screen.getByRole('alertdialog', { name: 'Unlink card 0001?' })).getByRole('button', {
+        name: 'Unlink',
+      }),
+    )
     await user.click(screen.getByRole('button', { name: 'Ready' }))
 
     expect(screen.queryByText('0001')).not.toBeInTheDocument()
@@ -86,10 +107,52 @@ describe('CardsTab', () => {
     await vi.waitFor(() => expect(calls).toEqual(['blocked id-0001 {"blocked":true}', 'unlink id-0001']))
   })
 
+  it('keeps blocked cards nobody has out of the way, and reuses one that turns up', async () => {
+    const calls = serve([
+      card('0003', { uid: '04A2B91E', blocked: true }),
+      card('0002', { uid: '04A2B91C' }),
+      card('0001', { uid: '04A2B91D', blocked: true, linkedTo: { name: 'Gijs Guest' } }),
+    ])
+    const { user } = renderApp(<CardsTab slug="night-owls" />)
+
+    // Hidden at first; a blocked card someone still has stays in view.
+    expect(await screen.findByText('0002')).toBeInTheDocument()
+    expect(screen.getByText('0001')).toBeInTheDocument()
+    expect(screen.queryByText('0003')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('checkbox', { name: 'Show blocked cards nobody has' }))
+    const rows = within(screen.getByRole('list')).getAllByRole('listitem')
+    expect(within(rows[rows.length - 1]).getByText('0003')).toBeInTheDocument()
+
+    await user.click(within(rows[rows.length - 1]).getByRole('button', { name: 'Actions for card 0003' }))
+    await user.click(within(rows[rows.length - 1]).getByRole('button', { name: 'Reuse as a new card' }))
+    await vi.waitFor(() => expect(calls).toEqual(['blocked id-0003 {"blocked":false}']))
+  })
+
+  it('only offers to delete a card that was never written, and asks first', async () => {
+    const calls = serve([card('0002'), card('0001', { uid: '04A2B91D' })])
+    const { user } = renderApp(<CardsTab slug="night-owls" />)
+
+    const unwritten = (await screen.findByText('0002')).closest('li')!
+    await user.click(within(unwritten).getByRole('button', { name: 'Actions for card 0002' }))
+    expect(within(unwritten).queryByRole('button', { name: 'Block' })).not.toBeInTheDocument()
+    await user.click(within(unwritten).getByRole('button', { name: 'Delete' }))
+    await user.click(
+      within(screen.getByRole('alertdialog', { name: 'Delete card 0002?' })).getByRole('button', {
+        name: 'Delete',
+      }),
+    )
+
+    await vi.waitFor(() => expect(calls).toEqual(['delete id-0002']))
+    const written = screen.getByText('0001').closest('li')!
+    await user.click(within(written).getByRole('button', { name: 'Actions for card 0001' }))
+    expect(within(written).queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument()
+  })
+
   it('explains that writing cards needs Chrome on Android', async () => {
     serve([])
     renderApp(<CardsTab slug="night-owls" />)
 
-    expect(await screen.findByText('Writing cards needs Chrome on an Android phone.')).toBeInTheDocument()
+    expect(await screen.findByText(/Writing cards needs Chrome on an Android phone/)).toBeInTheDocument()
   })
 })

@@ -1,6 +1,6 @@
 import { Navigate, Route, Routes, useParams } from 'react-router-dom'
 
-import { AdminPage } from '@/features/admin'
+import { AdminPage, PrintCardsPage } from '@/features/admin'
 import { AuthPage } from '@/features/auth'
 import { CardLinkPage, CardsPage } from '@/features/cards'
 import { EventPage } from '@/features/events'
@@ -38,6 +38,7 @@ export function AppRoutes() {
         <Route path="/:slug/wallet" element={<WalletPage />} />
         <Route path="/:slug/staff" element={<StaffPage />} />
         <Route path="/:slug/admin" element={<AdminPage />} />
+        <Route path="/:slug/admin/cards/print" element={<PrintCardsPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
       <Route element={<PublicShell />}>

@@ -5,3 +5,6 @@
 .impeccable/
 docs/superpowers/
 entryticketsScreens/
+
+# Server secrets: only the examples belong in the repository.
+deploy/.env

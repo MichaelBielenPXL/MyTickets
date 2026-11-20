@@ -193,3 +193,21 @@ export interface CardWriting {
   ready: boolean
   reason: string | null
 }
+
+/** One side of a printed card: its background, the logo, and a line of the organisation's own. */
+export interface CardSide {
+  background: 'brand' | 'colour' | 'image'
+  /** "#rrggbb" when the background is a colour of its own. */
+  colour: string | null
+  imageKey: string | null
+  imageUrl?: string | null
+  showLogo: boolean
+  /** A short line, like "Lidkaart 2026–2027". */
+  tagline: string
+}
+
+/** How the organisation's printed cards look. The back always carries the QR code, the card number and the name. */
+export interface CardDesign {
+  front: CardSide
+  back: CardSide
+}
