@@ -1,76 +1,72 @@
 # Putting MyTickets online
 
-Two pieces:
+Everything runs from one compose file, `docker-compose.yml` at the top of the repository:
 
-- **The site** (React) runs on **Vercel**, from `mytickets-frontend`.
-- **The API** runs with **Docker Compose** on a server, from this folder, with Redis and RustFS (uploaded pictures).
-  It listens on port **8001**; a **Cloudflare Tunnel** publishes that as the API's domain, with https.
-
-| Environment | API | Vercel |
+| Service | What it is | Reachable from outside |
 | --- | --- | --- |
-| dev | `https://devticketsapi.michaelbielen.be` | Preview deployments |
-| live | `https://myticketsapi.michaelbielen.be` | Production deployment |
+| `web` | The site, served by nginx, which also passes `/api` on to the API | yes: the site's domain |
+| `api` | The .NET API on port 8001 | only through `web` |
+| `redis` | Cache | no |
+| `storage` | RustFS, for uploaded logos and pictures | no |
 
-The site always calls `/api` on its own address. `mytickets-frontend/middleware.ts` forwards that to the API of the
-same environment. That keeps the sign-in cookie on the site's own domain: a cookie from another domain is blocked by
-Safari and on iPhones, so a site and API on different domains could not keep anyone signed in.
+One deployment always ships the site and the API from the same commit, and both live on one address (the API under
+`/api`). That keeps the sign-in cookie a first-party cookie: Safari and iPhones block cookies from another domain.
 
-## The API on a server
+The chain in front is Cloudflare (tunnel) → Coolify's proxy → `web` → `api`. Cloudflare tells the API who the
+visitor is in the `CF-Connecting-IP` header (`Proxy__ClientIpHeader`), so the sign-in limit counts per visitor.
 
-1. On the server, check out the repository and make the settings file:
+## With Coolify
 
-   ```sh
-   cp deploy/.env.dev.example deploy/.env      # the live server: deploy/.env.live.example
-   openssl rand -hex 32                          # paste this as STORAGE_SECRET_KEY
-   nano deploy/.env                              # fill in PUBLIC_URL (the site on Vercel) and the secret
-   ```
-
-2. Start it:
+1. **Install Coolify** on the server (as root; it installs Docker if needed and runs its own proxy on ports 80/443,
+   the dashboard on 8000):
 
    ```sh
-   docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d --build
+   curl -fsSL https://cdn.coollabs.io/coolify/install.sh | sudo bash
    ```
 
-   Check on the server: `curl http://127.0.0.1:8001/health` answers `{"status":"ok"}`.
+   Open `http://<server>:8000` and create the admin account.
 
-3. In the Cloudflare Tunnel, add a public hostname: `devticketsapi.michaelbielen.be` (live:
-   `myticketsapi.michaelbielen.be`) → service `http://localhost:8001`. Then
-   `https://devticketsapi.michaelbielen.be/health` answers the same.
+2. **Cloudflare Tunnel**: add public hostnames to the tunnel:
+   - the Coolify dashboard, e.g. `coolify.michaelbielen.be` → `http://192.168.0.150:8000`
+   - the dev site, e.g. `devtickets.michaelbielen.be` → `http://192.168.0.150:80`
+   - later the live site, e.g. `mytickets.michaelbielen.be` → `http://192.168.0.150:80`
 
-4. Update after a `git pull`: run the same `up -d --build` again. The databases update themselves on start.
+   Coolify's proxy picks the right app by its domain. Use `http://` in Coolify's domain fields: Cloudflare already
+   does https, so Coolify must not try to get its own certificates.
 
-Port 8001 only listens on the server itself (`API_BIND=127.0.0.1`), so the API is only reachable through the tunnel.
-Running cloudflared in a container instead? Set `API_BIND=0.0.0.0`, or add cloudflared to this compose network and
-point the hostname at `http://api:8001`.
+3. **Connect GitHub**: Sources › GitHub App, and give it access to the MyTickets repository.
 
-Everything that must survive a restart is in Docker volumes: `api-data` (the databases and the sign-in keys) and
-`pictures` (uploaded logos and pictures). Back up those two.
+4. **The dev environment**: a project with an environment `dev`, then New Resource › your repository ›
+   Build Pack **Docker Compose**, branch **`dev`**, compose file **`/docker-compose.yml`**.
+   - On the **web** service, set the domain: `http://devtickets.michaelbielen.be`.
+   - Environment Variables: paste `deploy/.env.dev.example` and fill in `STORAGE_SECRET_KEY`
+     (`openssl rand -hex 32`). `PUBLIC_URL` is the site's address with https.
+   - Turn on **Auto Deploy**: every push to `dev` deploys.
 
-The API sees each request after two proxies, Vercel and Cloudflare; `Proxy__ForwardedHops: "2"` makes the sign-in
-limit count per visitor. Change it if that chain changes.
+5. **The live environment** later: the same, with branch `main`, the live domain and `deploy/.env.live.example`.
 
-### Settings (deploy/.env)
+Updating is then `git push`. The databases update themselves when the API starts. Data that must survive deploys is
+in two volumes Coolify keeps: `api-data` (the databases and the sign-in keys) and `pictures`. Back those up
+(Coolify can schedule volume backups).
+
+## Settings
 
 | Setting | What it is |
 | --- | --- |
-| `API_DOMAIN` | The API's public address (the tunnel's hostname). For reference only. |
-| `API_BIND` | Where port 8001 listens: `127.0.0.1` (only for cloudflared on the server) or `0.0.0.0`. |
-| `PUBLIC_URL` | The site's address on Vercel. Card links (`/c/…`), Stripe's return pages and wallet passes point there. Card chips are locked with this address, so write cards only once it is the final one. |
+| `PUBLIC_URL` | The site's address, `https://…`. Card links (`/c/…`), Stripe's return pages and wallet passes point there. Card chips are locked with this address, so write cards only once it is the final one. |
 | `STORAGE_SECRET_KEY` | The password of the picture storage. Keep it the same once pictures are uploaded. |
 | `USE_TEST_CHECKOUT` | `true`: a test checkout where no money moves. Live: `false`, with the Stripe keys. |
-| `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | Stripe, for real (or Stripe test) payments. The webhook is `https://<API_DOMAIN>/api/payments/stripe-webhook`. |
+| `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | Stripe, for real (or Stripe test) payments. The webhook is `https://<site>/api/payments/stripe-webhook`. |
 
 Wallet passes (Apple/Google) need their keys too, under `WalletPasses__Apple__…` and `WalletPasses__Google__…`; add
-them to the `api` service's `environment` when you have them.
+them to the `api` service's environment when you have them.
 
-## The site on Vercel
+## Without Coolify
 
-1. New project from the repository, with **Root Directory** `mytickets-frontend`. Vercel reads `vercel.json` there
-   (Vite, output `dist`, every page served by `index.html`).
-2. Nothing else is needed: Production deployments use the live API and Preview deployments the dev API. To point an
-   environment somewhere else, set `API_ORIGIN` (e.g. `https://api.mytickets.be`) for it under Settings ›
-   Environment Variables.
-3. Give the dev site a fixed address (e.g. a domain on a `dev` branch), so `PUBLIC_URL` on the dev server stays right.
+```sh
+cp deploy/.env.dev.example deploy/.env    # fill in the secret
+docker compose --env-file deploy/.env up -d --build
+```
 
-Check after the first deployment: open the site and sign in, then reload. If sign-in does not stick, or the browser's
-network tab shows requests going to the API's own domain, the forwarding is not active.
+Nothing is published to the server's ports then; add one on `web` (e.g. `ports: ["8001:80"]` in a
+`docker-compose.override.yml`) and point the tunnel at it.
