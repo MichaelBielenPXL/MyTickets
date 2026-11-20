@@ -59,16 +59,28 @@ builder.Services.AddDataProtection()
     .SetApplicationName("MyTickets")
     .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(dataFolder, "keys")));
 
-// Live, requests pass through proxies first (Vercel for the site's /api, then the server's own). Proxy:ForwardedHops
-// says how many, so the visitor's own address is used for the sign-in limit and https is recognised.
+// Live, requests pass through proxies first. Two ways to find the visitor's own address, for the sign-in limit:
+// Proxy:ClientIpHeader names a header the outermost proxy sets to it (Cloudflare: CF-Connecting-IP), or
+// Proxy:ForwardedHops says how many proxies add themselves to X-Forwarded-For.
+var clientIpHeader = builder.Configuration["Proxy:ClientIpHeader"];
 var forwardedHops = builder.Configuration.GetValue("Proxy:ForwardedHops", 0);
-if (forwardedHops > 0)
+var behindProxy = !string.IsNullOrWhiteSpace(clientIpHeader) || forwardedHops > 0;
+if (behindProxy)
 {
     builder.Services.Configure<ForwardedHeadersOptions>(options =>
     {
         options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
-        options.ForwardLimit = forwardedHops;
-        // The proxies are on the server's private network and at Vercel, whose addresses change: trust the hops counted.
+        if (!string.IsNullOrWhiteSpace(clientIpHeader))
+        {
+            // One address, set by the proxy the visitor talked to.
+            options.ForwardedForHeaderName = clientIpHeader;
+            options.ForwardLimit = 1;
+        }
+        else
+        {
+            options.ForwardLimit = forwardedHops;
+        }
+        // The proxies' own addresses change (Cloudflare, Docker networks): trust the configured chain instead.
         options.KnownIPNetworks.Clear();
         options.KnownProxies.Clear();
     });
@@ -107,7 +119,7 @@ using (var scope = app.Services.CreateScope())
     await platform.Database.ExecuteSqlRawAsync("PRAGMA journal_mode=WAL;");
 }
 
-if (forwardedHops > 0) app.UseForwardedHeaders();
+if (behindProxy) app.UseForwardedHeaders();
 
 // A payment that can't be started is the buyer's business to know about, not an error page.
 app.Use(async (http, next) =>
