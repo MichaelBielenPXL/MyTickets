@@ -5,12 +5,11 @@ using MyTickets.Api.Endpoints;
 namespace MyTickets.Api.Services;
 
 /// <summary>
-/// Finds the card staff tapped, scanned or typed: the chip's serial number (a tap), the card's link or link code
-/// (the QR printed on it), or the number printed on it (typed).
+/// Finds the card staff tapped or scanned: the chip's serial number (a tap), or the card's link or link code
+/// (the QR printed on it). Never by its number: that counts up 1, 2, 3…, so anyone could guess one.
 /// </summary>
 public static class CardLookup
 {
-    private const int MaxNumberDigits = 6;
 
     public static async Task<NfcCard?> FindAsync(AppDbContext db, string? raw)
     {
@@ -19,10 +18,6 @@ public static class CardLookup
             return byCode;
         if (Http.NormaliseCardUid(raw) is { } uid && await cards.FirstOrDefaultAsync(c => c.Uid == uid) is { } bySerial)
             return bySerial;
-        // Serial numbers have at least 8 digits, so a short number is the one printed on the card.
-        var typed = raw?.Trim().TrimStart('#') ?? "";
-        if (typed.Length is > 0 and <= MaxNumberDigits && typed.All(char.IsAsciiDigit))
-            return await cards.FirstOrDefaultAsync(c => c.Number == int.Parse(typed));
         return null;
     }
 }

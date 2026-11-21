@@ -24,8 +24,8 @@ public static class CardCodes
         return code.Length == Length && code.All(Alphabet.Contains) ? code : null;
     }
 
-    /// <summary>The card number as printed: 42 -> "0042".</summary>
-    public static string Display(int number) => number.ToString("0000");
+    /// <summary>The card number as shown to admins and members: 42 -> "42".</summary>
+    public static string Display(int number) => number.ToString(System.Globalization.CultureInfo.InvariantCulture);
 
     /// <summary>The link on the chip and in the printed QR.</summary>
     public static string Url(string publicUrl, string code) => $"{publicUrl.TrimEnd('/')}/c/{code}";

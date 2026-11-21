@@ -45,7 +45,7 @@ public class TestApp : WebApplicationFactory<Program>
         var client = CreateClient();
         var response = await client.PostAsJsonAsync("/api/auth/register", new
         {
-            email = email ?? $"{name.ToLowerInvariant()}-{Guid.NewGuid():N}@example.com", password = "correct horse",
+            email = email ?? $"{name.ToLowerInvariant()}-{Guid.NewGuid():N}@example.com", password = "correct horse", acceptTerms = true,
             displayName = name, joinOrganisationSlug = organisationSlug,
         });
         Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
@@ -60,7 +60,7 @@ public class TestApp : WebApplicationFactory<Program>
         var client = CreateClient();
         var response = await client.PostAsJsonAsync("/api/auth/register", new
         {
-            email = $"bare-{Guid.NewGuid():N}@example.com", password = "correct horse", joinOrganisationSlug = organisationSlug,
+            email = $"bare-{Guid.NewGuid():N}@example.com", password = "correct horse", acceptTerms = true, joinOrganisationSlug = organisationSlug,
         });
         Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
         return client;
@@ -73,7 +73,7 @@ public class TestApp : WebApplicationFactory<Program>
         var response = await client.PostAsJsonAsync("/api/auth/register",
             new
             {
-                email = $"{name.ToLowerInvariant()}-{Guid.NewGuid():N}@example.com", password = "correct horse", displayName = name,
+                email = $"{name.ToLowerInvariant()}-{Guid.NewGuid():N}@example.com", password = "correct horse", acceptTerms = true, displayName = name,
                 organisationName = $"Test {Guid.NewGuid():N}",
             });
         response.EnsureSuccessStatusCode();

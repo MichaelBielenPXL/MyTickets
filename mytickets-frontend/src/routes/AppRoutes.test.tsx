@@ -183,6 +183,7 @@ describe('signing up at an organisation', () => {
     })
 
     await user.type(await screen.findByLabelText(/Password/), 'correct horse')
+    await user.click(screen.getByRole('checkbox', { name: /I agree to the terms of service/ }))
     await user.click(screen.getByRole('button', { name: 'Create account' }))
 
     expect(await screen.findByRole('heading', { name: 'Choose your membership' })).toBeInTheDocument()

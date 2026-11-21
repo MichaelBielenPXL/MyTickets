@@ -28,7 +28,7 @@ const BACKGROUNDS: { value: CardSide['background']; label: string }[] = [
 
 /**
  * Manage › Cards › Card design: how the front and the back of printed cards look, with a live preview at real
- * proportions. The back always carries the QR code, the card number and the name, in a fixed place.
+ * proportions. The back always carries the QR code and the name, in a fixed place.
  */
 export function CardDesignPanel({ slug }: { slug: string }) {
   const design = useCardDesign(slug).data
@@ -78,7 +78,7 @@ function DesignForm({
         <h3>{t('Card design')}</h3>
         <p className="muted">
           {t(
-            'Design the front and the back. The back always has the QR code, the card number and your name, in the same place, so it always scans.',
+            'Design the front and the back. The back always has the QR code and your name, in the same place, so it always scans.',
           )}
         </p>
       </div>
@@ -91,7 +91,7 @@ function DesignForm({
           organisationName={settings.name}
           logoUrl={settings.logoUrl}
           brandColor={settings.brandColor}
-          number="0001"
+          number="1"
           url={SAMPLE_URL}
         />
       </figure>

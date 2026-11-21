@@ -115,7 +115,7 @@ public class FlowTests : IClassFixture<TestApp>
         using var client = _app.CreateClient();
         var response = await client.PostAsJsonAsync("/api/auth/register", new
         {
-            email = $"founder-{Guid.NewGuid():N}@example.com", password = "correct horse", displayName = "Founder",
+            email = $"founder-{Guid.NewGuid():N}@example.com", password = "correct horse", acceptTerms = true, displayName = "Founder",
             organisationName = "Moonlight Society",
         });
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -129,6 +129,97 @@ public class FlowTests : IClassFixture<TestApp>
     }
 
     [Fact]
+    public async Task Registration_requires_accepting_the_terms_and_privacy_policy()
+    {
+        var org = await NewOrgAsync();
+        using var client = _app.CreateClient();
+        var email = $"terms-{Guid.NewGuid():N}@example.com";
+
+        var member = await client.PostAsJsonAsync("/api/auth/register", new { email, password = "correct horse", joinOrganisationSlug = org.Slug });
+        Assert.Equal(HttpStatusCode.BadRequest, member.StatusCode);
+        Assert.Contains("terms of service", await member.Content.ReadAsStringAsync());
+        var organiser = await client.PostAsJsonAsync("/api/auth/register",
+            new { email, password = "correct horse", acceptTerms = false, displayName = "Founder", organisationName = $"Terms {Guid.NewGuid():N}"[..20] });
+        Assert.Equal(HttpStatusCode.BadRequest, organiser.StatusCode);
+
+        // Nothing was created: the same address can still sign up once the terms are accepted.
+        (await client.PostAsJsonAsync("/api/auth/register",
+            new { email, password = "correct horse", acceptTerms = true, joinOrganisationSlug = org.Slug })).EnsureSuccessStatusCode();
+    }
+
+    [Fact]
+    public async Task Members_see_every_membership_they_had_newest_first()
+    {
+        var org = await NewOrgAsync();
+        var fan = (await org.Admin.PostOkAsync($"{org.Url}/admin/tiers", new { name = "Fan", priceCents = 0, isPublic = true })).Str("id");
+        var guest = await _app.NewGuestAsync(org.Slug, "Hilde");
+        Assert.Empty((await guest.GetOkAsync($"{org.Url}/me/memberships")).AsArray());
+
+        await guest.PostOkAsync($"{org.Url}/join", new { tierId = org.FreeTierId });
+        await guest.PostOkAsync($"{org.Url}/join", new { tierId = fan });
+
+        var history = (await guest.GetOkAsync($"{org.Url}/me/memberships")).AsArray();
+        Assert.Equal(["Fan", "Member"], history.Select(p => p!.Str("tierName")));
+        Assert.True(history[0]!["current"]!.GetValue<bool>());
+        Assert.False(history[1]!["current"]!.GetValue<bool>());
+
+        var member = (await org.Admin.GetOkAsync($"{org.Url}/admin/members")).AsArray().Single(m => m!.Str("displayName").StartsWith("Hilde"))!;
+
+        // An admin ending the membership closes the running period rather than adding one.
+        (await org.Admin.PutAsJsonAsync($"{org.Url}/admin/members/{member.Str("id")}",
+            new { role = "Member", tierId = fan, expiresAt = DateTime.UtcNow.AddMinutes(-1) })).EnsureSuccessStatusCode();
+        history = (await guest.GetOkAsync($"{org.Url}/me/memberships")).AsArray();
+        Assert.Equal(2, history.Count);
+        Assert.False(history[0]!["current"]!.GetValue<bool>());
+    }
+
+    [Fact]
+    public async Task Staff_and_admins_look_members_up_by_name_or_card_and_see_their_details_and_history()
+    {
+        var org = await NewOrgAsync();
+        var fan = (await org.Admin.PostOkAsync($"{org.Url}/admin/tiers", new { name = "Fan", priceCents = 0, isPublic = true })).Str("id");
+        var guest = await _app.NewGuestAsync(org.Slug, "Ingrid");
+        await guest.PostOkAsync($"{org.Url}/join", new { tierId = org.FreeTierId });
+        await guest.PostOkAsync($"{org.Url}/join", new { tierId = fan });
+        var card = await LinkCardAsync(guest, org);
+
+        // By name, in any case; a typed % is just a character, not "everyone".
+        var found = (await org.Admin.GetOkAsync($"{org.Url}/staff/members?search=ingRID")).AsArray();
+        var id = Assert.Single(found)!.Str("id");
+        Assert.Empty((await org.Admin.GetOkAsync($"{org.Url}/staff/members?search=%25")).AsArray());
+        // By card: checking it says which member it is.
+        Assert.Equal(id, (await org.Admin.PostOkAsync($"{org.Url}/staff/lookup", new { cardUid = card })).Str("memberId"));
+
+        var details = await org.Admin.GetOkAsync($"{org.Url}/staff/members/{id}");
+        Assert.Equal("Ingrid", details.Str("firstName"));
+        Assert.Equal("Fan", details.Str("tier"));
+        Assert.Single(details["cards"]!.AsArray());
+        Assert.Equal(["Fan", "Member"], details["history"]!.AsArray().Select(p => p!.Str("tierName")));
+
+        Assert.Equal("Optional", details["fields"]!.Str("phone"));
+        Assert.Equal("Ingrid", details["profile"]!.Str("firstName"));
+
+        // Admins can correct the details, with the same checks as the member's own form; nobody else can.
+        var corrected = new { firstName = "Ingrid", lastName = "Peeters", phone = "0470 12 34 56" };
+        (await org.Admin.PutAsJsonAsync($"{org.Url}/admin/members/{id}/profile", corrected)).EnsureSuccessStatusCode();
+        details = await org.Admin.GetOkAsync($"{org.Url}/staff/members/{id}");
+        Assert.Equal("Ingrid Peeters", details.Str("displayName"));
+        Assert.Equal("0470 12 34 56", details.Str("phone"));
+        Assert.Equal(HttpStatusCode.BadRequest,
+            (await org.Admin.PutAsJsonAsync($"{org.Url}/admin/members/{id}/profile", new { firstName = "", lastName = "" })).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await guest.PutAsJsonAsync($"{org.Url}/admin/members/{id}/profile", corrected)).StatusCode);
+
+        // A barman checks cards but does not look into people's details; nor do members.
+        var barman = await NewMemberAsync(org, "Bram");
+        var bram = (await org.Admin.GetOkAsync($"{org.Url}/admin/members")).AsArray().Single(m => m!.Str("displayName").StartsWith("Bram"))!;
+        (await org.Admin.PutAsJsonAsync($"{org.Url}/admin/members/{bram.Str("id")}",
+            new { role = "Barman", tierId = bram.Str("tierId"), expiresAt = (DateTime?)null })).EnsureSuccessStatusCode();
+        Assert.Equal(HttpStatusCode.Forbidden, (await barman.GetAsync($"{org.Url}/staff/members/{id}")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await barman.GetAsync($"{org.Url}/staff/members?search=Ingrid")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await guest.GetAsync($"{org.Url}/staff/members/{id}")).StatusCode);
+    }
+
+    [Fact]
     public async Task Registration_rejects_taken_or_reserved_organisation_names_without_creating_an_account()
     {
         var admin = await _app.NewUserAsync("Existing owner");
@@ -138,7 +229,7 @@ public class FlowTests : IClassFixture<TestApp>
         var email = $"blocked-{Guid.NewGuid():N}@example.com";
         var taken = await client.PostAsJsonAsync("/api/auth/register", new
         {
-            email, password = "correct horse", displayName = "Blocked", organisationName = name,
+            email, password = "correct horse", acceptTerms = true, displayName = "Blocked", organisationName = name,
         });
         Assert.Equal(HttpStatusCode.Conflict, taken.StatusCode);
         var takenLogin = await client.PostAsJsonAsync("/api/auth/login", new { email, password = "correct horse" });
@@ -147,7 +238,7 @@ public class FlowTests : IClassFixture<TestApp>
         var reservedEmail = $"reserved-{Guid.NewGuid():N}@example.com";
         var reserved = await client.PostAsJsonAsync("/api/auth/register", new
         {
-            email = reservedEmail, password = "correct horse", displayName = "Reserved", organisationName = "tickets",
+            email = reservedEmail, password = "correct horse", acceptTerms = true, displayName = "Reserved", organisationName = "tickets",
         });
         Assert.Equal(HttpStatusCode.BadRequest, reserved.StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized,
@@ -165,7 +256,7 @@ public class FlowTests : IClassFixture<TestApp>
         var email = $"invalid-{Guid.NewGuid():N}@example.com";
         var response = await client.PostAsJsonAsync("/api/auth/register", new
         {
-            email, password = "correct horse", displayName = "Invalid name", organisationName,
+            email, password = "correct horse", acceptTerms = true, displayName = "Invalid name", organisationName,
         });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
@@ -186,7 +277,7 @@ public class FlowTests : IClassFixture<TestApp>
         using var visitor = _app.CreateClient();
         var response = await visitor.PostAsJsonAsync("/api/auth/register", new
         {
-            email = $"member-{Guid.NewGuid():N}@example.com", password = "correct horse", displayName = "New member",
+            email = $"member-{Guid.NewGuid():N}@example.com", password = "correct horse", acceptTerms = true, displayName = "New member",
             joinOrganisationSlug = org.Slug,
         });
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -204,11 +295,11 @@ public class FlowTests : IClassFixture<TestApp>
         var orgName = $"Shared {Guid.NewGuid():N}";
         var first = firstClient.PostAsJsonAsync("/api/auth/register", new
         {
-            email = $"first-{Guid.NewGuid():N}@example.com", password = "correct horse", displayName = "First", organisationName = orgName,
+            email = $"first-{Guid.NewGuid():N}@example.com", password = "correct horse", acceptTerms = true, displayName = "First", organisationName = orgName,
         });
         var second = secondClient.PostAsJsonAsync("/api/auth/register", new
         {
-            email = $"second-{Guid.NewGuid():N}@example.com", password = "correct horse", displayName = "Second", organisationName = orgName,
+            email = $"second-{Guid.NewGuid():N}@example.com", password = "correct horse", acceptTerms = true, displayName = "Second", organisationName = orgName,
         });
         var responses = await Task.WhenAll(first, second);
         Assert.Single(responses, r => r.StatusCode == HttpStatusCode.OK);
@@ -585,7 +676,7 @@ public class FlowTests : IClassFixture<TestApp>
 
         // Neither of them manages anything.
         Assert.Equal(HttpStatusCode.Forbidden, (await barman.GetAsync($"{org.Url}/admin/products")).StatusCode);
-        Assert.Equal(["Bar", "Door", "CashTopUp", "CheckCard"], (await org.Admin.GetOkAsync($"{org.Url}/staff/context"))["tasks"]!.AsArray().Select(t => t!.GetValue<string>()));
+        Assert.Equal(["Bar", "Door", "CashTopUp", "CheckCard", "MemberInfo"], (await org.Admin.GetOkAsync($"{org.Url}/staff/context"))["tasks"]!.AsArray().Select(t => t!.GetValue<string>()));
     }
 
     [Fact]
@@ -707,11 +798,11 @@ public class FlowTests : IClassFixture<TestApp>
         var card = await LinkCardAsync(atFirst, first);
         await TopUpAsync(atFirst, first, 2000);
         Assert.Equal(HttpStatusCode.Unauthorized, (await atFirst.GetAsync($"{second.Url}/wallet")).StatusCode);
-        var login = await _app.CreateClient().PostAsJsonAsync("/api/auth/login", new { email, password = "correct horse", organisationSlug = second.Slug });
+        var login = await _app.CreateClient().PostAsJsonAsync("/api/auth/login", new { email, password = "correct horse", acceptTerms = true, organisationSlug = second.Slug });
         Assert.Equal(HttpStatusCode.Unauthorized, login.StatusCode);
 
         // The same email address can sign up there too, and starts from nothing.
-        var again = await atFirst.PostAsJsonAsync("/api/auth/register", new { email, password = "another password", displayName = "Gijs", joinOrganisationSlug = second.Slug });
+        var again = await atFirst.PostAsJsonAsync("/api/auth/register", new { email, password = "another password", acceptTerms = true, displayName = "Gijs", joinOrganisationSlug = second.Slug });
         Assert.True(again.IsSuccessStatusCode, await again.Content.ReadAsStringAsync());
         (await atFirst.PutAsJsonAsync($"{second.Url}/me/profile", new { firstName = "Gijs", lastName = "Jazz" })).EnsureSuccessStatusCode();
         await atFirst.PostOkAsync($"{second.Url}/join", new { tierId = second.FreeTierId });
@@ -812,7 +903,7 @@ public class FlowTests : IClassFixture<TestApp>
         var email = $"olga-{Guid.NewGuid():N}@example.com";
         var owner = _app.CreateClient();
         var firstName = $"First {Guid.NewGuid():N}"[..20];
-        var registered = await owner.PostOkAsync("/api/auth/register", new { email, password = "correct horse", displayName = "Olga", organisationName = firstName });
+        var registered = await owner.PostOkAsync("/api/auth/register", new { email, password = "correct horse", acceptTerms = true, displayName = "Olga", organisationName = firstName });
         var first = $"/api/orgs/{registered.Str("organisationSlug")}";
         var second = $"/api/orgs/{(await owner.PostOkAsync("/api/orgs", new { name = $"Second {Guid.NewGuid():N}"[..20] })).Str("slug")}";
         await owner.PostOkAsync($"{first}/admin/products", new { name = "Beer", priceCents = 250, active = true });
@@ -830,7 +921,7 @@ public class FlowTests : IClassFixture<TestApp>
         // Someone who only has a guest account cannot add organisations, and an owner's email is taken for sign-up.
         var guest = await _app.NewGuestAsync(first.Split('/').Last());
         Assert.Equal(HttpStatusCode.Forbidden, (await guest.PostAsJsonAsync("/api/orgs", new { name = "Sneaky" })).StatusCode);
-        var twice = await _app.CreateClient().PostAsJsonAsync("/api/auth/register", new { email, password = "correct horse", displayName = "Olga", organisationName = $"Third {Guid.NewGuid():N}"[..20] });
+        var twice = await _app.CreateClient().PostAsJsonAsync("/api/auth/register", new { email, password = "correct horse", acceptTerms = true, displayName = "Olga", organisationName = $"Third {Guid.NewGuid():N}"[..20] });
         Assert.Equal(HttpStatusCode.Conflict, twice.StatusCode);
     }
 

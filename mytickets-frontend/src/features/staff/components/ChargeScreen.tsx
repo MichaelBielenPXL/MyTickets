@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { QrScanner } from '@/components/QrScanner'
 import { t } from '@/lib/i18n'
@@ -14,9 +14,9 @@ export type ChargeStep =
 
 type ChargeScreenProps = {
   step: ChargeStep
-  /** Whether cards held to the phone are being read; otherwise scanning or typing works. */
+  /** Whether cards held to the phone are being read; otherwise the card's QR code is scanned. */
   listening: boolean
-  /** A tapped or typed card number, or a scanned member QR code (app or wallet) or card QR. */
+  /** A tapped card's serial number, or a scanned member QR code (app or wallet) or card QR. */
   onCard: (uid: string) => void
   onClose: () => void
   /** After a refused charge: try the same order again. */
@@ -30,7 +30,6 @@ const SUCCESS_SHOWN_MS = 2600
  * Apple or Google Wallet, or printed on the card), then a big ✓ or ✗ readable across the bar.
  */
 export function ChargeScreen({ step, listening, onCard, onClose, onRetry }: ChargeScreenProps) {
-  const [typed, setTyped] = useState('')
   // Off while the order is being sent; on again for "Try another card".
   const [cameraOn, setCameraOn] = useState(false)
   const [cameraProblem, setCameraProblem] = useState('')
@@ -41,13 +40,6 @@ export function ChargeScreen({ step, listening, onCard, onClose, onRetry }: Char
     const timer = window.setTimeout(onClose, SUCCESS_SHOWN_MS)
     return () => window.clearTimeout(timer)
   }, [step, onClose])
-
-  function submit(event: FormEvent) {
-    event.preventDefault()
-    if (!typed.trim()) return
-    onCard(typed.trim())
-    setTyped('')
-  }
 
   if (step.kind === 'done') {
     const { outcome } = step
@@ -100,7 +92,7 @@ export function ChargeScreen({ step, listening, onCard, onClose, onRetry }: Char
             onError={() => {
               setCameraOn(false)
               setCameraProblem(
-                t('The camera could not start. Allow camera access for this site, or type the card number.'),
+                t('The camera could not start. Allow camera access for this site, or tap the card.'),
               )
             }}
           />
@@ -116,7 +108,7 @@ export function ChargeScreen({ step, listening, onCard, onClose, onRetry }: Char
               ? t('Hold the QR code in front of the camera')
               : listening
                 ? t('Hold the card to the back of the phone')
-                : t('Type the card number')}
+                : t("Scan the card's QR code")}
         </p>
         {cameraProblem && <p className="charge-problem">{cameraProblem}</p>}
       </div>
@@ -130,20 +122,6 @@ export function ChargeScreen({ step, listening, onCard, onClose, onRetry }: Char
       >
         {cameraOn ? t('Stop camera') : t('Scan QR code')}
       </button>
-      <form onSubmit={submit} className="charge-typed">
-        <input
-          value={typed}
-          onChange={(e) => setTyped(e.target.value)}
-          placeholder={t('Card number')}
-          aria-label={t('Card number')}
-          autoCapitalize="characters"
-          autoComplete="off"
-          disabled={step.kind === 'busy'}
-        />
-        <button className="till-ghost" disabled={step.kind === 'busy' || !typed.trim()}>
-          {t('Use')}
-        </button>
-      </form>
       <button className="till-ghost" onClick={onClose} disabled={step.kind === 'busy'}>
         {t('Cancel')}
       </button>

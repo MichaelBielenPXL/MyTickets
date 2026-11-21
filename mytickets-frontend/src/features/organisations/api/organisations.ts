@@ -6,6 +6,7 @@ import { api } from '@/lib/api-client'
 import type {
   JoinResult,
   MemberPass,
+  MembershipPeriod,
   Organisation,
   OrganisationSummary,
   ProfileForm,
@@ -14,6 +15,7 @@ import type {
 
 export const organisationKeys = {
   profile: (slug: string) => ['profile', slug] as const,
+  memberships: (slug: string) => ['membership-history', slug] as const,
   list: ['organisations'] as const,
   detail: (slug: string) => ['organisation', slug] as const,
   publicDetail: (slug: string) => ['public-organisation', slug] as const,
@@ -88,6 +90,7 @@ export function useJoinOrganisation(slug: string) {
       Promise.all([
         queryClient.invalidateQueries({ queryKey: organisationKeys.detail(slug) }),
         queryClient.invalidateQueries({ queryKey: organisationKeys.list }),
+        queryClient.invalidateQueries({ queryKey: organisationKeys.memberships(slug) }),
         queryClient.invalidateQueries({ queryKey: meQueryKey }),
       ]),
   })
@@ -98,6 +101,14 @@ export function useMyProfile(slug: string) {
   return useQuery({
     queryKey: organisationKeys.profile(slug),
     queryFn: () => api.get<ProfileForm>(`/orgs/${slug}/me/profile`),
+  })
+}
+
+/** Every membership the signed-in person has had at this organisation, newest first. */
+export function useMyMemberships(slug: string) {
+  return useQuery({
+    queryKey: organisationKeys.memberships(slug),
+    queryFn: () => api.get<MembershipPeriod[]>(`/orgs/${slug}/me/memberships`),
   })
 }
 

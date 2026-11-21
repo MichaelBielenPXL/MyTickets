@@ -5,18 +5,15 @@
  */
 export const nl: Record<string, string> = {
   // ---- The app ----
-  'or type the card number': 'of typ het kaartnummer',
-  'Card number': 'Kaartnummer',
-  Use: 'Gebruik',
-  'Tapping cards works in Chrome on an Android phone. Here you can type the number.':
-    'Kaarten scannen werkt in Chrome op een Android-telefoon. Hier kun je het nummer typen.',
+  "Tapping cards works in Chrome on an Android phone. Here, scan the card's QR code.":
+    'Kaarten scannen werkt in Chrome op een Android-telefoon. Scan hier de QR-code van de kaart.',
   'Start card reader': 'Kaartlezer starten',
   Cancel: 'Annuleren',
   'One moment…': 'Even geduld…',
   'Loading…': 'Laden…',
   'Move {name}': '{name} verplaatsen',
-  'The card reader could not start. Allow NFC for this site, or type the card number.':
-    'De kaartlezer kon niet starten. Sta NFC toe voor deze site, of typ het kaartnummer.',
+  "The card reader could not start. Allow NFC for this site, or scan the card's QR code.":
+    'De kaartlezer kon niet starten. Sta NFC toe voor deze site, of scan de QR-code van de kaart.',
   Categories: 'Categorieën',
   'Tabs across the top of the till, such as Beer, Soft drinks and Food. Drag them into the order you want.':
     'Tabbladen bovenaan de kassa, zoals Bier, Frisdrank en Eten. Sleep ze in de volgorde die je wilt.',
@@ -423,6 +420,25 @@ export const nl: Record<string, string> = {
     'Voor {choice}. {org} bekijkt elke aanvraag voor het lidmaatschap start.',
   'For {choice}. {org} asks this of its members.': 'Voor {choice}. {org} vraagt dit aan zijn leden.',
   'My details': 'Mijn gegevens',
+  'I agree to the {terms} and the {privacy}.': 'Ik ga akkoord met de {terms} en de {privacy}.',
+  'terms of service': 'gebruiksvoorwaarden',
+  'privacy policy': 'privacyverklaring',
+  'Terms of service': 'Gebruiksvoorwaarden',
+  'Privacy policy': 'Privacyverklaring',
+  'Last updated {date}': 'Laatst bijgewerkt op {date}',
+  'My memberships': 'Mijn lidmaatschappen',
+  'No memberships yet.': 'Nog geen lidmaatschappen.',
+  'Membership history': 'Lidmaatschapsgeschiedenis',
+  'No details given.': 'Geen gegevens opgegeven.',
+  Details: 'Gegevens',
+  'Membership type': 'Soort lidmaatschap',
+  Role: 'Rol',
+  'Joined {date}': 'Lid geworden op {date}',
+  'No cards linked.': 'Geen kaarten gekoppeld.',
+  'linked {date}': 'gekoppeld op {date}',
+  'Tap a card to see whose it is': 'Scan een kaart om te zien van wie ze is',
+  '{from} to {until}': '{from} tot {until}',
+  'since {date}': 'sinds {date}',
   'Save details': 'Gegevens opslaan',
   '{price} until {date}': '{price} tot {date}',
   'Confirming your payment…': 'Je betaling wordt bevestigd…',
@@ -475,7 +491,7 @@ export const nl: Record<string, string> = {
   'To pay': 'Te betalen',
   'Check tokens': 'Tokens bekijken',
   'Hold the card to the back of the phone': 'Houd de kaart tegen de achterkant van de telefoon',
-  'Type the card number': 'Typ het kaartnummer',
+  "Scan the card's QR code": 'Scan de QR-code van de kaart',
   expired: 'verlopen',
   'Tap a card to see who it belongs to and how many tokens are on it':
     'Scan een kaart om te zien van wie ze is en hoeveel tokens erop staan',
@@ -490,8 +506,8 @@ export const nl: Record<string, string> = {
   'Hold the QR code in front of the camera': 'Houd de QR-code voor de camera',
   "Take the cash first, then tap the guest's card or scan their QR code.":
     'Neem eerst het cash aan, tik dan de kaart van de gast of scan de QR-code.',
-  'The camera could not start. Allow camera access for this site, or type the card number.':
-    'De camera kon niet starten. Sta cameratoegang toe voor deze site, of typ het kaartnummer.',
+  'The camera could not start. Allow camera access for this site, or tap the card.':
+    'De camera kon niet starten. Sta cameratoegang toe voor deze site, of scan de kaart met NFC.',
   'Ready. Hold a card against the back of the phone.':
     'Klaar. Houd een kaart tegen de achterkant van de telefoon.',
   'or type the ticket code': 'of typ de ticketcode',
@@ -663,6 +679,8 @@ export const nl: Record<string, string> = {
   'Choose an end date within the next ten years.': 'Kies een einddatum binnen de komende tien jaar.',
   'Choose a password of at least 8 characters.': 'Kies een wachtwoord van minstens 8 tekens.',
   'Choose a picture to upload.': 'Kies een afbeelding om te uploaden.',
+  'Accept the terms of service and privacy policy to create an account.':
+    'Ga akkoord met de gebruiksvoorwaarden en de privacyverklaring om een account te maken.',
   'Choose at least one ticket.': 'Kies minstens één ticket.',
   'Choose one of your categories.': 'Kies een van je categorieën.',
   'Choose one of your deposits.': 'Kies een van je waarborgen.',
@@ -706,8 +724,8 @@ export const nl: Record<string, string> = {
   'Send the new order.': 'Stuur de nieuwe volgorde.',
   'Sign in with your organiser account to create an organisation.':
     'Meld je aan met je organisatoraccount om een organisatie aan te maken.',
-  'Tap a card, scan a member QR code, or enter its number.':
-    'Scan een kaart of een QR-code van een lid, of vul het nummer in.',
+  'Tap a card, or scan its QR code or a member QR code.':
+    'Scan een kaart, of scan de QR-code ervan of een QR-code van een lid.',
   "That doesn't look like a card number. It is 8 to 20 letters and digits (0-9, A-F).":
     'Dat lijkt geen kaartnummer. Het bestaat uit 8 tot 20 letters en cijfers (0-9, A-F).',
   'That invite code is not valid.': 'Die uitnodigingscode is niet geldig.',
@@ -856,11 +874,9 @@ export const nl: Record<string, string> = {
     'Elke kaart is een eigen pagina op bankkaartformaat. Kies je kaartprinter, of bewaar als PDF.',
   'Print {count} cards': '{count} kaarten printen',
   'Every card is already written.': 'Alle kaarten zijn al geschreven.',
-  'QR code for card {number}': 'QR-code van kaart {number}',
+  'QR code of the card': 'QR-code van de kaart',
   'Print cards with QR codes': 'Kaarten printen met QR-code',
   'Card design': 'Kaartontwerp',
-  'The QR code, the card number and your name are always on the card, in the same place, so it always scans.':
-    'De QR-code, het kaartnummer en jullie naam staan altijd op de kaart, op dezelfde plek, zodat ze altijd scant.',
   'Card preview': 'Voorbeeld van de kaart',
   Background: 'Achtergrond',
   'Brand colour': 'Merkkleur',
@@ -884,8 +900,8 @@ export const nl: Record<string, string> = {
   'Side of the card': 'Kant van de kaart',
   '{side}: give the colour as a code like #0b3d2e.': '{side}: geef de kleur als code, zoals #0b3d2e.',
   '{side}: upload a picture first.': '{side}: laad eerst een afbeelding op.',
-  'Design the front and the back. The back always has the QR code, the card number and your name, in the same place, so it always scans.':
-    'Ontwerp de voor- en achterkant. Op de achterkant staan altijd de QR-code, het kaartnummer en jullie naam, op dezelfde plek, zodat ze altijd scant.',
+  'Design the front and the back. The back always has the QR code and your name, in the same place, so it always scans.':
+    'Ontwerp de voor- en achterkant. Op de achterkant staan altijd de QR-code en jullie naam, op dezelfde plek, zodat ze altijd scant.',
   'Landscape, at least 1012 × 638 pixels. Text on it gets a soft shade so it stays readable.':
     'Liggend, minstens 1012 × 638 pixels. Tekst erop krijgt een zachte schaduw zodat ze leesbaar blijft.',
   'Both sides': 'Beide kanten',

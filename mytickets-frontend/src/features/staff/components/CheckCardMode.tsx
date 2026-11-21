@@ -40,9 +40,7 @@ export function CheckCardMode({ slug }: CheckCardModeProps) {
       <ScanQrButton
         onScan={(payload) => lookUp.mutate(cardIdFromQr(payload))}
         disabled={lookUp.isPending}
-        cameraProblem={t(
-          'The camera could not start. Allow camera access for this site, or type the card number.',
-        )}
+        cameraProblem={t('The camera could not start. Allow camera access for this site, or tap the card.')}
       />
       <CardReader
         prompt={t('Tap a card to see who it belongs to and how many tokens are on it')}

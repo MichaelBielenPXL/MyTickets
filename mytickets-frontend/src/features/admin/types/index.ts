@@ -1,3 +1,4 @@
+import type { MemberDetails } from '@/features/organisations'
 import type { EventStatus } from '@/features/staff'
 import type { Role, Tier } from '@/types'
 
@@ -103,19 +104,6 @@ export interface Member extends MemberDetails {
   extraCardAllowed: boolean
 }
 
-/** What a member told the organisation when choosing a membership. Missing when not asked or not given. */
-export interface MemberDetails {
-  firstName: string | null
-  lastName: string | null
-  phone: string | null
-  street: string | null
-  postalCode: string | null
-  city: string | null
-  school: string | null
-  faculty: string | null
-  studyYear: string | null
-}
-
 /** Someone asking for a membership that needs approval. */
 export interface JoinRequest extends MemberDetails {
   id: string
@@ -172,7 +160,7 @@ export interface PayoutSetup {
 /** A card the organisation issued, as Manage lists it. */
 export interface AdminCard {
   id: string
-  /** The number printed on it, e.g. "0042". */
+  /** Its number, counting up from 1, e.g. "42". */
   number: string
   /** The code in its link; null for cards linked before cards were issued. */
   code: string | null
@@ -206,8 +194,10 @@ export interface CardSide {
   tagline: string
 }
 
-/** How the organisation's printed cards look. The back always carries the QR code, the card number and the name. */
+/** How the organisation's printed cards look. The back always carries the QR code and the name. */
 export interface CardDesign {
   front: CardSide
   back: CardSide
 }
+
+export type { MemberDetails }

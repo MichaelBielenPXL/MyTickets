@@ -28,6 +28,7 @@ public class MembershipService(AppDbContext db, WalletService wallets, IConfigur
             };
             db.Memberships.Add(membership);
         }
+        await RecordPeriodAsync(userId, tier, expires);
         membership.TierId = tier.Id;
         membership.ExpiresAt = expires;
         // An approved request for this membership has now done its job.
@@ -36,5 +37,36 @@ public class MembershipService(AppDbContext db, WalletService wallets, IConfigur
         await db.SaveChangesAsync();
         await wallets.GetOrCreateAsync(userId, organisationId);
         return membership;
+    }
+
+    public record PeriodView(Guid Id, string TierName, DateTime StartedAt, DateTime? EndsAt, bool Current);
+
+    /// <summary>Every membership the person has had here, newest first. The member, admins and staff all see this.</summary>
+    public static async Task<List<PeriodView>> HistoryAsync(AppDbContext db, Guid userId, DateTime now) =>
+        (await db.MembershipPeriods.AsNoTracking().Where(p => p.UserId == userId).OrderByDescending(p => p.StartedAt).ToListAsync())
+        .Select(p => new PeriodView(p.Id, p.TierName, p.StartedAt, p.EndsAt, p.EndsAt is null || p.EndsAt > now)).ToList();
+
+    /// <summary>
+    /// Keeps the membership history in step with a change to someone's membership (saved with the caller's
+    /// changes). The same type running on, perhaps to another end date, stays one period; another type, or
+    /// joining again after the last one ran out, starts a new one and ends the one still running.
+    /// </summary>
+    public async Task RecordPeriodAsync(Guid userId, MembershipTier tier, DateTime? expiresAt)
+    {
+        var now = clock.GetUtcNow().UtcDateTime;
+        var running = await db.MembershipPeriods.Where(p => p.UserId == userId && (p.EndsAt == null || p.EndsAt > now))
+            .OrderByDescending(p => p.StartedAt).FirstOrDefaultAsync();
+        if (running?.TierId == tier.Id)
+        {
+            running.EndsAt = expiresAt;
+            return;
+        }
+        if (running is not null) running.EndsAt = now;
+        // Put on a type that has already run out: nothing new to remember.
+        if (expiresAt <= now) return;
+        db.MembershipPeriods.Add(new MembershipPeriod
+        {
+            Id = Guid.NewGuid(), UserId = userId, TierId = tier.Id, TierName = tier.Name, StartedAt = now, EndsAt = expiresAt,
+        });
     }
 }

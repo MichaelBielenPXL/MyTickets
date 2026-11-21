@@ -107,6 +107,35 @@ namespace MyTickets.Api.Data.Migrations
                     b.ToTable("Memberships");
                 });
 
+            modelBuilder.Entity("MyTickets.Api.Data.MembershipPeriod", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("EndsAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("StartedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("TierId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("TierName")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("MembershipPeriods");
+                });
+
             modelBuilder.Entity("MyTickets.Api.Data.MembershipRequest", b =>
                 {
                     b.Property<Guid>("Id")
@@ -628,6 +657,12 @@ namespace MyTickets.Api.Data.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<string>("StudyYear")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("TermsAcceptedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("TermsVersion")
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");

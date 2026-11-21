@@ -15,7 +15,7 @@ function Panel({ cards }: { cards: AdminCard[] }) {
 }
 
 vi.mock('@/lib/nfc', () => ({ nfcSupported: true, writeCard: vi.fn() }))
-// The camera is not there in tests: the stand-in "scans" the QR printed on card 0042.
+// The camera is not there in tests: the stand-in "scans" the QR printed on card 42.
 vi.mock('@/components/QrScanner', () => ({
   QrScanner: ({ onScan }: { onScan: (code: string) => void }) => (
     <button onClick={() => onScan('https://tickets.test/c/ABCDEFGHJK')}>Fake camera</button>
@@ -24,7 +24,7 @@ vi.mock('@/components/QrScanner', () => ({
 
 const printed = {
   id: 'c42',
-  number: '0042',
+  number: '42',
   code: 'ABCDEFGHJK',
   url: 'https://tickets.test/c/ABCDEFGHJK',
   uid: null,
@@ -43,7 +43,7 @@ function serve({ failFirstReport = false } = {}) {
       HttpResponse.json({ ready: true, reason: null }),
     ),
     http.post(apiUrl('/orgs/night-owls/admin/cards/blank'), () =>
-      HttpResponse.json({ ...printed, id: 'c43', number: '0043', url: 'https://tickets.test/c/BBBBBBBBBB' }),
+      HttpResponse.json({ ...printed, id: 'c43', number: '43', url: 'https://tickets.test/c/BBBBBBBBBB' }),
     ),
     http.post(apiUrl('/orgs/night-owls/admin/cards/:id/written'), async ({ params, request }) => {
       reports.push({ id: params.id, ...((await request.json()) as object) })
@@ -68,7 +68,7 @@ describe('WriteCards', () => {
     await user.click(screen.getByRole('button', { name: 'Write a printed card' }))
     await user.click(screen.getByRole('button', { name: 'Fake camera' }))
 
-    expect(await screen.findByRole('status')).toHaveTextContent('Card 0042 is written.')
+    expect(await screen.findByRole('status')).toHaveTextContent('Card 42 is written.')
     expect(writeCard).toHaveBeenCalledWith('https://tickets.test/c/ABCDEFGHJK', expect.anything())
     expect(reports).toEqual([{ id: 'c42', uid: '04:a2:b9:1c', locked: true }])
   })
@@ -80,7 +80,7 @@ describe('WriteCards', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Write a blank card' }))
 
-    expect(await screen.findByRole('status')).toHaveTextContent('Card 0043 is written.')
+    expect(await screen.findByRole('status')).toHaveTextContent('Card 43 is written.')
     expect(writeCard).toHaveBeenCalledWith('https://tickets.test/c/BBBBBBBBBB', expect.anything())
     expect(reports).toEqual([{ id: 'c43', uid: '04:a2:b9:1d', locked: true }])
   })
@@ -94,7 +94,7 @@ describe('WriteCards', () => {
     await user.click(screen.getByRole('button', { name: 'Fake camera' }))
     await user.click(await screen.findByRole('button', { name: 'Try again' }))
 
-    expect(await screen.findByRole('status')).toHaveTextContent('Card 0042 is written.')
+    expect(await screen.findByRole('status')).toHaveTextContent('Card 42 is written.')
     expect(writeCard).toHaveBeenCalledTimes(1)
     expect(reports).toHaveLength(2)
   })
@@ -113,10 +113,10 @@ describe('WriteCards', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Write a printed card' }))
     await user.click(screen.getByRole('button', { name: 'Fake camera' }))
-    expect(screen.getByText('Card 0042 is blocked and nobody has it.')).toBeInTheDocument()
+    expect(screen.getByText('Card 42 is blocked and nobody has it.')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Reuse as a new card' }))
 
-    expect(await screen.findByRole('status')).toHaveTextContent('Card 0042 is ready to be linked again.')
+    expect(await screen.findByRole('status')).toHaveTextContent('Card 42 is ready to be linked again.')
     expect(unblocked).toEqual([{ blocked: false }])
     expect(writeCard).not.toHaveBeenCalled()
   })

@@ -218,7 +218,21 @@ public static class AdminEndpoints
             return Results.Ok(members);
         });
 
-        admin.MapPut("/members/{id:guid}", async (Guid id, MemberRequest req, HttpContext http, AppDbContext db) =>
+        // An admin correcting a member's details, with the same checks as the member's own My details.
+        admin.MapPut("/members/{id:guid}/profile", async (Guid id, ProfileFields.Values values, HttpContext http, AppDbContext db, TimeProvider clock) =>
+        {
+            var orgId = http.Org().Org.Id;
+            var userId = await db.Memberships.Where(m => m.Id == id && m.OrganisationId == orgId).Select(m => (Guid?)m.UserId).FirstOrDefaultAsync();
+            if (userId is null) return Http.Error(404, "Member not found.");
+            var modes = ProfileFields.Read(await db.Organisations.AsNoTracking().FirstAsync());
+            if (ProfileFields.Problem(values, modes) is { } problem) return Http.Error(400, problem);
+            var user = await db.Users.FirstAsync(u => u.Id == userId);
+            ProfileFields.Apply(user, values, modes, clock.GetUtcNow().UtcDateTime);
+            await db.SaveChangesAsync();
+            return Results.NoContent();
+        });
+
+        admin.MapPut("/members/{id:guid}", async (Guid id, MemberRequest req, HttpContext http, AppDbContext db, MembershipService memberships) =>
         {
             var orgId = http.Org().Org.Id;
             var member = await db.Memberships.FirstOrDefaultAsync(m => m.Id == id && m.OrganisationId == orgId);
@@ -229,6 +243,11 @@ public static class AdminEndpoints
             if (member.Role == OrgRole.Admin && req.Role != OrgRole.Admin &&
                 await db.Memberships.CountAsync(m => m.OrganisationId == orgId && m.Role == OrgRole.Admin) == 1)
                 return Http.Error(409, "An organisation needs at least one admin.");
+            if (member.TierId != req.TierId || member.ExpiresAt != Http.Utc(req.ExpiresAt))
+            {
+                var tier = await db.MembershipTiers.FirstAsync(t => t.Id == req.TierId);
+                await memberships.RecordPeriodAsync(member.UserId, tier, Http.Utc(req.ExpiresAt));
+            }
             member.Role = req.Role;
             member.TierId = req.TierId;
             member.ExpiresAt = Http.Utc(req.ExpiresAt);

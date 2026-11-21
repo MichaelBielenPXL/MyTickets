@@ -18,11 +18,11 @@ function serve() {
   server.use(
     http.get(apiUrl('/orgs/night-owls/me/cards'), () =>
       HttpResponse.json([
-        { id: 'c1', number: '0007', label: '', blocked: false, linkedAt: '2026-11-01T20:00:00Z' },
+        { id: 'c1', number: '7', label: '', blocked: false, linkedAt: '2026-11-01T20:00:00Z' },
       ]),
     ),
     http.get(apiUrl('/orgs/night-owls/cards/ABCDEFGHJK'), () =>
-      HttpResponse.json({ number: '0042', state: 'free', member: true }),
+      HttpResponse.json({ number: '42', state: 'free', member: true }),
     ),
   )
 }
@@ -34,7 +34,7 @@ describe('CardsPage', () => {
     serve()
     open()
 
-    expect(await screen.findByText('Card 0007')).toBeInTheDocument()
+    expect(await screen.findByText('Card 7')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: '‹ My wallet' })).toHaveAttribute('href', '/night-owls/wallet')
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
     expect(screen.getByText('Hold the card to your phone, or scan its QR code.')).toBeInTheDocument()
@@ -49,7 +49,7 @@ describe('CardsPage', () => {
     await user.click(screen.getByRole('button', { name: 'Fake camera' }))
 
     expect(
-      await screen.findByRole('alertdialog', { name: 'Link card 0042 to your wallet?' }),
+      await screen.findByRole('alertdialog', { name: 'Link card 42 to your wallet?' }),
     ).toBeInTheDocument()
   })
 

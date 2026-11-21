@@ -2,7 +2,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { meQueryKey } from '@/features/auth'
 import { eventKeys } from '@/features/events'
-import { type FieldMode, type ProfileFieldName, organisationKeys } from '@/features/organisations'
+import {
+  type FieldMode,
+  type ProfileFieldName,
+  type ProfileValues,
+  organisationKeys,
+} from '@/features/organisations'
 import { staffKeys } from '@/features/staff'
 import { api } from '@/lib/api-client'
 
@@ -131,6 +136,13 @@ export function useSaveTicketType(slug: string, eventId: string) {
 export function useUpdateMember(slug: string) {
   return useAdminMutation(slug, (member: Pick<Member, 'id' | 'role' | 'tierId' | 'expiresAt'>) =>
     api.put(`${base(slug)}/members/${member.id}`, member),
+  )
+}
+
+/** An admin correcting a member's details (the same form as the member's own My details). */
+export function useSaveMemberProfile(slug: string, memberId: string) {
+  return useAdminMutation(slug, (values: ProfileValues) =>
+    api.put(`${base(slug)}/members/${memberId}/profile`, values),
   )
 }
 
@@ -348,7 +360,12 @@ export function useAllowExtraCard(slug: string) {
   return useMutation({
     mutationFn: ({ memberId, allowed }: { memberId: string; allowed: boolean }) =>
       api.put<void>(`${base(slug)}/members/${memberId}/extra-card`, { allowed }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: adminKeys.members(slug) }),
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: adminKeys.members(slug) }),
+        // The member's page.
+        queryClient.invalidateQueries({ queryKey: staffKeys.context(slug) }),
+      ]),
   })
 }
 

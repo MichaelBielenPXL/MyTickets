@@ -7,7 +7,7 @@ public static partial class OrganisationSlug
     private static readonly HashSet<string> Reserved = new(StringComparer.OrdinalIgnoreCase)
     {
         "api", "login", "register", "tickets", "cards", "checkout", "discover", "platform", "o", "health", "assets",
-        "favicon.ico", "robots.txt", "sitemap.xml",
+        "terms", "privacy", "favicon.ico", "robots.txt", "sitemap.xml",
     };
 
     public static string FromName(string name) =>

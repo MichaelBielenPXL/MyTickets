@@ -55,7 +55,6 @@ function Cards({ slug, cards }: { slug: string; cards: AdminCard[] }) {
 
   // Numbers carry on from the highest card so far.
   const first = Math.max(0, ...cards.map((card) => Number(card.number) || 0)) + 1
-  const numbered = (n: number) => String(n).padStart(4, '0')
 
   const shown = cards
     .filter((card) => filter === 'all' || statusOf(card) === filter)
@@ -94,8 +93,8 @@ function Cards({ slug, cards }: { slug: string; cards: AdminCard[] }) {
         open={confirming !== null}
         title={t('Create {count} cards?', { count: confirming ?? 0 })}
         message={t('They get the numbers {first} to {last}.', {
-          first: numbered(first),
-          last: numbered(first + (confirming ?? 1) - 1),
+          first: String(first),
+          last: String(first + (confirming ?? 1) - 1),
         })}
         confirmLabel={t('Create')}
         busy={create.isPending}

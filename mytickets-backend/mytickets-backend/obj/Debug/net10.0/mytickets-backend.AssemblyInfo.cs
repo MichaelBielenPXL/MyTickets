@@ -22,7 +22,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("mytickets-backend")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+5220fcdadc3ee7ab7b6f98f31aa8789dd1a6b8f0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+55c92bacfdf3f44b93622868dbfc1fc929b5f928")]
 [assembly: System.Reflection.AssemblyProductAttribute("mytickets-backend")]
 [assembly: System.Reflection.AssemblyTitleAttribute("mytickets-backend")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

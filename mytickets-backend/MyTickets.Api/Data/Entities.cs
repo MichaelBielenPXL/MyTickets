@@ -9,17 +9,21 @@ namespace MyTickets.Api.Data;
 public enum OrgRole { Member, Barman, Doorman, Staff, Admin }
 
 /// <summary>The jobs at an event, each opened up to some roles.</summary>
-public enum StaffTask { Bar, Door, CashTopUp, CheckCard }
+public enum StaffTask { Bar, Door, CashTopUp, CheckCard, MemberInfo }
 
 public static class StaffTasks
 {
-    /// <summary>Barmen work the bar, doormen the door; staff and admins do everything. All of them can check a card.</summary>
+    /// <summary>
+    /// Barmen work the bar, doormen the door; staff and admins do everything. All of them can check a card;
+    /// only staff and admins look up members' details and history.
+    /// </summary>
     public static bool Can(OrgRole role, StaffTask task) => task switch
     {
         StaffTask.Bar => role is OrgRole.Barman or OrgRole.Staff or OrgRole.Admin,
         StaffTask.Door => role is OrgRole.Doorman or OrgRole.Staff or OrgRole.Admin,
         StaffTask.CashTopUp => role is OrgRole.Staff or OrgRole.Admin,
         StaffTask.CheckCard => role is not OrgRole.Member,
+        StaffTask.MemberInfo => role is OrgRole.Staff or OrgRole.Admin,
         _ => false,
     };
 
@@ -51,6 +55,10 @@ public class User
     /// <summary>Free text, as people say it: "2nd bachelor", "Master 1".</summary>
     public string? StudyYear { get; set; }
     public DateTime? ProfileUpdatedAt { get; set; }
+
+    /// <summary>When they agreed to the terms of service and privacy policy, and which version (see <see cref="Services.Legal"/>).</summary>
+    public DateTime? TermsAcceptedAt { get; set; }
+    public string? TermsVersion { get; set; }
 }
 
 public class Organisation
@@ -119,6 +127,23 @@ public class Membership
     public bool IsActive(DateTime now) => ExpiresAt is null || ExpiresAt > now;
 }
 
+/// <summary>
+/// One stretch on one membership type: the history behind <see cref="Membership"/>, which only holds the current one.
+/// A new row each time someone joins (again, say the next academic year) or moves to another type.
+/// </summary>
+public class MembershipPeriod
+{
+    public Guid Id { get; set; }
+    public Guid UserId { get; set; }
+    /// <summary>No foreign key: the history stays when a membership type is deleted later.</summary>
+    public Guid TierId { get; set; }
+    /// <summary>The type's name back then, so renaming "2025-2026" to "2026-2027" does not rewrite history.</summary>
+    public required string TierName { get; set; }
+    public DateTime StartedAt { get; set; }
+    /// <summary>When it stopped or will stop. Null: it never ends.</summary>
+    public DateTime? EndsAt { get; set; }
+}
+
 public class Wallet
 {
     public Guid Id { get; set; }
@@ -156,7 +181,7 @@ public class WalletTransaction
 public class NfcCard
 {
     public Guid Id { get; set; }
-    /// <summary>The number printed on the card, 1, 2, 3… within the organisation; shown as 0042.</summary>
+    /// <summary>The card's number, 1, 2, 3… within the organisation. Not printed on it, and never used to find it.</summary>
     public int Number { get; set; }
     /// <summary>The code in the card's link and printed QR; see <see cref="Services.CardCodes"/>.</summary>
     public string? Code { get; set; }

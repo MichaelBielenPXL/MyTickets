@@ -1714,6 +1714,74 @@ input[type='checkbox']:focus-visible {
 .join-heading h1 {
   margin: 2px 0 4px;
 }
+.membership-history {
+  margin-top: 1.2rem;
+}
+.membership-history h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+.membership-periods {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.membership-periods li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 16px;
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+}
+.membership-periods li:first-child {
+  border-top: 0;
+}
+.membership-periods-name {
+  font-weight: 600;
+}
+.member-list,
+.member-info-results {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.member-list .list-item,
+.member-info-results .list-item {
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+.member-list-email {
+  display: block;
+  font-size: 0.88rem;
+}
+.member-page .panel {
+  margin-top: 1rem;
+}
+.member-page h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+.member-page-extra-card {
+  align-self: flex-start;
+}
+.auth-terms {
+  align-items: flex-start;
+  font-size: 0.9rem;
+}
+.auth-terms input {
+  margin-top: 3px;
+}
+.legal-page {
+  max-width: 720px;
+}
+.legal-page h2 {
+  font-size: 1.15rem;
+  margin-bottom: 0.4rem;
+}
+.legal-page li + li {
+  margin-top: 0.3rem;
+}
 .step {
   margin: 0;
   color: var(--muted);
@@ -2400,21 +2468,6 @@ main.staff.till-mode {
 .charge-prompt .charge-problem {
   max-width: 360px;
   color: #fca5a5;
-}
-.charge-typed {
-  display: flex;
-  gap: 8px;
-  width: min(360px, 100%);
-}
-.charge-typed input {
-  flex: 1;
-  min-width: 0;
-  min-height: 44px;
-  padding: 8px 12px;
-  border: 1px solid #3f3f46;
-  border-radius: 10px;
-  background: #17171a;
-  color: #f5f5f5;
 }
 .charge-screen .till-ghost {
   color: #f5f5f5;
@@ -4420,12 +4473,14 @@ a.member-card-balance:hover {
   font-size: 7.5pt;
   opacity: 0.85;
 }
-.card-face-number {
-  margin-top: 2mm;
-  font-size: 17pt;
-  font-weight: 700;
+/* Small and faint in the corner: for telling cards apart, not something to read out. */
+.card-face > .card-face-number {
+  position: absolute;
+  right: 5mm;
+  bottom: 2.5mm;
+  font-size: 10pt;
   font-variant-numeric: tabular-nums;
-  letter-spacing: 0.05em;
+  opacity: 0.55;
 }
 .card-face-qr {
   flex: none;

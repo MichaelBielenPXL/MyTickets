@@ -14,7 +14,7 @@ namespace MyTickets.Api.Endpoints;
 /// </summary>
 public static class AuthEndpoints
 {
-    public record RegisterRequest(string? Email, string? Password, string? DisplayName, string? OrganisationName, string? JoinOrganisationSlug);
+    public record RegisterRequest(string? Email, string? Password, string? DisplayName, string? OrganisationName, string? JoinOrganisationSlug, bool? AcceptTerms);
     public record LoginRequest(string? Email, string? Password, string? OrganisationSlug);
     public record LogoutRequest(string? OrganisationSlug);
 
@@ -39,6 +39,8 @@ public static class AuthEndpoints
             if (organiserSignUp && name.Length is < 2 or > 80) return Http.Error(400, "Enter your name.");
             if (name.Length > 80) return Http.Error(400, "Your name is too long.");
             if ((req.Password?.Length ?? 0) < 8) return Http.Error(400, "Choose a password of at least 8 characters.");
+            if (req.AcceptTerms != true) return Http.Error(400, Legal.NotAccepted);
+            var now = clock.GetUtcNow().UtcDateTime;
 
             // Signing up from an organisation's page: a member account in that organisation, and nothing else.
             if (!string.IsNullOrWhiteSpace(req.JoinOrganisationSlug))
@@ -54,7 +56,7 @@ public static class AuthEndpoints
                 var user = new User
                 {
                     Id = Guid.NewGuid(), Email = email, DisplayName = name.Length > 0 ? name : email.Split('@')[0],
-                    CreatedAt = clock.GetUtcNow().UtcDateTime,
+                    CreatedAt = now, TermsAcceptedAt = now, TermsVersion = Legal.TermsVersion,
                 };
                 user.PasswordHash = hasher.HashPassword(user, req.Password!);
                 db.Users.Add(user);
@@ -81,6 +83,8 @@ public static class AuthEndpoints
                 return Http.Error(409, "There is already an organiser account with this email address. Sign in to add another organisation.");
 
             var owner = OrganisationProvisioner.NewOwner(email, name, req.Password!, clock);
+            owner.TermsAcceptedAt = now;
+            owner.TermsVersion = Legal.TermsVersion;
             try
             {
                 var (created, adminUserId) = await provisioner.CreateAsync(owner, ownerIsNew: true, orgName, slug, description: "");

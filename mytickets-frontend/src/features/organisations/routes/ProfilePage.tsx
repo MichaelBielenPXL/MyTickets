@@ -4,6 +4,7 @@ import { ErrorNote, Loading } from '@/components'
 import { t } from '@/lib/i18n'
 
 import { useMyProfile, useSaveProfile } from '../api/organisations'
+import { MembershipHistory } from '../components/MembershipHistory'
 import { ProfileFormFields } from '../components/ProfileFormFields'
 
 /** "My details": what the person told this organisation, to keep up to date. */
@@ -40,6 +41,7 @@ export function ProfilePage() {
           </p>
         )}
       </div>
+      <MembershipHistory slug={slug} />
     </main>
   )
 }

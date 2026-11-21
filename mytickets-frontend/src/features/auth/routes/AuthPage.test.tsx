@@ -37,12 +37,14 @@ describe('AuthPage', () => {
     await user.type(screen.getByLabelText(/Your name/), 'Gijs Guest')
     await user.type(screen.getByLabelText('Email'), 'gijs@example.com')
     await user.type(screen.getByLabelText(/Password/), 'correct horse')
+    await user.click(screen.getByRole('checkbox', { name: /I agree to the terms of service/ }))
     await user.click(screen.getByRole('button', { name: 'Create account' }))
 
     await vi.waitFor(() =>
       expect(sent).toEqual({
         email: 'gijs@example.com',
         password: 'correct horse',
+        acceptTerms: true,
         displayName: 'Gijs Guest',
         organisationName: 'Moonlight Society',
       }),
@@ -91,12 +93,18 @@ describe('AuthPage', () => {
     // No name asked here: that comes with the other details, after choosing a membership.
     expect(screen.queryByLabelText(/Your name/)).not.toBeInTheDocument()
     await user.type(screen.getByLabelText(/Password/), 'correct horse')
+    // Without agreeing to the terms the form does not go anywhere.
+    await user.click(screen.getByRole('button', { name: 'Create account' }))
+    expect(sent).toBeUndefined()
+    expect(screen.getByRole('link', { name: 'privacy policy' })).toHaveAttribute('href', '/privacy')
+    await user.click(screen.getByRole('checkbox', { name: /I agree to the terms of service/ }))
     await user.click(screen.getByRole('button', { name: 'Create account' }))
 
     await vi.waitFor(() =>
       expect(sent).toEqual({
         email: 'gijs@example.com',
         password: 'correct horse',
+        acceptTerms: true,
         joinOrganisationSlug: 'night-owls',
       }),
     )

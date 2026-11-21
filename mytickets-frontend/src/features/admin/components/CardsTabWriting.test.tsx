@@ -12,7 +12,7 @@ vi.mock('@/lib/nfc', () => ({ nfcSupported: true, writeCard: vi.fn() }))
 
 const unwritten = {
   id: 'c7',
-  number: '0007',
+  number: '7',
   code: 'ABCDEFGHJK',
   url: 'https://tickets.test/c/ABCDEFGHJK',
   uid: null,
@@ -40,10 +40,10 @@ describe('CardsTab on a phone that writes cards', () => {
     vi.mocked(writeCard).mockResolvedValue({ serialNumber: '04:a2:b9:1c' })
     const { user } = renderApp(<CardsTab slug="night-owls" />)
 
-    const row = (await screen.findByText('0007')).closest('li')!
+    const row = (await screen.findByText('7')).closest('li')!
     await user.click(await within(row).findByRole('button', { name: 'Write to chip' }))
 
-    expect(await screen.findByRole('status')).toHaveTextContent('Card 0007 is written.')
+    expect(await screen.findByRole('status')).toHaveTextContent('Card 7 is written.')
     expect(writeCard).toHaveBeenCalledWith('https://tickets.test/c/ABCDEFGHJK', expect.anything())
     expect(reports).toEqual([{ uid: '04:a2:b9:1c', locked: true }])
   })

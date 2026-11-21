@@ -6,12 +6,16 @@ import { server } from '@/test/server'
 
 import { BarMode } from './BarMode'
 
-// The camera is not there in tests: the stand-in "scans" the member code shown in the app.
+// The camera is not there in tests: the stand-in "scans" what `camera.shows`, at first the member code in the app.
+const camera = vi.hoisted(() => ({ shows: '' }))
 vi.mock('@/components/QrScanner', () => ({
   QrScanner: ({ onScan }: { onScan: (code: string) => void }) => (
-    <button onClick={() => onScan('MTABCD2345WXYZ')}>Fake camera</button>
+    <button onClick={() => onScan(camera.shows)}>Fake camera</button>
   ),
 }))
+beforeEach(() => {
+  camera.shows = 'MTABCD2345WXYZ'
+})
 
 const beers = { id: 'beers', name: 'Beers' }
 const softs = { id: 'softs', name: 'Soft drinks' }
@@ -68,13 +72,16 @@ const ticket = () => within(screen.getByRole('complementary', { name: 'Order' })
 
 async function payWith(user: User, uid = '04A2B91C5E8F80') {
   await user.click(ticket().getByRole('button', { name: /^(Charge|Give back)/ }))
-  await typeCard(user, uid)
+  await scanCard(user, uid)
 }
 
-async function typeCard(user: User, uid: string) {
+/** Cards are never typed in: without a card reader (as in tests) staff scan the QR code printed on the card. */
+async function scanCard(user: User, uid: string) {
+  camera.shows = `https://cards.example/c?uid=${uid}`
   const screenStep = within(screen.getByRole('dialog', { name: 'Tap card' }))
-  await user.type(screenStep.getByLabelText('Card number'), uid)
-  await user.click(screenStep.getByRole('button', { name: 'Use' }))
+  const scanButton = screenStep.queryByRole('button', { name: 'Scan QR code' })
+  if (scanButton) await user.click(scanButton)
+  await user.click(await screenStep.findByRole('button', { name: 'Fake camera' }))
 }
 
 function answerSales(answer: (sale: Sale, count: number) => Response) {
@@ -192,7 +199,7 @@ describe('BarMode', () => {
     expect(await screen.findByRole('status')).toHaveTextContent('Not enough tokens')
 
     await user.click(screen.getByRole('button', { name: 'Try another card' }))
-    await typeCard(user, '04FFFFFFFFFF80')
+    await scanCard(user, '04FFFFFFFFFF80')
     expect(await screen.findByText(/Paid/)).toBeInTheDocument()
     expect(sales[1].requestId).toBe(sales[0].requestId)
   })
@@ -234,7 +241,7 @@ describe('BarMode', () => {
 
     await user.click(screen.getByRole('button', { name: /^Beer/ }))
     await user.click(ticket().getByRole('button', { name: 'Check tokens' }))
-    await typeCard(user, '04A2B91C5E8F80')
+    await scanCard(user, '04A2B91C5E8F80')
 
     const result = await screen.findByRole('status')
     expect(result).toHaveTextContent('€ 10,40')

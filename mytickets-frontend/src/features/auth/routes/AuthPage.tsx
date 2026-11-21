@@ -7,7 +7,7 @@ import {
   useOrganisationSlugAvailability,
   usePublicOrganisation,
 } from '@/features/organisations'
-import { t } from '@/lib/i18n'
+import { Trans, t } from '@/lib/i18n'
 
 import { useSignIn } from '../api/auth'
 import { ContinueWithEmail } from '../components/ContinueWithEmail'
@@ -23,6 +23,7 @@ export function AuthPage({ mode }: AuthPageProps) {
   const [typedEmail, setTypedEmail] = useState('')
   const [password, setPassword] = useState('')
   const [displayName, setDisplayName] = useState('')
+  const [acceptTerms, setAcceptTerms] = useState(false)
   const [organisationName, setOrganisationName] = useState('')
   const [checkedOrganisationName, setCheckedOrganisationName] = useState('')
   const { slug = '' } = useParams()
@@ -62,6 +63,7 @@ export function AuthPage({ mode }: AuthPageProps) {
       {
         email,
         password,
+        ...(registering ? { acceptTerms } : {}),
         // Members give their name with their other details, after choosing a membership.
         ...(registering && !slug ? { displayName } : {}),
         // Signing in on an organisation's page means the account at that organisation.
@@ -196,6 +198,34 @@ export function AuthPage({ mode }: AuthPageProps) {
             required
           />
         </Field>
+        {registering && (
+          <label className="check auth-terms">
+            <input
+              type="checkbox"
+              checked={acceptTerms}
+              onChange={(e) => setAcceptTerms(e.target.checked)}
+              required
+            />
+            <span>
+              {/* In a new tab, so reading them does not lose what was typed here. */}
+              <Trans
+                text="I agree to the {terms} and the {privacy}."
+                values={{
+                  terms: (
+                    <Link to="/terms" target="_blank" rel="noreferrer">
+                      {t('terms of service')}
+                    </Link>
+                  ),
+                  privacy: (
+                    <Link to="/privacy" target="_blank" rel="noreferrer">
+                      {t('privacy policy')}
+                    </Link>
+                  ),
+                }}
+              />
+            </span>
+          </label>
+        )}
         <ErrorNote error={signIn.error} />
         <button className="btn primary" disabled={signIn.isPending || (checkingName && !nameIsAvailable)}>
           {registering ? t('Create account') : t('Sign in')}

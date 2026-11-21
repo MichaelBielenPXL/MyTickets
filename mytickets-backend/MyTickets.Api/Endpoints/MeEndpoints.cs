@@ -33,6 +33,10 @@ public static class MeEndpoints
             return Results.Ok(new { Profile = ProfileFields.Of(user), Complete = true });
         });
 
+        // Every membership they have had here, newest first: the years they were a member, and as what.
+        group.MapGet("/memberships", async (HttpContext http, AppDbContext db, TimeProvider clock) =>
+            Results.Ok(await MembershipService.HistoryAsync(db, http.User.UserId(), clock.GetUtcNow().UtcDateTime)));
+
         group.MapGet("/tickets", async (HttpContext http, AppDbContext db) =>
         {
             var userId = http.User.UserId();

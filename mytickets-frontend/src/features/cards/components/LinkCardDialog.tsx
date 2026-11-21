@@ -15,7 +15,7 @@ type LinkCardDialogProps = {
 }
 
 /**
- * "Link card 0042 to your wallet?", asked after someone taps a card nobody has claimed yet (or scans its QR).
+ * "Link card 42 to your wallet?", asked after someone taps a card nobody has claimed yet (or scans its QR).
  * Someone without a membership is sent to join first; the card is remembered so they come back to it.
  */
 export function LinkCardDialog({ slug, code, onDone }: LinkCardDialogProps) {

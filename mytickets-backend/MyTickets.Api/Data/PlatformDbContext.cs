@@ -34,6 +34,9 @@ public class OwnerAccount
     public required string DisplayName { get; set; }
     public string PasswordHash { get; set; } = "";
     public DateTime CreatedAt { get; set; }
+    /// <summary>When they agreed to the terms of service and privacy policy, and which version (see <see cref="Services.Legal"/>).</summary>
+    public DateTime? TermsAcceptedAt { get; set; }
+    public string? TermsVersion { get; set; }
 }
 
 /// <summary>Says which organisations an owner created, and which account inside each one is theirs.</summary>

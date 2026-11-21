@@ -39,6 +39,8 @@ export interface Credentials {
   joinOrganisationSlug?: string
   /** Set when signing in on an organisation's page: the account at that organisation. */
   organisationSlug?: string
+  /** Creating an account: agreed to the terms of service and privacy policy. Required by the server. */
+  acceptTerms?: boolean
 }
 
 export interface AuthResult {

@@ -75,6 +75,29 @@ export interface ProfileValues {
   studyYear: string | null
 }
 
+/** What a member told the organisation when choosing a membership. Missing when not asked or not given. */
+export interface MemberDetails {
+  firstName: string | null
+  lastName: string | null
+  phone: string | null
+  street: string | null
+  postalCode: string | null
+  city: string | null
+  school: string | null
+  faculty: string | null
+  studyYear: string | null
+}
+
+/** One stretch on one membership type, from the person's membership history. */
+export interface MembershipPeriod {
+  id: string
+  tierName: string
+  startedAt: string
+  /** When it stopped or will stop; null when it never ends. */
+  endsAt: string | null
+  current: boolean
+}
+
 export interface ProfileForm {
   fields: Record<ProfileFieldName, FieldMode>
   profile: ProfileValues
