@@ -40,7 +40,13 @@ builder.Services.AddScoped<AppCache>();
 builder.Services.AddScoped<WalletService>();
 builder.Services.AddScoped<MembershipService>();
 builder.Services.AddScoped<PaymentService>();
+builder.Services.AddScoped<SettlementService>();
 builder.Services.AddScoped<OutboxDispatcher>();
+builder.Services.AddScoped<OverviewService>();
+builder.Services.AddScoped<JoinService>();
+builder.Services.AddScoped<TicketOrderService>();
+builder.Services.AddScoped<TillService>();
+builder.Services.AddScoped<DoorService>();
 builder.Services.AddSingleton<AppleWalletPasses>();
 builder.Services.AddSingleton<GoogleWalletPasses>();
 builder.Services.AddHostedService<PaymentExpiryWorker>();
@@ -122,10 +128,17 @@ using (var scope = app.Services.CreateScope())
 
 if (behindProxy) app.UseForwardedHeaders();
 
-// A payment that can't be started is the buyer's business to know about, not an error page.
+// What can't be done is the person's business to know about, not an error page: a refusal from a service, or a
+// payment that can't be started.
 app.Use(async (http, next) =>
 {
     try { await next(); }
+    catch (AppProblem e) when (!http.Response.HasStarted)
+    {
+        var body = new Dictionary<string, object?>(e.Details) { ["error"] = e.Message };
+        if (e.Code is not null) body["code"] = e.Code;
+        await Results.Json(body, statusCode: e.Status).ExecuteAsync(http);
+    }
     catch (PaymentsNotSetUpException e) when (!http.Response.HasStarted)
     {
         await Http.Error(409, e.Message).ExecuteAsync(http);

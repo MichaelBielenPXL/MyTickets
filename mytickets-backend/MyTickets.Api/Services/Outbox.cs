@@ -10,7 +10,7 @@ namespace MyTickets.Api.Services;
 /// </summary>
 public static class OutboxEvents
 {
-    /// <summary>A payment was paid. Handled by passing the organisation its money (see <see cref="PaymentService.SettleAsync"/>).</summary>
+    /// <summary>A payment was paid. Handled by passing the organisation its money (see <see cref="SettlementService.SettleAsync"/>).</summary>
     public const string PaymentCompleted = "PaymentCompleted";
 
     public record PaymentCompletedData(Guid PaymentId);
@@ -86,8 +86,7 @@ public class OutboxDispatcher(AppDbContext db, IServiceProvider services, TimePr
         {
             case OutboxEvents.PaymentCompleted:
                 var data = JsonSerializer.Deserialize<OutboxEvents.PaymentCompletedData>(message.Data)!;
-                var payments = services.GetRequiredService<PaymentService>();
-                return await payments.SettleAsync(data.PaymentId);
+                return await services.GetRequiredService<SettlementService>().SettleAsync(data.PaymentId);
             default:
                 throw new InvalidOperationException($"No handler for outbox event \"{message.Type}\".");
         }

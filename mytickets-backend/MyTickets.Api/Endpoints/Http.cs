@@ -55,8 +55,6 @@ public static class Http
 
     public static DateTime? Utc(DateTime? value) => value is { } v ? Utc(v) : null;
 
-    public static int Discounted(int priceCents, int percent) => (priceCents * (100 - percent) + 50) / 100;
-
     /// <summary>Card serial numbers arrive as "04:a2:1b:..." from phones or typed by hand; store one canonical form.</summary>
     public static string? NormaliseCardUid(string? raw)
     {

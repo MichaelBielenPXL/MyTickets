@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { locale, t } from '@/lib/i18n'
 import { money, tokenPrice } from '@/utils/format'
 
-import type { Summary } from '../types'
+import type { Summary } from '../../types'
 
 type TakingsChartProps = {
   byPeriod: Summary['byPeriod']

@@ -70,7 +70,7 @@ public static class AuthEndpoints
             }
 
             // Signing up from the front page: an owner login and their first organisation, together or not at all.
-            if (!OrgEndpoints.MayCreateOrganisation(config, email))
+            if (!OrganisationProvisioner.MayCreate(config, email))
                 return Http.Error(403, "You are not allowed to create organisations.");
             var orgName = req.OrganisationName?.Trim() ?? "";
             if (orgName.Length is < 2 or > 80) return Http.Error(400, "Give the organisation a name of 2 to 80 characters.");
@@ -181,7 +181,7 @@ public static class AuthEndpoints
                 IsOwner = owner is not null,
                 Memberships = memberships.OrderBy(m => m.Name),
                 // Only an owner login can add organisations; everyone else starts with organiser sign-up.
-                CanCreateOrganisations = owner is not null && OrgEndpoints.MayCreateOrganisation(config, owner.Email),
+                CanCreateOrganisations = owner is not null && OrganisationProvisioner.MayCreate(config, owner.Email),
             });
         });
     }

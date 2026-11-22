@@ -355,6 +355,10 @@ public class FlowTests : IClassFixture<TestApp>
         Assert.Equal("Guest Tester", checkedIn.Str("name"));
         var again = await org.Admin.PostAsJsonAsync($"{org.Url}/staff/checkin", new { eventId, cardUid = card });
         Assert.Equal(HttpStatusCode.Conflict, again.StatusCode);
+        // The door shows who it was and when they came in.
+        var body = JsonNode.Parse(await again.Content.ReadAsStringAsync())!;
+        Assert.Equal(("Already checked in.", "Guest Tester"), (body.Str("error"), body.Str("name")));
+        Assert.NotNull(body["checkedInAt"]);
     }
 
     [Fact]

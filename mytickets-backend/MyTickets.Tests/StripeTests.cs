@@ -280,7 +280,7 @@ public class StripeTests : IClassFixture<StripeTestApp>
         Assert.Equal(503, summary["payout"]!.Int("payoutFeeCents"));
         Assert.Equal(253, summary["bankPayouts"]!.Int("bufferCents"));
         var payouts = summary["bankPayouts"]!["payouts"]!.AsArray();
-        Assert.Equal([(2_000, 15, 0), (10_000, 35, 200)], payouts.Select(p => (p!.Int("amountCents"), p.Int("feeCents"), p.Int("accountFeeCents"))));
+        Assert.Equal([(2_000, 15, 0), (10_000, 35, 200)], payouts.Select(p => (p!.Int("amountCents"), p!.Int("feeCents"), p!.Int("accountFeeCents"))));
         Assert.Equal(250, summary["bankPayouts"]!.Int("feeCents"));
         Assert.Equal(0, summary["bankPayouts"]!.Int("owedCents"));
     }
@@ -288,27 +288,27 @@ public class StripeTests : IClassFixture<StripeTestApp>
     [Fact]
     public void Stripe_s_payout_fee_is_a_quarter_percent_rounded_up_plus_ten_cents_and_more_for_instant_payouts()
     {
-        var rules = new PaymentService.FeeRules(5m, 150, 5, PayoutFeePercent: 0.25m, PayoutFeeFixedCents: 10, InstantPayoutFeePercent: 1m);
-        Assert.Equal(35, PaymentService.PayoutFee(10_000, rules));
+        var rules = new FeeRules(5m, 150, 5, PayoutFeePercent: 0.25m, PayoutFeeFixedCents: 10, InstantPayoutFeePercent: 1m);
+        Assert.Equal(35, Fees.PayoutFee(10_000, rules));
         // Never rounded in the platform's disadvantage: €12.34 is €0.03085, so €0.04.
-        Assert.Equal(14, PaymentService.PayoutFee(1_234, rules));
-        Assert.Equal(12, PaymentService.PayoutFee(600, rules));
+        Assert.Equal(14, Fees.PayoutFee(1_234, rules));
+        Assert.Equal(12, Fees.PayoutFee(600, rules));
         // Instant: 1% on top of the standard fee, the most Stripe could charge for it.
-        Assert.Equal(135, PaymentService.PayoutFee(10_000, rules, instant: true));
+        Assert.Equal(135, Fees.PayoutFee(10_000, rules, instant: true));
     }
 
     [Fact]
     public void Payout_costs_are_set_aside_before_the_money_goes_out_and_the_buffer_tops_itself_up()
     {
-        var rules = new PaymentService.FeeRules(5m, 150, 5, PayoutFeePercent: 0.25m, PayoutFeeFixedCents: 10, PayoutBufferCents: 250);
+        var rules = new FeeRules(5m, 150, 5, PayoutFeePercent: 0.25m, PayoutFeeFixedCents: 10, PayoutBufferCents: 250);
         // A first €100: 0.25% (€0.25) and the whole €2.50 buffer.
-        Assert.Equal(275, PaymentService.PayoutCostsToSetAside(10_000, 0, rules));
+        Assert.Equal(275, Fees.PayoutCostsToSetAside(10_000, 0, rules));
         // Buffer full: only the 0.25%.
-        Assert.Equal(25, PaymentService.PayoutCostsToSetAside(10_000, 250, rules));
+        Assert.Equal(25, Fees.PayoutCostsToSetAside(10_000, 250, rules));
         // A payout used €2.35 of the buffer: that comes back first.
-        Assert.Equal(260, PaymentService.PayoutCostsToSetAside(10_000, 15, rules));
+        Assert.Equal(260, Fees.PayoutCostsToSetAside(10_000, 15, rules));
         // Never more than there is.
-        Assert.Equal(40, PaymentService.PayoutCostsToSetAside(40, -213, rules));
+        Assert.Equal(40, Fees.PayoutCostsToSetAside(40, -213, rules));
     }
 
     private async Task<int> RecordPayoutsAsync(string slug)
@@ -317,7 +317,7 @@ public class StripeTests : IClassFixture<StripeTestApp>
         using (var lookup = _app.Services.CreateScope())
             organisation = (await lookup.ServiceProvider.GetRequiredService<AppCache>().OrganisationBySlugAsync(slug))!;
         await using var scope = await _app.Services.GetRequiredService<TenantScopes>().OpenAsync(organisation);
-        return await scope.ServiceProvider.GetRequiredService<PaymentService>().RecordPayoutsAsync();
+        return await scope.ServiceProvider.GetRequiredService<SettlementService>().RecordPayoutsAsync();
     }
 
     [Fact]
@@ -481,10 +481,10 @@ public class StripeTests : IClassFixture<StripeTestApp>
 
 public class PlatformFeeTests
 {
-    private static readonly PaymentService.FeeRules Rules = new(PercentPerItem: 5m, MaxCentsPerItem: 150, MinimumMarginCents: 5);
+    private static readonly FeeRules Rules = new(PercentPerItem: 5m, MaxCentsPerItem: 150, MinimumMarginCents: 5);
 
     private static int Fee(int stripeFeeCents, params int[] ticketPrices) =>
-        PaymentService.PlatformFee(ticketPrices, ticketPrices.Sum(), stripeFeeCents, Rules);
+        Fees.PlatformFee(ticketPrices, ticketPrices.Sum(), stripeFeeCents, Rules);
 
     [Theory]
     [InlineData(2000, 55, 100)]  // 5% of €20 = €1.00; Stripe €0.55: the organisation keeps 95%

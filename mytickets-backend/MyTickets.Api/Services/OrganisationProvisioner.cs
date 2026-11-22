@@ -11,6 +11,13 @@ public class SlugTakenException() : Exception("This organisation page address is
 public class OrganisationProvisioner(PlatformDbContext platform, TenantDatabases databases, TenantScopes scopes,
     AppCache cache, TimeProvider clock, ILogger<OrganisationProvisioner> log)
 {
+    /// <summary>Anyone may create an organisation unless Organisations:CreatorEmails lists who may.</summary>
+    public static bool MayCreate(IConfiguration config, string email)
+    {
+        var allowed = config.GetSection("Organisations:CreatorEmails").Get<string[]>() ?? [];
+        return allowed.Length == 0 || allowed.Contains(email, StringComparer.OrdinalIgnoreCase);
+    }
+
     /// <summary>
     /// The owner is saved together with the organisation when they are new (first sign-up), so a refused
     /// organisation name never leaves an owner account behind. Throws <see cref="SlugTakenException"/>
