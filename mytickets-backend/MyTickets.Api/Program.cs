@@ -40,6 +40,7 @@ builder.Services.AddScoped<AppCache>();
 builder.Services.AddScoped<WalletService>();
 builder.Services.AddScoped<MembershipService>();
 builder.Services.AddScoped<PaymentService>();
+builder.Services.AddScoped<OutboxDispatcher>();
 builder.Services.AddSingleton<AppleWalletPasses>();
 builder.Services.AddSingleton<GoogleWalletPasses>();
 builder.Services.AddHostedService<PaymentExpiryWorker>();

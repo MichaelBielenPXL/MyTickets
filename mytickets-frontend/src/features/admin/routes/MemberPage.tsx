@@ -79,9 +79,14 @@ function MembershipPanel({ slug, info, isAdmin }: { slug: string; info: MemberIn
   )
 }
 
-/** Admins only: the membership type, the role, and one extra card for someone who lost theirs. */
+/**
+ * Admins only: the membership type, the role, and one extra card for someone who lost theirs. Another type
+ * runs until that type's end date (the server sets it), as if they had joined it.
+ */
 function MembershipControls({ slug, info }: { slug: string; info: MemberInfo }) {
   const tiers = useAdminTiers(slug).data ?? []
+  // "2026-11-22" on this device's clock, to compare with the types' end dates.
+  const today = new Date().toLocaleDateString('sv-SE')
   const update = useUpdateMember(slug)
   const extraCard = useAllowExtraCard(slug)
   const change = (changes: { role?: Role; tierId?: string }) =>
@@ -102,11 +107,15 @@ function MembershipControls({ slug, info }: { slug: string; info: MemberInfo }) 
             onChange={(e) => change({ tierId: e.target.value })}
             disabled={update.isPending}
           >
-            {tiers.map((tier) => (
-              <option key={tier.id} value={tier.id}>
-                {tier.name}
-              </option>
-            ))}
+            {tiers.map((tier) => {
+              // A type whose end date has passed can't be given out until it gets a new one.
+              const ended = tier.endsOn !== null && tier.endsOn < today && tier.id !== info.tierId
+              return (
+                <option key={tier.id} value={tier.id} disabled={ended}>
+                  {ended ? t('{name} (ended)', { name: tier.name }) : tier.name}
+                </option>
+              )
+            })}
           </select>
         </Field>
         <Field label={t('Role')}>

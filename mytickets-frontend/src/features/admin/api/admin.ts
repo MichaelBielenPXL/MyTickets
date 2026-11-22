@@ -24,6 +24,7 @@ import type {
   OrganisationSettings,
   OrganisationSettingsInput,
   PayoutSetup,
+  Period,
   Product,
   ProductInput,
   StoredImage,
@@ -38,7 +39,8 @@ export const adminKeys = {
   payouts: (slug: string) => ['admin', slug, 'payouts'] as const,
   requests: (slug: string) => ['admin', slug, 'requests'] as const,
   memberFields: (slug: string) => ['admin', slug, 'member-fields'] as const,
-  summary: (slug: string) => ['admin', slug, 'summary'] as const,
+  summary: (slug: string, period: Period = {}) =>
+    ['admin', slug, 'summary', period.from ?? '', period.to ?? ''] as const,
   tiers: (slug: string) => ['admin', slug, 'tiers'] as const,
   members: (slug: string) => ['admin', slug, 'members'] as const,
   events: (slug: string) => ['admin', slug, 'events'] as const,
@@ -59,10 +61,15 @@ export function useOrganisationSettings(slug: string) {
   })
 }
 
-export function useSummary(slug: string) {
+export function useSummary(slug: string, period: Period = {}) {
+  const query = new URLSearchParams(
+    Object.entries(period).filter(([, v]) => v) as [string, string][],
+  ).toString()
   return useQuery({
-    queryKey: adminKeys.summary(slug),
-    queryFn: () => api.get<Summary>(`${base(slug)}/summary`),
+    queryKey: adminKeys.summary(slug, period),
+    queryFn: () => api.get<Summary>(`${base(slug)}/summary${query ? `?${query}` : ''}`),
+    // Keeps the last figures up while another period loads.
+    placeholderData: (previous) => previous,
   })
 }
 

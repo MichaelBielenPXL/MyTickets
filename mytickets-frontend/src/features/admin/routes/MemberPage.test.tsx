@@ -52,13 +52,25 @@ const gijs = {
 }
 
 function serve(role: string) {
-  const sent: { profile: unknown[]; extraCard: unknown[] } = { profile: [], extraCard: [] }
+  const sent: { profile: unknown[]; extraCard: unknown[]; member: unknown[] } = {
+    profile: [],
+    extraCard: [],
+    member: [],
+  }
   server.use(
     http.get(apiUrl('/auth/me'), () => HttpResponse.json(aMe({ memberships: [aMembership({ role })] }))),
     http.get(apiUrl('/orgs/night-owls/staff/members/m1'), () => HttpResponse.json(gijs)),
     http.get(apiUrl('/orgs/night-owls/admin/tiers'), () =>
-      HttpResponse.json([{ id: 'tier-free', name: 'Member 2026-2027' }]),
+      HttpResponse.json([
+        { id: 'tier-free', name: 'Member 2026-2027', endsOn: null },
+        { id: 'tier-old', name: 'Season 2024', endsOn: '2024-06-30' },
+        { id: 'tier-board', name: 'Board', endsOn: '2099-06-30' },
+      ]),
     ),
+    http.put(apiUrl('/orgs/night-owls/admin/members/m1'), async ({ request }) => {
+      sent.member.push(await request.json())
+      return new HttpResponse(null, { status: 204 })
+    }),
     http.put(apiUrl('/orgs/night-owls/admin/members/m1/profile'), async ({ request }) => {
       sent.profile.push(await request.json())
       return new HttpResponse(null, { status: 204 })
@@ -92,6 +104,17 @@ describe('MemberPage', () => {
 
     expect(screen.getByText('Card 7')).toBeInTheDocument()
     expect(screen.getByText('Member 2025-2026')).toBeInTheDocument()
+  })
+
+  it('assigns another membership type, but not one that has ended', async () => {
+    const sent = serve('Admin')
+    const { user } = renderPage()
+
+    const type = await screen.findByRole('combobox', { name: 'Membership type' })
+    expect(await within(type).findByRole('option', { name: 'Season 2024 (ended)' })).toBeDisabled()
+    await user.selectOptions(type, 'Board')
+
+    await vi.waitFor(() => expect(sent.member).toMatchObject([{ tierId: 'tier-board', role: 'Member' }]))
   })
 
   it('shows staff the same page without anything to change', async () => {

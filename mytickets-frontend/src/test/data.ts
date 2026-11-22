@@ -118,3 +118,107 @@ export function aMembership(overrides: object = {}) {
     ...overrides,
   }
 }
+
+/**
+ * Manage › Overview for one period. A €25 membership and a €12.50 top-up paid online; the first carried this
+ * month's €2 payout-account fee. One €10 top-up in cash. Override what the test is about.
+ */
+export function aSummary(overrides: object = {}) {
+  return {
+    payout: {
+      paidCents: 3750,
+      feeCents: 187,
+      accountFeeCents: 200,
+      payoutFeeCents: 0,
+      youGetCents: 3363,
+      testCents: 0,
+      monthlyAccountFeeCents: 200,
+    },
+    sources: [
+      {
+        purpose: 'TopUp',
+        count: 1,
+        paidCents: 1250,
+        feeCents: 62,
+        accountFeeCents: 0,
+        payoutFeeCents: 0,
+        netCents: 1188,
+      },
+      {
+        purpose: 'Tickets',
+        count: 0,
+        paidCents: 0,
+        feeCents: 0,
+        accountFeeCents: 0,
+        netCents: 0,
+      },
+      {
+        purpose: 'Membership',
+        count: 1,
+        paidCents: 2500,
+        feeCents: 125,
+        accountFeeCents: 200,
+        payoutFeeCents: 0,
+        netCents: 2175,
+      },
+    ],
+    cash: { count: 1, cents: 1000 },
+    bar: { sales: 12, takingsCents: 34050, depositsOutCents: 400, depositsBackCents: 300 },
+    tokens: {
+      boughtCents: 2250,
+      paidCents: 2250,
+      bonusCents: 0,
+      spentAtBarCents: 34050,
+      spentOnTicketsCents: 0,
+      outstandingCents: 12000,
+      depositsHeldCents: 100,
+    },
+    memberships: { active: 42, joined: 5, byType: [{ name: 'Member', active: 42 }] },
+    tickets: { sold: 3, revenueCents: 3600, checkedIn: 2 },
+    byPeriod: {
+      unit: 'day',
+      points: [
+        { key: '2026-11-21', barCents: 0, barSales: 0, moneyInCents: 0 },
+        { key: '2026-11-22', barCents: 34050, barSales: 12, moneyInCents: 4750 },
+      ],
+    },
+    payments: [
+      {
+        id: 'p2',
+        paidAt: '2026-11-22T20:15:00Z',
+        purpose: 'TopUp',
+        description: 'Top up €12.50',
+        amountCents: 1250,
+        feeCents: 62,
+        accountFeeCents: 0,
+        payoutFeeCents: 0,
+        netCents: 1188,
+        test: false,
+      },
+      {
+        id: 'p1',
+        paidAt: '2026-11-22T19:00:00Z',
+        purpose: 'Membership',
+        description: 'Member membership',
+        amountCents: 2500,
+        feeCents: 125,
+        accountFeeCents: 200,
+        payoutFeeCents: 0,
+        netCents: 2175,
+        test: false,
+      },
+    ],
+    paymentsCount: 2,
+    bankPayouts: {
+      payouts: [
+        { id: 'b1', paidAt: '2026-11-20T06:00:00Z', amountCents: 10000, feeCents: 35, accountFeeCents: 200 },
+      ],
+      amountCents: 10000,
+      feeCents: 235,
+      bufferCents: 15,
+      owedCents: 0,
+      targetBufferCents: 250,
+    },
+    ...overrides,
+  }
+}

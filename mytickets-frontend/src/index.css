@@ -933,6 +933,194 @@ main.admin-shell {
   border-top: 1px solid #ededed;
   font-size: 0.92rem;
 }
+/* ---------- Manage › Overview ---------- */
+.admin-card {
+  margin: 0;
+  padding: 16px 20px;
+  border: 1px solid #e4e4e7;
+  border-radius: 16px;
+  background: #ffffff;
+  min-width: 0;
+}
+.admin-card-title {
+  margin: 0 0 4px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #18181b;
+}
+.admin-card-note {
+  margin: 6px 0 0;
+  color: #71717a;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+.admin-data-row > span {
+  color: #52525b;
+}
+.admin-data-row > strong {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: #18181b;
+}
+.admin-data-row.indent {
+  padding-left: 14px;
+  font-size: 0.86rem;
+}
+.overview-hero {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+.overview-metric dt {
+  color: #52525b;
+  font-size: 0.88rem;
+  font-weight: 500;
+}
+.overview-metric dd {
+  margin-left: 0;
+}
+.overview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+.overview-now {
+  margin: 14px 0 0;
+  color: #71717a;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.admin-table-scroll {
+  margin-top: 10px;
+  overflow-x: auto;
+}
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+  font-variant-numeric: tabular-nums;
+}
+.admin-table th,
+.admin-table td {
+  padding: 9px 10px;
+  border-top: 1px solid #ededed;
+  text-align: right;
+  white-space: nowrap;
+}
+.admin-table th:first-child,
+.admin-table td:first-child {
+  padding-left: 0;
+  text-align: left;
+}
+.admin-table thead th {
+  border-top: 0;
+  color: #71717a;
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+.admin-table tbody th {
+  font-weight: 500;
+}
+.admin-table tfoot th,
+.admin-table tfoot td {
+  border-top: 1px solid #a1a1aa;
+  font-weight: 600;
+}
+.payments-table td:nth-child(2) {
+  max-width: 260px;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+}
+/* One series: the palette's first blue, rounded data-ends, 2px gaps between bars. */
+.takings-chart {
+  --takings-bar: #2a78d6;
+}
+.takings-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 6px 16px;
+}
+.takings-readout {
+  margin: 0;
+  min-height: 1.4em;
+  color: #52525b;
+  font-size: 0.85rem;
+  text-align: right;
+}
+.takings-readout strong {
+  color: #18181b;
+  font-variant-numeric: tabular-nums;
+}
+.takings-plot {
+  position: relative;
+  margin-top: 12px;
+  padding-top: 18px;
+}
+.takings-max {
+  position: absolute;
+  top: 0;
+  left: 0;
+  color: #a1a1aa;
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+}
+.takings-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 160px;
+  border-bottom: 1px solid #d4d4d8;
+  background: repeating-linear-gradient(to top, transparent 0 39px, #f4f4f5 39px 40px);
+}
+.takings-bar {
+  display: flex;
+  flex: 1 1 0;
+  align-items: flex-end;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: default;
+}
+.takings-bar > span {
+  display: block;
+  width: 100%;
+  border-radius: 4px 4px 0 0;
+  background: var(--takings-bar);
+}
+.takings-bar.shown > span,
+.takings-bar:focus-visible > span {
+  background: #1c5fae;
+}
+.takings-bar:focus-visible {
+  outline: 2px solid #1c5fae;
+  outline-offset: 1px;
+}
+.takings-axis {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+  color: #a1a1aa;
+  font-size: 0.72rem;
+}
+.takings-empty {
+  margin: 18px 0 6px;
+}
+.takings-table {
+  margin-top: 12px;
+  font-size: 0.85rem;
+}
+.takings-table summary {
+  color: #52525b;
+  cursor: pointer;
+}
 .admin-outline-link {
   display: inline-flex;
   min-height: 42px;

@@ -344,6 +344,18 @@ public class Payment
     public int? StripeFeeCents { get; set; }
     /// <summary>What the platform kept. Never less than <see cref="StripeFeeCents"/> plus the minimum margin.</summary>
     public int? PlatformFeeCents { get; set; }
+    /// <summary>
+    /// Only on payments settled before payouts were tracked: their share of Stripe's monthly payout-account fee.
+    /// That fee now comes with the month's first payout and is paid back through <see cref="PayoutFeeCents"/>.
+    /// </summary>
+    public int? AccountFeeCents { get; set; }
+    /// <summary>
+    /// Set aside from this payment for Stripe's costs of paying the organisation out (see <see cref="BankPayout"/>):
+    /// the percentage on this money, and topping up the small buffer that pays the fixed costs before Stripe charges them.
+    /// </summary>
+    public int? PayoutFeeCents { get; set; }
+    /// <summary>When the money was passed on to the organisation.</summary>
+    public DateTime? SettledAt { get; set; }
     /// <summary>The transfer of the rest to the organisation. Null until it is done.</summary>
     public string? TransferId { get; set; }
 }
@@ -363,6 +375,28 @@ public class StripeAccount
     public bool PayoutsEnabled { get; set; }
     public bool DetailsSubmitted { get; set; }
     public DateTime CheckedAt { get; set; }
+    /// <summary>
+    /// From when the organisation pays Stripe's fee on its payouts: the first time they were checked. Payouts
+    /// from before were the platform's to pay, as agreed then.
+    /// </summary>
+    public DateTime? PayoutFeesSince { get; set; }
+}
+
+/// <summary>
+/// A payout from the organisation's Stripe account to its bank. Stripe charges the platform a fee for each
+/// (0.25% + €0.10), and €2 for every month with payouts; they are paid from what was set aside from the
+/// organisation's payments for them, before the money went to it.
+/// </summary>
+public class BankPayout
+{
+    public Guid Id { get; set; }
+    /// <summary>Stripe's id for the payout ("po_..."), so each is counted once.</summary>
+    public required string PayoutId { get; set; }
+    public int AmountCents { get; set; }
+    public int FeeCents { get; set; }
+    /// <summary>Stripe's monthly fee for an active payout account, carried by the month's first payout; 0 on the others.</summary>
+    public int AccountFeeCents { get; set; }
+    public DateTime PaidAt { get; set; }
 }
 
 public enum RequestStatus { Pending, Approved, Rejected, Completed }
@@ -380,4 +414,24 @@ public class MembershipRequest
     public DateTime CreatedAt { get; set; }
     public DateTime? DecidedAt { get; set; }
     public Guid? DecidedByUserId { get; set; }
+}
+
+/// <summary>
+/// An event that still has work to do outside this database, such as passing a payment on to the organisation.
+/// Written in the same transaction as the change it is about; worked off by <see cref="Services.OutboxDispatcher"/>.
+/// </summary>
+public class OutboxMessage
+{
+    public Guid Id { get; set; }
+    /// <summary>Which event; see <see cref="Services.OutboxEvents"/>.</summary>
+    public required string Type { get; set; }
+    /// <summary>The event's details, as JSON.</summary>
+    public required string Data { get; set; }
+    public DateTime CreatedAt { get; set; }
+    /// <summary>When it may be handled (again): straight away at first, later after each failed try.</summary>
+    public DateTime NextAttemptAt { get; set; }
+    public int Attempts { get; set; }
+    public string? LastError { get; set; }
+    /// <summary>When its work was done. Null while it still has to be.</summary>
+    public DateTime? ProcessedAt { get; set; }
 }

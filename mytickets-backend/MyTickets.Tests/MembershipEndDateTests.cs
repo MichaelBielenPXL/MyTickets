@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.AspNetCore.TestHost;
 using MyTickets.Api.Data;
 using MyTickets.Api.Services;
 
@@ -120,5 +121,116 @@ public class MembershipEndDateTests : IClassFixture<TestApp>
         using (var lookup = _app.Services.CreateScope())
             organisation = (await lookup.ServiceProvider.GetRequiredService<AppCache>().OrganisationBySlugAsync(slug))!;
         return await _app.Services.GetRequiredService<TenantScopes>().OpenAsync(organisation);
+    }
+}
+
+/// <summary>A clock the test moves forward, so memberships can run out without waiting a season.</summary>
+public class TestClock : TimeProvider
+{
+    private TimeSpan _ahead;
+    public override DateTimeOffset GetUtcNow() => DateTimeOffset.UtcNow + _ahead;
+    public void Advance(TimeSpan by) => _ahead += by;
+}
+
+/// <summary>The real API on a <see cref="TestClock"/>. Sign-in cookies keep real time, so moving the clock keeps everyone signed in.</summary>
+public class ClockedTestApp : TestApp
+{
+    public TestClock Clock { get; } = new();
+
+    protected override void ConfigureWebHost(Microsoft.AspNetCore.Hosting.IWebHostBuilder builder)
+    {
+        base.ConfigureWebHost(builder);
+        builder.ConfigureTestServices(services =>
+        {
+            services.AddSingleton<TimeProvider>(Clock);
+            services.PostConfigureAll<Microsoft.AspNetCore.Authentication.Cookies.CookieAuthenticationOptions>(o => o.TimeProvider = TimeProvider.System);
+        });
+    }
+}
+
+public class MembershipExpiryTests : IClassFixture<ClockedTestApp>
+{
+    private readonly ClockedTestApp _app;
+    public MembershipExpiryTests(ClockedTestApp app) => _app = app;
+
+    private static string Day(DateTimeOffset at) => DateOnly.FromDateTime(at.UtcDateTime).ToString("yyyy-MM-dd");
+
+    private static async Task<string> MemberIdAsync(ShopSetup shop, string name) =>
+        (await shop.Admin.GetOkAsync($"{shop.Url}/admin/members")).AsArray().Single(m => m!.Str("displayName").StartsWith(name))!.Str("id");
+
+    private static async Task<System.Text.Json.Nodes.JsonNode> InfoAsync(ShopSetup shop, string memberId) =>
+        await shop.Admin.GetOkAsync($"{shop.Url}/staff/members/{memberId}");
+
+    [Fact]
+    public async Task Reopening_an_ended_membership_type_does_not_bring_its_old_members_back()
+    {
+        var shop = await _app.NewShopAsync();
+        var season = (await shop.Admin.PostOkAsync($"{shop.Url}/admin/tiers",
+            new { name = "Season", priceCents = 0, isPublic = true, endsOn = Day(_app.Clock.GetUtcNow().AddDays(30)) })).Str("id");
+        var guest = await _app.NewGuestAsync(shop.Slug, "Lotte");
+        await guest.PostOkAsync($"{shop.Url}/join", new { tierId = season });
+        var lotte = await MemberIdAsync(shop, "Lotte");
+
+        // The season ends; a while later the admin opens it again for the next one.
+        _app.Clock.Advance(TimeSpan.FromDays(60));
+        Assert.False((await InfoAsync(shop, lotte))["membershipActive"]!.GetValue<bool>());
+        (await shop.Admin.PutAsJsonAsync($"{shop.Url}/admin/tiers/{season}",
+            new { name = "Season", priceCents = 0, isPublic = true, endsOn = Day(_app.Clock.GetUtcNow().AddDays(300)) })).EnsureSuccessStatusCode();
+
+        // Lotte's ran out: it stays run out until she joins again.
+        var info = await InfoAsync(shop, lotte);
+        Assert.False(info["membershipActive"]!.GetValue<bool>());
+        Assert.False(info["history"]![0]!["current"]!.GetValue<bool>());
+
+        await guest.PostOkAsync($"{shop.Url}/join", new { tierId = season });
+        info = await InfoAsync(shop, lotte);
+        Assert.True(info["membershipActive"]!.GetValue<bool>());
+        // Two seasons on the same type: two lines in her history.
+        Assert.Equal([true, false], info["history"]!.AsArray().Select(p => p!["current"]!.GetValue<bool>()));
+    }
+
+    [Fact]
+    public async Task Moving_the_date_of_a_running_membership_type_moves_its_history_too()
+    {
+        var shop = await _app.NewShopAsync();
+        var now = _app.Clock.GetUtcNow();
+        var season = (await shop.Admin.PostOkAsync($"{shop.Url}/admin/tiers",
+            new { name = "Season", priceCents = 0, isPublic = true, endsOn = Day(now.AddDays(30)) })).Str("id");
+        var guest = await _app.NewGuestAsync(shop.Slug, "Mats");
+        await guest.PostOkAsync($"{shop.Url}/join", new { tierId = season });
+
+        var later = Day(now.AddDays(90));
+        (await shop.Admin.PutAsJsonAsync($"{shop.Url}/admin/tiers/{season}",
+            new { name = "Season", priceCents = 0, isPublic = true, endsOn = later })).EnsureSuccessStatusCode();
+
+        var info = await InfoAsync(shop, await MemberIdAsync(shop, "Mats"));
+        var end = MembershipDates.EndOfDayInBelgium(later);
+        Assert.Equal(end, info["expiresAt"]!.GetValue<DateTime>().ToUniversalTime());
+        Assert.Equal(end, info["history"]![0]!["endsAt"]!.GetValue<DateTime>().ToUniversalTime());
+    }
+
+    [Fact]
+    public async Task Assigning_another_membership_type_gives_that_types_end_date()
+    {
+        var shop = await _app.NewShopAsync();
+        var now = _app.Clock.GetUtcNow();
+        var season = (await shop.Admin.PostOkAsync($"{shop.Url}/admin/tiers",
+            new { name = "Season", priceCents = 0, isPublic = true, endsOn = Day(now.AddDays(200)) })).Str("id");
+        var guest = await _app.NewGuestAsync(shop.Slug, "Noor");
+        var forever = (await shop.Admin.GetOkAsync($"{shop.Url}/admin/tiers")).AsArray().First(t => t!["endsOn"] is null)!.Str("id");
+        await guest.PostOkAsync($"{shop.Url}/join", new { tierId = forever });
+        var noor = await MemberIdAsync(shop, "Noor");
+
+        // The page sends the end date it had (none); the new type's date wins.
+        (await shop.Admin.PutAsJsonAsync($"{shop.Url}/admin/members/{noor}",
+            new { role = "Member", tierId = season, expiresAt = (DateTime?)null })).EnsureSuccessStatusCode();
+        var info = await InfoAsync(shop, noor);
+        Assert.Equal("Season", info.Str("tier"));
+        Assert.Equal(MembershipDates.EndOfDayInBelgium(Day(now.AddDays(200))), info["expiresAt"]!.GetValue<DateTime>().ToUniversalTime());
+
+        // Back to a type without an end date: it runs forever again.
+        (await shop.Admin.PutAsJsonAsync($"{shop.Url}/admin/members/{noor}",
+            new { role = "Member", tierId = forever, expiresAt = info["expiresAt"]!.GetValue<DateTime>() })).EnsureSuccessStatusCode();
+        Assert.Null((await InfoAsync(shop, noor))["expiresAt"]);
     }
 }

@@ -9,7 +9,13 @@ import { PayoutsTab } from './PayoutsTab'
 function serve(status: string, requirementsDue = 0) {
   server.use(
     http.get(apiUrl('/orgs/night-owls/admin/payouts'), () =>
-      HttpResponse.json({ status, requirementsDue, feePercent: 5, feeMaxCentsPerItem: 150 }),
+      HttpResponse.json({
+        status,
+        requirementsDue,
+        feePercent: 5,
+        feeMaxCentsPerItem: 150,
+        monthlyAccountFeeCents: 200,
+      }),
     ),
   )
 }

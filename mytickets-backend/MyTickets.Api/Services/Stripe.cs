@@ -16,7 +16,14 @@ public class StripeException(string message, HttpStatusCode? status = null) : Ex
 }
 
 /// <summary>A paid charge, and what Stripe charged the platform for it.</summary>
-public record StripeCharge(string Id, int StripeFeeCents);
+/// <param name="DirectTransferId">
+/// Set when Stripe already sent the money to the organisation's account at payment time (how payments worked
+/// before they were passed on afterwards): that transfer, with the platform's application fee.
+/// </param>
+public record StripeCharge(string Id, int StripeFeeCents, string? DirectTransferId = null, int? ApplicationFeeCents = null);
+
+/// <summary>Money Stripe sent from an organisation's Stripe balance to its bank account. Instant payouts cost more.</summary>
+public record StripePayout(string Id, int AmountCents, DateTime CreatedAt, bool Instant = false);
 
 /// <summary>An organisation's Stripe account, as far as taking payments and getting paid out goes.</summary>
 public record StripeAccountStatus(string Id, bool ChargesEnabled, bool PayoutsEnabled, bool DetailsSubmitted, int RequirementsDue);
@@ -145,7 +152,9 @@ public class StripeClient(HttpClient http, IConfiguration config)
         if (!session.TryGetProperty("payment_intent", out var intent) || intent.ValueKind != JsonValueKind.Object) return null;
         if (!intent.TryGetProperty("latest_charge", out var charge) || charge.ValueKind != JsonValueKind.Object) return null;
         if (!charge.TryGetProperty("balance_transaction", out var booked) || booked.ValueKind != JsonValueKind.Object) return null;
-        return new StripeCharge(charge.GetProperty("id").GetString()!, booked.GetProperty("fee").GetInt32());
+        var direct = charge.TryGetProperty("transfer", out var t) && t.ValueKind == JsonValueKind.String ? t.GetString() : null;
+        int? applicationFee = charge.TryGetProperty("application_fee_amount", out var a) && a.ValueKind == JsonValueKind.Number ? a.GetInt32() : null;
+        return new StripeCharge(charge.GetProperty("id").GetString()!, booked.GetProperty("fee").GetInt32(), direct, applicationFee);
     }
 
     /// <summary>
@@ -166,6 +175,23 @@ public class StripeClient(HttpClient http, IConfiguration config)
         };
         var transfer = await SendAsync(HttpMethod.Post, "transfers", new FormUrlEncodedContent(form), ct, idempotencyKey: $"transfer-{paymentId:N}");
         return transfer.GetProperty("id").GetString()!;
+    }
+
+    /// <summary>
+    /// The payouts Stripe made from an organisation's balance to its bank since a moment, newest first (at most
+    /// 100: payouts go out at most daily, and this is checked far more often).
+    /// </summary>
+    public async Task<IReadOnlyList<StripePayout>> ListPaidPayoutsAsync(string connectedAccountId, DateTime since, CancellationToken ct = default)
+    {
+        var from = new DateTimeOffset(DateTime.SpecifyKind(since, DateTimeKind.Utc)).ToUnixTimeSeconds();
+        var list = await SendAsync(HttpMethod.Get, $"payouts?status=paid&limit=100&created[gte]={from}", null, ct,
+            connectedAccount: Safe(connectedAccountId));
+        return list.GetProperty("data").EnumerateArray()
+            .Where(p => p.GetProperty("currency").GetString() == "eur")
+            .Select(p => new StripePayout(p.GetProperty("id").GetString()!, p.GetProperty("amount").GetInt32(),
+                DateTimeOffset.FromUnixTimeSeconds(p.GetProperty("created").GetInt64()).UtcDateTime,
+                p.TryGetProperty("method", out var method) && method.GetString() == "instant"))
+            .ToList();
     }
 
     /// <summary>Closes the payment page so it can no longer be paid. Only open sessions can be closed.</summary>
@@ -203,13 +229,15 @@ public class StripeClient(HttpClient http, IConfiguration config)
     /// ("/v2/...") and a Stripe-Version header.
     /// </summary>
     private async Task<JsonElement> SendAsync(HttpMethod method, string path, HttpContent? content, CancellationToken ct,
-        string? apiVersion = null, string? idempotencyKey = null)
+        string? apiVersion = null, string? idempotencyKey = null, string? connectedAccount = null)
     {
         var key = SecretKey ?? throw new StripeException("Online payments are not set up: the platform's Stripe key is missing.");
         using var request = new HttpRequestMessage(method, path);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", key);
         if (apiVersion is not null) request.Headers.Add("Stripe-Version", apiVersion);
         if (idempotencyKey is not null) request.Headers.Add("Idempotency-Key", idempotencyKey);
+        // Acting on an organisation's own Stripe account rather than the platform's.
+        if (connectedAccount is not null) request.Headers.Add("Stripe-Account", connectedAccount);
         request.Content = content;
 
         HttpResponseMessage response;

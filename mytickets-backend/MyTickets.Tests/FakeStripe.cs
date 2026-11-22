@@ -20,7 +20,9 @@ public class FakeStripe : HttpMessageHandler
     public const string WebhookSecret = "whsec_test0123456789";
 
     public record Account(Dictionary<string, string> Request, bool Active);
-    public record Session(Dictionary<string, string> Request, string Status, string PaymentStatus, int StripeFeeCents = 0);
+    /// <param name="DirectTo">Paid straight into an organisation's account, as payments were at first: (transfer id, application fee).</param>
+    public record Session(Dictionary<string, string> Request, string Status, string PaymentStatus, int StripeFeeCents = 0,
+        (string TransferId, int ApplicationFeeCents)? DirectTo = null);
 
     public ConcurrentDictionary<string, Account> Accounts { get; } = new();
     public ConcurrentDictionary<string, Session> Sessions { get; } = new();
@@ -38,6 +40,17 @@ public class FakeStripe : HttpMessageHandler
 
     /// <summary>Stripe has checked the organisation's details: it can take payments and be paid out.</summary>
     public void Approve(string accountId) => Accounts[accountId] = Accounts[accountId] with { Active = true };
+
+    /// <summary>Payouts Stripe made from each organisation's Stripe balance to its bank, by account.</summary>
+    public ConcurrentDictionary<string, List<(string Id, int AmountCents, DateTimeOffset Created)>> Payouts { get; } = new();
+
+    /// <summary>Stripe pays an organisation's balance out to its bank.</summary>
+    public string PayOut(string accountId, int amountCents, DateTimeOffset? at = null)
+    {
+        var id = $"po_{Guid.NewGuid():N}"[..20];
+        Payouts.GetOrAdd(accountId, _ => []).Add((id, amountCents, at ?? DateTimeOffset.UtcNow));
+        return id;
+    }
 
     public void Pay(string sessionId) =>
         Sessions[sessionId] = Sessions[sessionId] with { Status = "complete", PaymentStatus = "paid", StripeFeeCents = NextStripeFeeCents };
@@ -101,6 +114,20 @@ public class FakeStripe : HttpMessageHandler
                 Sessions[sessionId] = new Session(form, "open", "unpaid");
                 LastSessionId = sessionId;
                 return Ok(SessionView(sessionId));
+        }
+        if (request.Method == HttpMethod.Get && path == "/v1/payouts")
+        {
+            // Listed on the organisation's own account, named in the Stripe-Account header.
+            if (!request.Headers.TryGetValues("Stripe-Account", out var acting)) return Error(HttpStatusCode.BadRequest, "Stripe-Account header required");
+            var query = System.Web.HttpUtility.ParseQueryString(request.RequestUri.Query);
+            var since = long.Parse(query["created[gte]"] ?? "0");
+            var data = Payouts.GetValueOrDefault(acting.Single()) ?? [];
+            return Ok(new
+            {
+                @object = "list",
+                data = data.Where(p => p.Created.ToUnixTimeSeconds() >= since).OrderByDescending(p => p.Created)
+                    .Select(p => new { id = p.Id, @object = "payout", amount = p.AmountCents, currency = "eur", status = "paid", created = p.Created.ToUnixTimeSeconds() }),
+            });
         }
         if (path.StartsWith("/v1/accounts/", StringComparison.Ordinal))
         {
@@ -167,6 +194,8 @@ public class FakeStripe : HttpMessageHandler
             {
                 id = $"ch_{id}", @object = "charge",
                 balance_transaction = new { id = $"txn_{id}", @object = "balance_transaction", fee = s.StripeFeeCents },
+                transfer = s.DirectTo?.TransferId,
+                application_fee_amount = s.DirectTo?.ApplicationFeeCents,
             },
         };
         return new { id, @object = "checkout.session", status = s.Status, payment_status = s.PaymentStatus, payment_intent = intent };

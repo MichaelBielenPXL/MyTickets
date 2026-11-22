@@ -25,32 +25,7 @@ public static class AdminEndpoints
     {
         var admin = app.MapGroup("/api/orgs/{slug}/admin").RequireOrg(OrgRole.Admin);
 
-        admin.MapGet("/summary", async (HttpContext http, AppDbContext db) =>
-        {
-            var org = http.Org().Org;
-            var wallets = db.Wallets.Where(w => w.OrganisationId == org.Id);
-            var ledger = db.WalletTransactions.Where(t => wallets.Any(w => w.Id == t.WalletId));
-            var bar = ledger.Where(t => t.Type == WalletTxType.Purchase || t.Type == WalletTxType.Return);
-            var depositsHeld = await bar.SumAsync(t => t.DepositCents);
-            return Results.Ok(new
-            {
-                Members = await db.Memberships.CountAsync(m => m.OrganisationId == org.Id),
-                CreditOutstandingCents = await wallets.SumAsync(w => w.BalanceCents),
-                // Deposit money is held for guests until their cups come back, so it isn't takings.
-                BarRevenueCents = -await bar.SumAsync(t => t.AmountCents) - depositsHeld,
-                DepositsHeldCents = depositsHeld,
-                // In euros paid, which with a deal is less than the tokens it gave.
-                OnlineTopUpsCents = await db.Payments.Where(p => p.OrganisationId == org.Id && p.Purpose == PaymentPurpose.TopUp && p.Status == PaymentStatus.Paid)
-                    .SumAsync(p => p.AmountCents),
-                CashTopUpsCents = await ledger.Where(t => t.Type == WalletTxType.CashTopUp).SumAsync(t => t.AmountCents),
-                // What the platform kept on paid online payments (Stripe's cost included). Wallet and cash take no fee.
-                TicketFeesCents = await FeesAsync(db, org.Id, PaymentPurpose.Tickets),
-                TopUpFeesCents = await FeesAsync(db, org.Id, PaymentPurpose.TopUp),
-                TicketRevenueCents = await db.Tickets
-                    .Where(t => t.TicketType.Event.OrganisationId == org.Id && (t.Status == TicketStatus.Valid || t.Status == TicketStatus.CheckedIn))
-                    .SumAsync(t => t.PricePaidCents),
-            });
-        });
+        admin.MapOverview();
 
         // ---- Top-up deals: the organisation's own prices for tokens ----
         admin.MapGet("/topup-deals", async (HttpContext http, AppDbContext db) =>
@@ -187,12 +162,18 @@ public static class AdminEndpoints
             if (await ApplyAsync(tier, req, db, zone, clock.GetUtcNow().UtcDateTime) is { } error) return error;
             await using var tx = await db.Database.BeginTransactionAsync();
             await db.SaveChangesAsync();
-            // Moving the end date (say, the season got longer) moves it for everyone who got it from this type.
-            // Members whose date an admin set by hand keep theirs.
+            // Moving the end date (say, the season got longer) moves it for everyone who still has it from this type.
+            // Members whose date an admin set by hand keep theirs. Once it has run out, it stays run out: reopening
+            // an ended type for a new season means its old members join (and pay) again.
             var newExpiry = tier.ExpiresAt(zone);
-            if (newExpiry != oldExpiry)
+            var now = clock.GetUtcNow().UtcDateTime;
+            if (newExpiry != oldExpiry && (oldExpiry is null || oldExpiry > now))
+            {
                 await db.Memberships.Where(m => m.TierId == tier.Id && m.ExpiresAt == oldExpiry)
                     .ExecuteUpdateAsync(u => u.SetProperty(m => m.ExpiresAt, newExpiry));
+                await db.MembershipPeriods.Where(p => p.TierId == tier.Id && p.EndsAt == oldExpiry)
+                    .ExecuteUpdateAsync(u => u.SetProperty(p => p.EndsAt, newExpiry));
+            }
             await tx.CommitAsync();
             return Results.NoContent();
         });
@@ -232,25 +213,30 @@ public static class AdminEndpoints
             return Results.NoContent();
         });
 
-        admin.MapPut("/members/{id:guid}", async (Guid id, MemberRequest req, HttpContext http, AppDbContext db, MembershipService memberships) =>
+        admin.MapPut("/members/{id:guid}", async (Guid id, MemberRequest req, HttpContext http, AppDbContext db, MembershipService memberships,
+            IConfiguration config, TimeProvider clock) =>
         {
             var orgId = http.Org().Org.Id;
             var member = await db.Memberships.FirstOrDefaultAsync(m => m.Id == id && m.OrganisationId == orgId);
             if (member is null) return Http.Error(404, "Member not found.");
             if (!Enum.IsDefined(req.Role)) return Http.Error(400, "Unknown role.");
-            if (!await db.MembershipTiers.AnyAsync(t => t.Id == req.TierId && t.OrganisationId == orgId))
-                return Http.Error(400, "Unknown membership type.");
+            var tier = await db.MembershipTiers.FirstOrDefaultAsync(t => t.Id == req.TierId && t.OrganisationId == orgId);
+            if (tier is null) return Http.Error(400, "Unknown membership type.");
+            // Another type: it runs until that type's end date, as if they had joined it. The same type keeps
+            // whatever end date was sent, so an admin can still change it by hand.
+            var zone = MembershipService.LocalZone(config);
+            var tierChanged = member.TierId != tier.Id;
+            if (tierChanged && tier.HasEnded(clock.GetUtcNow().UtcDateTime, zone))
+                return Http.Error(409, $"\"{tier.Name}\" ended on {tier.EndsOn:dd/MM/yyyy}. Give it a new end date first, or choose another membership.");
+            var expiresAt = tierChanged ? tier.ExpiresAt(zone) : Http.Utc(req.ExpiresAt);
             if (member.Role == OrgRole.Admin && req.Role != OrgRole.Admin &&
                 await db.Memberships.CountAsync(m => m.OrganisationId == orgId && m.Role == OrgRole.Admin) == 1)
                 return Http.Error(409, "An organisation needs at least one admin.");
-            if (member.TierId != req.TierId || member.ExpiresAt != Http.Utc(req.ExpiresAt))
-            {
-                var tier = await db.MembershipTiers.FirstAsync(t => t.Id == req.TierId);
-                await memberships.RecordPeriodAsync(member.UserId, tier, Http.Utc(req.ExpiresAt));
-            }
+            if (tierChanged || member.ExpiresAt != expiresAt)
+                await memberships.RecordPeriodAsync(member.UserId, tier, expiresAt);
             member.Role = req.Role;
             member.TierId = req.TierId;
-            member.ExpiresAt = Http.Utc(req.ExpiresAt);
+            member.ExpiresAt = expiresAt;
             await db.SaveChangesAsync();
             return Results.NoContent();
         });
@@ -591,10 +577,6 @@ public static class AdminEndpoints
         foreach (var rest in items.Where(t => !ids.Contains(idOf(t)))) setOrder(rest, ++next);
         return null;
     }
-
-    private static Task<int> FeesAsync(AppDbContext db, Guid orgId, PaymentPurpose purpose) =>
-        db.Payments.Where(p => p.OrganisationId == orgId && p.Purpose == purpose && p.Status == PaymentStatus.Paid)
-            .SumAsync(p => p.PlatformFeeCents ?? 0);
 
     /// <summary>A drink can only come with one of this organisation's deposits, and a deposit drinks come with stays one.</summary>
     private static async Task<IResult?> CheckDepositAsync(AppDbContext db, Product product)

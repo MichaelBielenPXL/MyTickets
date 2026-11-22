@@ -17,6 +17,36 @@ namespace MyTickets.Api.Data.Migrations
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.14");
 
+            modelBuilder.Entity("MyTickets.Api.Data.BankPayout", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("AccountFeeCents")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("AmountCents")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("FeeCents")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("PaidAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PayoutId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PayoutId")
+                        .IsUnique();
+
+                    b.ToTable("BankPayouts");
+                });
+
             modelBuilder.Entity("MyTickets.Api.Data.Event", b =>
                 {
                     b.Property<Guid>("Id")
@@ -322,11 +352,50 @@ namespace MyTickets.Api.Data.Migrations
                     b.ToTable("Organisations");
                 });
 
+            modelBuilder.Entity("MyTickets.Api.Data.OutboxMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Data")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("LastError")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("NextAttemptAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("ProcessedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProcessedAt", "NextAttemptAt");
+
+                    b.ToTable("Outbox");
+                });
+
             modelBuilder.Entity("MyTickets.Api.Data.Payment", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT");
+
+                    b.Property<int?>("AccountFeeCents")
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("AmountCents")
                         .HasColumnType("INTEGER");
@@ -347,6 +416,9 @@ namespace MyTickets.Api.Data.Migrations
                     b.Property<Guid>("OrganisationId")
                         .HasColumnType("TEXT");
 
+                    b.Property<int?>("PayoutFeeCents")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int?>("PlatformFeeCents")
                         .HasColumnType("INTEGER");
 
@@ -360,6 +432,9 @@ namespace MyTickets.Api.Data.Migrations
                     b.Property<string>("Purpose")
                         .IsRequired()
                         .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("SettledAt")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Status")
@@ -474,6 +549,9 @@ namespace MyTickets.Api.Data.Migrations
 
                     b.Property<bool>("DetailsSubmitted")
                         .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("PayoutFeesSince")
+                        .HasColumnType("TEXT");
 
                     b.Property<bool>("PayoutsEnabled")
                         .HasColumnType("INTEGER");

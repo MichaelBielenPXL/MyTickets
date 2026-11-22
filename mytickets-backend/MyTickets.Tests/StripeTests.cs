@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json.Nodes;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using MyTickets.Api.Data;
 using MyTickets.Api.Services;
@@ -135,17 +136,22 @@ public class StripeTests : IClassFixture<StripeTestApp>
         Assert.Equal(1250, (await buyer.GetOkAsync($"{shop.Url}/wallet")).Int("balanceCents"));
         Assert.Equal("Paid", (await buyer.GetOkAsync($"{shop.Url}/payments/{paymentId}")).Str("status"));
 
-        // And passed on to the organisation exactly once: €12.50 minus 5% (€0.62, more than Stripe's €0.55 + €0.05).
+        // And passed on to the organisation exactly once: €12.50 minus 5% (€0.62, more than Stripe's €0.55 + €0.05),
+        // minus €2.53 set aside for Stripe's payout costs: the €2.50 buffer, and 0.25% of the €11.88 (€0.03).
         var transfer = Assert.Single(Stripe.Transfers.Values, t => t["metadata[paymentId]"] == paymentId.ToString());
-        Assert.Equal("1188", transfer["amount"]);
+        Assert.Equal("935", transfer["amount"]);
         Assert.Equal(accountId, transfer["destination"]);
         Assert.Equal($"ch_{sessionId}", transfer["source_transaction"]);
 
-        // The admin overview shows what the platform kept on top-ups, and nothing on tickets yet.
+        // The admin overview shows it line by line: paid, MyTickets' fee, set aside for payout costs, and what was sent on.
         var summary = await shop.Admin.GetOkAsync($"{shop.Url}/admin/summary");
-        Assert.Equal(1250, summary.Int("onlineTopUpsCents"));
-        Assert.Equal(62, summary.Int("topUpFeesCents"));
-        Assert.Equal(0, summary.Int("ticketFeesCents"));
+        var topUps = summary["sources"]!.AsArray().Single(s => s!.Str("purpose") == "TopUp")!;
+        Assert.Equal([1250, 62, 253, 935], new[] { "paidCents", "feeCents", "payoutFeeCents", "netCents" }.Select(topUps.Int));
+        Assert.Equal(0, summary["sources"]!.AsArray().Single(s => s!.Str("purpose") == "Tickets")!.Int("paidCents"));
+        Assert.Equal(935, summary["payout"]!.Int("youGetCents"));
+        Assert.Equal(253, summary["bankPayouts"]!.Int("bufferCents"));
+        var line = Assert.Single(summary["payments"]!.AsArray())!;
+        Assert.Equal((false, 935), (line["test"]!.GetValue<bool>(), line.Int("netCents")));
     }
 
     [Fact]
@@ -169,8 +175,8 @@ public class StripeTests : IClassFixture<StripeTestApp>
             Stripe.NextStripeFeeCents = 55;
         }
 
-        // The platform keeps €0.95: Stripe's €0.90 plus €0.05. The organisation gets the rest.
-        Assert.Equal("1155", Stripe.TransferFor(paymentId)!["amount"]);
+        // The platform keeps €0.95: Stripe's €0.90 plus €0.05. The organisation gets the rest, minus the payout buffer (€2.53).
+        Assert.Equal("902", Stripe.TransferFor(paymentId)!["amount"]);
         Assert.Equal(accountId, Stripe.TransferFor(paymentId)!["destination"]);
     }
 
@@ -195,10 +201,143 @@ public class StripeTests : IClassFixture<StripeTestApp>
             Stripe.FailTransfers = false;
         }
 
+        // The payment and its "pass it on" event were saved together; the failed try is on the event, to retry later.
+        var waiting = Assert.Single(await OutboxAsync(shop.Slug));
+        Assert.Equal((OutboxEvents.PaymentCompleted, 1, (DateTime?)null), (waiting.Type, waiting.Attempts, waiting.ProcessedAt));
+        Assert.NotNull(waiting.LastError);
+        Assert.True(waiting.NextAttemptAt > DateTime.UtcNow);
+
         // The background tidy-up passes it on, once, even when run again.
         await TidyUpAsync(shop.Slug);
         await TidyUpAsync(shop.Slug);
-        Assert.Equal("1188", Stripe.TransferFor(paymentId)!["amount"]);
+        Assert.Equal("935", Stripe.TransferFor(paymentId)!["amount"]);
+        var done = Assert.Single(await OutboxAsync(shop.Slug));
+        Assert.Equal((2, (string?)null), (done.Attempts, done.LastError));
+        Assert.NotNull(done.ProcessedAt);
+    }
+
+    [Fact]
+    public async Task Payout_costs_too_big_for_one_payment_come_off_the_next_ones_and_nothing_is_sent_for_nothing()
+    {
+        // €1 tickets: Stripe's €0.55 plus €0.05 leaves €0.40 per ticket.
+        var shop = await _app.NewShopAsync(priceCents: 100, capacity: 20);
+        await shop.Admin.PostOkAsync($"{shop.Url}/admin/payouts/onboarding", new { });
+        Stripe.Approve(Stripe.LastAccountId);
+        // Looking at Payouts picks up that Stripe approved it.
+        await shop.Admin.GetOkAsync($"{shop.Url}/admin/payouts");
+        await RecordPayoutsAsync(shop.Slug);
+        // A €10 payout, the first this month: €0.13 fee plus the month's €2 = €2.13 owed.
+        Stripe.PayOut(Stripe.LastAccountId, 1_000);
+        Assert.Equal(1, await RecordPayoutsAsync(shop.Slug));
+
+        async Task<Guid> BuyAsync()
+        {
+            var buyer = await _app.NewBuyerAsync(shop);
+            (await buyer.OrderAsync(shop)).EnsureSuccessStatusCode();
+            var paymentId = Guid.Parse(Stripe.Sessions[Stripe.LastSessionId].Request["metadata[paymentId]"]);
+            Stripe.Pay(Stripe.LastSessionId);
+            await buyer.PostOkAsync($"{shop.Url}/payments/{paymentId}/refresh", new { });
+            return paymentId;
+        }
+
+        // Eleven tickets' €0.40 each go to the €2.13, then to the €2.50 buffer for the next payouts: nothing is sent
+        // for them (Stripe refuses €0 anyway).
+        for (var i = 0; i < 11; i++) Assert.Null(Stripe.TransferFor(await BuyAsync()));
+        // The twelfth fills the buffer (€0.23, plus a cent for Stripe's 0.25%) and the organisation gets the rest;
+        // after that, all of it but that cent.
+        Assert.Equal("16", Stripe.TransferFor(await BuyAsync())!["amount"]);
+        Assert.Equal("40", Stripe.TransferFor(await BuyAsync())!["amount"]);
+    }
+
+    [Fact]
+    public async Task The_organisation_pays_Stripe_s_fee_on_each_payout_to_its_bank_from_its_next_money()
+    {
+        var shop = await PayingShopAsync();
+        var accountId = Stripe.LastAccountId;
+        // A payout from before payout fees were passed on: the platform's to pay, as agreed then.
+        Stripe.PayOut(accountId, 50_000, DateTimeOffset.UtcNow.AddDays(-1));
+        Assert.Equal(0, await RecordPayoutsAsync(shop.Slug));
+        Assert.Equal(0, await RecordPayoutsAsync(shop.Slug));
+
+        // Stripe pays €100 out to the bank: 0.25% (€0.25) + €0.10, and €2 as the first payout this month.
+        // Looking again does not count it twice; a second payout this month costs only its own fee.
+        Stripe.PayOut(accountId, 10_000);
+        Assert.Equal(1, await RecordPayoutsAsync(shop.Slug));
+        Assert.Equal(0, await RecordPayoutsAsync(shop.Slug));
+        Stripe.PayOut(accountId, 2_000, DateTimeOffset.UtcNow.AddMinutes(1));
+        Assert.Equal(1, await RecordPayoutsAsync(shop.Slug));
+
+        // The next top-up: €12.50 minus MyTickets' €0.62, the payout costs so far (€0.35 + €2 + €0.15), and the buffer
+        // for the next ones (€2.50, plus 0.25% of this money: €0.03).
+        var buyer = await _app.NewBuyerAsync(shop);
+        await buyer.PostOkAsync($"{shop.Url}/wallet/topup", new { amountCents = 1250 });
+        var paymentId = Guid.Parse(Stripe.Sessions[Stripe.LastSessionId].Request["metadata[paymentId]"]);
+        Stripe.Pay(Stripe.LastSessionId);
+        await buyer.PostOkAsync($"{shop.Url}/payments/{paymentId}/refresh", new { });
+        Assert.Equal("685", Stripe.TransferFor(paymentId)!["amount"]);
+
+        var summary = await shop.Admin.GetOkAsync($"{shop.Url}/admin/summary");
+        Assert.Equal(503, summary["payout"]!.Int("payoutFeeCents"));
+        Assert.Equal(253, summary["bankPayouts"]!.Int("bufferCents"));
+        var payouts = summary["bankPayouts"]!["payouts"]!.AsArray();
+        Assert.Equal([(2_000, 15, 0), (10_000, 35, 200)], payouts.Select(p => (p!.Int("amountCents"), p.Int("feeCents"), p.Int("accountFeeCents"))));
+        Assert.Equal(250, summary["bankPayouts"]!.Int("feeCents"));
+        Assert.Equal(0, summary["bankPayouts"]!.Int("owedCents"));
+    }
+
+    [Fact]
+    public void Stripe_s_payout_fee_is_a_quarter_percent_rounded_up_plus_ten_cents_and_more_for_instant_payouts()
+    {
+        var rules = new PaymentService.FeeRules(5m, 150, 5, PayoutFeePercent: 0.25m, PayoutFeeFixedCents: 10, InstantPayoutFeePercent: 1m);
+        Assert.Equal(35, PaymentService.PayoutFee(10_000, rules));
+        // Never rounded in the platform's disadvantage: €12.34 is €0.03085, so €0.04.
+        Assert.Equal(14, PaymentService.PayoutFee(1_234, rules));
+        Assert.Equal(12, PaymentService.PayoutFee(600, rules));
+        // Instant: 1% on top of the standard fee, the most Stripe could charge for it.
+        Assert.Equal(135, PaymentService.PayoutFee(10_000, rules, instant: true));
+    }
+
+    [Fact]
+    public void Payout_costs_are_set_aside_before_the_money_goes_out_and_the_buffer_tops_itself_up()
+    {
+        var rules = new PaymentService.FeeRules(5m, 150, 5, PayoutFeePercent: 0.25m, PayoutFeeFixedCents: 10, PayoutBufferCents: 250);
+        // A first €100: 0.25% (€0.25) and the whole €2.50 buffer.
+        Assert.Equal(275, PaymentService.PayoutCostsToSetAside(10_000, 0, rules));
+        // Buffer full: only the 0.25%.
+        Assert.Equal(25, PaymentService.PayoutCostsToSetAside(10_000, 250, rules));
+        // A payout used €2.35 of the buffer: that comes back first.
+        Assert.Equal(260, PaymentService.PayoutCostsToSetAside(10_000, 15, rules));
+        // Never more than there is.
+        Assert.Equal(40, PaymentService.PayoutCostsToSetAside(40, -213, rules));
+    }
+
+    private async Task<int> RecordPayoutsAsync(string slug)
+    {
+        Organisation organisation;
+        using (var lookup = _app.Services.CreateScope())
+            organisation = (await lookup.ServiceProvider.GetRequiredService<AppCache>().OrganisationBySlugAsync(slug))!;
+        await using var scope = await _app.Services.GetRequiredService<TenantScopes>().OpenAsync(organisation);
+        return await scope.ServiceProvider.GetRequiredService<PaymentService>().RecordPayoutsAsync();
+    }
+
+    [Fact]
+    public async Task A_payment_Stripe_already_paid_straight_to_the_organisation_counts_as_sent_and_is_never_sent_again()
+    {
+        var shop = await PayingShopAsync();
+        var buyer = await _app.NewBuyerAsync(shop);
+        await buyer.PostOkAsync($"{shop.Url}/wallet/topup", new { amountCents = 2000 });
+        var sessionId = Stripe.LastSessionId;
+        var paymentId = Guid.Parse(Stripe.Sessions[sessionId].Request["metadata[paymentId]"]);
+        // As payments worked at first: the money went to the organisation's account at payment time, minus a €1 fee.
+        Stripe.Pay(sessionId);
+        Stripe.Sessions[sessionId] = Stripe.Sessions[sessionId] with { DirectTo = ("tr_direct", 100) };
+
+        await buyer.PostOkAsync($"{shop.Url}/payments/{paymentId}/refresh", new { });
+        await TidyUpAsync(shop.Slug);
+
+        Assert.Null(Stripe.TransferFor(paymentId));
+        var line = Assert.Single((await shop.Admin.GetOkAsync($"{shop.Url}/admin/summary"))["payments"]!.AsArray())!;
+        Assert.Equal(1900, line.Int("netCents"));
     }
 
     [Fact]
@@ -323,7 +462,20 @@ public class StripeTests : IClassFixture<StripeTestApp>
         using (var lookup = _app.Services.CreateScope())
             organisation = (await lookup.ServiceProvider.GetRequiredService<AppCache>().OrganisationBySlugAsync(slug))!;
         await using var scope = await _app.Services.GetRequiredService<TenantScopes>().OpenAsync(organisation);
-        return await scope.ServiceProvider.GetRequiredService<PaymentService>().ExpireStaleAsync(TimeSpan.Zero, TimeSpan.Zero);
+        var expired = await scope.ServiceProvider.GetRequiredService<PaymentService>().ExpireStaleAsync(TimeSpan.Zero, TimeSpan.Zero);
+        // As the worker does next: the outbox, as if every retry were due already.
+        await scope.ServiceProvider.GetRequiredService<OutboxDispatcher>().ProcessDueAsync(asOf: DateTime.UtcNow.AddDays(1));
+        return expired;
+    }
+
+    /// <summary>The organisation's outbox, oldest first.</summary>
+    private async Task<List<OutboxMessage>> OutboxAsync(string slug)
+    {
+        Organisation organisation;
+        using (var lookup = _app.Services.CreateScope())
+            organisation = (await lookup.ServiceProvider.GetRequiredService<AppCache>().OrganisationBySlugAsync(slug))!;
+        await using var scope = await _app.Services.GetRequiredService<TenantScopes>().OpenAsync(organisation);
+        return await scope.ServiceProvider.GetRequiredService<AppDbContext>().Outbox.AsNoTracking().OrderBy(m => m.CreatedAt).ToListAsync();
     }
 }
 

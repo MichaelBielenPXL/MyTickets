@@ -220,6 +220,36 @@ public class FlowTests : IClassFixture<TestApp>
     }
 
     [Fact]
+    public async Task The_overview_counts_only_the_chosen_period_and_shows_the_bar_day_by_day()
+    {
+        var org = await NewOrgAsync();
+        var beer = (await org.Admin.PostOkAsync($"{org.Url}/admin/products", new { name = "Beer", priceCents = 300, active = true })).Str("id");
+        var guest = await NewMemberAsync(org);
+        var card = await LinkCardAsync(guest, org);
+        await org.Admin.PostOkAsync($"{org.Url}/staff/topup", new { cardUid = card, amountCents = 1000 });
+        await org.Admin.PostOkAsync($"{org.Url}/staff/charge", new { cardUid = card, items = new[] { new { productId = beer, quantity = 2 } } });
+
+        var brussels = TimeZoneInfo.FindSystemTimeZoneById("Europe/Brussels");
+        var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, brussels));
+        var week = await org.Admin.GetOkAsync($"{org.Url}/admin/summary?from={today.AddDays(-6):yyyy-MM-dd}&to={today:yyyy-MM-dd}");
+        Assert.Equal((1, 600), (week["bar"]!.Int("sales"), week["bar"]!.Int("takingsCents")));
+        Assert.Equal((1, 1000), (week["cash"]!.Int("count"), week["cash"]!.Int("cents")));
+        // A week is drawn day by day: seven days, the sale on the last.
+        var points = week["byPeriod"]!["points"]!.AsArray();
+        Assert.Equal("day", week["byPeriod"]!.Str("unit"));
+        Assert.Equal(7, points.Count);
+        Assert.Equal((today.ToString("yyyy-MM-dd"), 600, 1000), (points[6]!.Str("key"), points[6]!.Int("barCents"), points[6]!.Int("moneyInCents")));
+
+        // Last month knew nothing of it; what guests can still spend is about now, whatever the period.
+        var earlier = await org.Admin.GetOkAsync($"{org.Url}/admin/summary?from={today.AddDays(-40):yyyy-MM-dd}&to={today.AddDays(-10):yyyy-MM-dd}");
+        Assert.Equal(0, earlier["bar"]!.Int("takingsCents"));
+        Assert.Equal(400, earlier["tokens"]!.Int("outstandingCents"));
+
+        Assert.Equal(HttpStatusCode.BadRequest, (await org.Admin.GetAsync($"{org.Url}/admin/summary?from=22-11-2026")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await guest.GetAsync($"{org.Url}/admin/summary")).StatusCode);
+    }
+
+    [Fact]
     public async Task Registration_rejects_taken_or_reserved_organisation_names_without_creating_an_account()
     {
         var admin = await _app.NewUserAsync("Existing owner");
@@ -465,7 +495,7 @@ public class FlowTests : IClassFixture<TestApp>
         // The guest sees it in their history, and the bar's takings no longer count the returned deposits.
         var history = (await guest.GetOkAsync($"{org.Url}/wallet"))["transactions"]!.AsArray();
         Assert.Contains(history, t => t!.Str("type") == "Return" && t!.Int("amountCents") == 100 && t!.Str("description") == "1× Cup returned");
-        Assert.Equal(450, (await org.Admin.GetOkAsync($"{org.Url}/admin/summary")).Int("barRevenueCents"));
+        Assert.Equal(450, (await org.Admin.GetOkAsync($"{org.Url}/admin/summary"))["bar"]!.Int("takingsCents"));
 
         // Only deposits can come back: nobody gets credit for "returning" a beer.
         var beerBack = await org.Admin.PostAsJsonAsync($"{org.Url}/staff/charge", new { cardUid = card, items = new[] { new { productId = beer, quantity = -1 } } });
@@ -505,8 +535,8 @@ public class FlowTests : IClassFixture<TestApp>
 
         // One cup is still out: its euro is held for the guest, not counted as takings.
         var summary = await org.Admin.GetOkAsync($"{org.Url}/admin/summary");
-        Assert.Equal(1400, summary.Int("barRevenueCents"));
-        Assert.Equal(100, summary.Int("depositsHeldCents"));
+        Assert.Equal(1400, summary["bar"]!.Int("takingsCents"));
+        Assert.Equal(100, summary["tokens"]!.Int("depositsHeldCents"));
     }
 
     [Fact]
@@ -598,10 +628,13 @@ public class FlowTests : IClassFixture<TestApp>
         Assert.Equal([500, 2000], deals.Select(d => d!.Int("priceCents")));
         var fiveForSix = deals[0]!.Str("id");
 
-        // Pay €5, get 6 tokens. The overview counts the €5 that came in.
+        // Pay €5, get 6 tokens. The overview counts the €5 that came in, and the token given on top.
         await guest.PayAsync(await guest.PostOkAsync($"{org.Url}/wallet/topup", new { amountCents = 0, dealId = fiveForSix }));
         Assert.Equal(600, await BalanceAsync(guest, org));
-        Assert.Equal(500, (await org.Admin.GetOkAsync($"{org.Url}/admin/summary")).Int("onlineTopUpsCents"));
+        var summary = await org.Admin.GetOkAsync($"{org.Url}/admin/summary");
+        // Paid with the test checkout: listed apart, as no real money.
+        Assert.Equal(500, summary["payout"]!.Int("testCents"));
+        Assert.Equal((600, 500, 100), (summary["tokens"]!.Int("boughtCents"), summary["tokens"]!.Int("paidCents"), summary["tokens"]!.Int("bonusCents")));
 
         // With deals on offer, an amount of your own is not allowed.
         var ownAmount = await guest.PostAsJsonAsync($"{org.Url}/wallet/topup", new { amountCents = 700 });

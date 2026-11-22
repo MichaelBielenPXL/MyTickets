@@ -24,21 +24,91 @@ export type OrganisationSettingsInput = Pick<
   'name' | 'description' | 'logoKey' | 'brandColor'
 >
 
+export type PaymentPurpose = 'TopUp' | 'Tickets' | 'Membership'
+
+/** One online payment, and what the organisation gets from it. Every paid payment counts as passed on. */
+export interface PaymentLine {
+  id: string
+  paidAt: string
+  purpose: PaymentPurpose
+  description: string
+  amountCents: number
+  /** MyTickets' fee, Stripe's card costs included. */
+  feeCents: number
+  /** Only on payments from before payouts were tracked: their share of Stripe's monthly payout-account fee. */
+  accountFeeCents: number
+  /** Set aside for Stripe's payout costs. */
+  payoutFeeCents: number
+  /** What the organisation gets. */
+  netCents: number
+  /** Paid with the test checkout on a test server: no real money, and not in the totals. */
+  test: boolean
+}
+
+/** Manage › Overview for one period: money in, what came off, what the organisation actually gets. */
 export interface Summary {
-  members: number
-  /** Money guests have paid that they can still spend. */
-  creditOutstandingCents: number
-  /** Bar takings, without deposits. */
-  barRevenueCents: number
-  /** Deposit money for cups that haven't come back yet: the guests' until they do. */
-  depositsHeldCents: number
-  onlineTopUpsCents: number
-  cashTopUpsCents: number
-  ticketRevenueCents: number
-  /** What MyTickets kept on tickets paid online (card costs included). Wallet payments carry no fee. */
-  ticketFeesCents: number
-  /** What MyTickets kept on online top-ups. Cash top-ups carry no fee. */
-  topUpFeesCents: number
+  payout: {
+    paidCents: number
+    feeCents: number
+    accountFeeCents: number
+    payoutFeeCents: number
+    /** What the organisation gets from online payments: paid minus every fee. */
+    youGetCents: number
+    testCents: number
+    monthlyAccountFeeCents: number
+  }
+  /** Online payments per kind. */
+  sources: {
+    purpose: PaymentPurpose
+    count: number
+    paidCents: number
+    feeCents: number
+    accountFeeCents: number
+    payoutFeeCents: number
+    netCents: number
+  }[]
+  /** Stripe's payouts from the organisation's Stripe account to its bank, with Stripe's fee on each. */
+  bankPayouts: {
+    /** feeCents is Stripe's fee on the payout; accountFeeCents the month's account fee, on the month's first payout. */
+    payouts: { id: string; paidAt: string; amountCents: number; feeCents: number; accountFeeCents: number }[]
+    amountCents: number
+    feeCents: number
+    /** Right now: set aside for payout costs and not used yet. */
+    bufferCents: number
+    /** Right now: payout costs the next money still has to cover (after an unusually expensive month). */
+    owedCents: number
+    /** The buffer kept topped up for the next payouts. */
+    targetBufferCents: number
+  }
+  /** Top-ups at the cashier (cash, or the organisation's own card terminal): no MyTickets fees. */
+  cash: { count: number; cents: number }
+  /** In tokens. Takings leave deposits out: those are the guests' until their cups come back. */
+  bar: { sales: number; takingsCents: number; depositsOutCents: number; depositsBackCents: number }
+  tokens: {
+    boughtCents: number
+    paidCents: number
+    bonusCents: number
+    spentAtBarCents: number
+    spentOnTicketsCents: number
+    /** Right now, whatever the period. */
+    outstandingCents: number
+    depositsHeldCents: number
+  }
+  memberships: { active: number; joined: number; byType: { name: string; active: number }[] }
+  tickets: { sold: number; revenueCents: number; checkedIn: number }
+  byPeriod: {
+    unit: 'day' | 'month'
+    points: { key: string; barCents: number; barSales: number; moneyInCents: number }[]
+  }
+  /** The newest payments (at most 200); paymentsCount says how many there were in all. */
+  payments: PaymentLine[]
+  paymentsCount: number
+}
+
+/** A period for the overview, as days on the local clock (both included). No dates: from the start until now. */
+export interface Period {
+  from?: string
+  to?: string
 }
 
 export interface AdminTier extends Tier {
@@ -155,6 +225,13 @@ export interface PayoutSetup {
   /** The platform's share: this percentage of every ticket (or top-up), at most feeMaxCentsPerItem each. */
   feePercent: number
   feeMaxCentsPerItem: number
+  /** Stripe's monthly fee for the payout account, in months with payouts; paid by the organisation from its next money. */
+  monthlyAccountFeeCents: number
+  /** Stripe's fee on each payout to the bank (this percentage plus a fixed part), paid from the next money. */
+  payoutFeePercent: number
+  payoutFeeFixedCents: number
+  /** Kept back from the organisation's money so payout costs are always paid in advance; stays theirs. */
+  payoutBufferCents: number
 }
 
 /** A card the organisation issued, as Manage lists it. */

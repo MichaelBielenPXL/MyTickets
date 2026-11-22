@@ -6,6 +6,7 @@ import { money, tokenPrice } from '@/utils/format'
 
 import { useSummary } from '../api/admin'
 import { ADMIN_SECTIONS, type AdminSection } from '../sections'
+import { periodOf } from '../utils/period'
 
 type ManageMenuProps = {
   slug: string
@@ -29,7 +30,7 @@ const SUMMARIES: Record<AdminSection, string> = {
  * does: everything in view at once, nothing hidden behind sideways scrolling. Each row opens its section.
  */
 export function ManageMenu({ slug }: ManageMenuProps) {
-  const summary = useSummary(slug)
+  const summary = useSummary(slug, periodOf('month'))
   const s = summary.data
 
   return (
@@ -44,10 +45,14 @@ export function ManageMenu({ slug }: ManageMenuProps) {
           <span>{t('Details ›')}</span>
         </span>
         <span className="manage-glance-grid">
-          <Stat label={t('Ticket sales')} value={s ? money(s.ticketRevenueCents) : '…'} />
-          <Stat label={t('Bar sales')} value={s ? money(s.barRevenueCents) : '…'} />
-          <Stat label={t('Members')} value={s ? String(s.members) : '…'} />
-          <Stat label={t('Tokens not spent')} value={s ? tokenPrice(s.creditOutstandingCents) : '…'} />
+          {/* This month: what is the organisation's (online, after fees, and cash), and how the bar did. */}
+          <Stat
+            label={t('Paid to you this month')}
+            value={s ? money(s.payout.youGetCents + s.cash.cents) : '…'}
+          />
+          <Stat label={t('Bar takings')} value={s ? tokenPrice(s.bar.takingsCents) : '…'} />
+          <Stat label={t('Active members')} value={s ? String(s.memberships.active) : '…'} />
+          <Stat label={t('Tokens not spent')} value={s ? tokenPrice(s.tokens.outstandingCents) : '…'} />
         </span>
       </Link>
       <nav className="manage-menu" aria-label={t('Manage sections')}>

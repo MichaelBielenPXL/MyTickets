@@ -46,6 +46,7 @@ export const terms: Record<Language, LegalDocument> = {
         body: [
           'If you create an organisation, you are responsible for its page, its events, its prices and how it treats its members, and for following the law that applies to them (consumer law, tax, event permits).',
           'You decide which details your organisation asks of members and you are the controller of those details under the GDPR. MyTickets processes them on your behalf, as described in the privacy policy.',
+          "Online payments are passed on to your organisation's Stripe account minus MyTickets' fee, which includes Stripe's card costs. Stripe's costs of paying you out (a fee on each payout to your bank, and a monthly fee in months with payouts) are yours too. MyTickets sets them aside from your payments before passing them on, keeping a small buffer so they are always paid in advance. The buffer stays your money and is settled when your organisation closes.",
         ],
       },
       {
@@ -112,6 +113,7 @@ export const terms: Record<Language, LegalDocument> = {
         body: [
           'Maak je een organisatie aan, dan ben je verantwoordelijk voor haar pagina, evenementen, prijzen en de manier waarop ze met haar leden omgaat, en voor het naleven van de wetten die daarop van toepassing zijn (consumentenrecht, belastingen, vergunningen).',
           'Je bepaalt welke gegevens je organisatie aan leden vraagt en je bent onder de AVG (GDPR) verwerkingsverantwoordelijke voor die gegevens. MyTickets verwerkt ze in jouw opdracht, zoals beschreven in de privacyverklaring.',
+          'Online betalingen gaan naar het Stripe-account van je organisatie, min de vergoeding van MyTickets, waarin de kaartkosten van Stripe zitten. De kosten die Stripe rekent om je uit te betalen (per uitbetaling naar je bank, en maandelijks in maanden met uitbetalingen) zijn ook voor jou. MyTickets houdt ze opzij van je betalingen voor ze worden doorgestort, met een kleine buffer zodat ze altijd vooraf betaald zijn. Die buffer blijft jouw geld en wordt verrekend wanneer je organisatie stopt.',
         ],
       },
       {
