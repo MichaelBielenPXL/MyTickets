@@ -51,6 +51,8 @@ builder.Services.AddScoped<DoorService>();
 builder.Services.AddScoped<ProfileCopyService>();
 builder.Services.AddScoped<AccountService>();
 builder.Services.AddScoped<PasswordResetService>();
+builder.Services.AddScoped<MyTickets.Api.Services.Tickets.TicketDocuments>();
+builder.Services.AddScoped<MyTickets.Api.Services.Tickets.TicketMailer>();
 builder.Services.AddEmail(builder.Configuration);
 builder.Services.AddSingleton<AppleWalletPasses>();
 builder.Services.AddSingleton<GoogleWalletPasses>();
@@ -120,6 +122,9 @@ builder.Services.AddRateLimiter(options =>
 });
 
 builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+
+// Ticket PDFs (QuestPDF): free under its Community licence for organisations under $1M a year in revenue.
+QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
 
 var app = builder.Build();
 

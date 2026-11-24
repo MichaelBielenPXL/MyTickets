@@ -1,33 +1,19 @@
 import { QRCodeSVG } from 'qrcode.react'
-import { useState } from 'react'
 
-import { t } from '@/lib/i18n'
+import { getLanguage, t } from '@/lib/i18n'
 import { dateTime } from '@/utils/format'
 
 import type { MyTicket } from '../types'
-import { downloadTicketPdf } from '../utils/ticket-pdf'
 
 type TicketCardProps = {
   ticket: MyTicket
-  /** Printed on the PDF; left off when unknown. */
-  holderName: string | null
   /** Whether the QR code is showing. */
   open: boolean
   onToggle: () => void
 }
 
-export function TicketCard({ ticket, holderName, open, onToggle }: TicketCardProps) {
+export function TicketCard({ ticket, open, onToggle }: TicketCardProps) {
   const used = ticket.status === 'CheckedIn'
-  const [saving, setSaving] = useState(false)
-
-  async function download() {
-    setSaving(true)
-    try {
-      await downloadTicketPdf(ticket, holderName)
-    } finally {
-      setSaving(false)
-    }
-  }
 
   return (
     <div className="ticket">
@@ -54,9 +40,14 @@ export function TicketCard({ ticket, holderName, open, onToggle }: TicketCardPro
           />
           <code>{ticket.code}</code>
           <p className="muted">{t('Show this at the door, or tap your card.')}</p>
-          <button type="button" className="btn small" disabled={saving} onClick={() => void download()}>
-            {saving ? t('One moment…') : t('Download PDF')}
-          </button>
+          {/* Made by the server: the same PDF as in the email after buying. */}
+          <a
+            className="btn small"
+            href={`/api/orgs/${ticket.organisationSlug}/me/tickets/${ticket.id}/pdf?lang=${getLanguage()}`}
+            download
+          >
+            {t('Download PDF')}
+          </a>
         </div>
       )}
     </div>

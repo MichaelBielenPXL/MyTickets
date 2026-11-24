@@ -4,8 +4,11 @@ using MimeKit;
 
 namespace MyTickets.Api.Services.Email;
 
-/// <summary>One email: to whom, the subject, and the text (plain text, which every mail app shows well).</summary>
-public record EmailMessage(string To, string Subject, string Text);
+/// <summary>One email: to whom, the subject, the text (plain text, which every mail app shows well), and any files.</summary>
+public record EmailMessage(string To, string Subject, string Text, IReadOnlyList<EmailAttachment>? Attachments = null);
+
+/// <summary>A file sent along with an email, such as tickets as a PDF.</summary>
+public record EmailAttachment(string FileName, string ContentType, byte[] Content);
 
 /// <summary>Sends email. Which one is used depends on whether the server has a mail account set up (see <see cref="EmailSetup"/>).</summary>
 public interface IEmailSender
@@ -35,7 +38,10 @@ public class SmtpEmailSender(EmailSettings settings) : IEmailSender
         mail.From.Add(new MailboxAddress(settings.FromName, settings.From));
         mail.To.Add(MailboxAddress.Parse(message.To));
         mail.Subject = message.Subject;
-        mail.Body = new TextPart("plain") { Text = message.Text };
+        var body = new BodyBuilder { TextBody = message.Text };
+        foreach (var file in message.Attachments ?? [])
+            body.Attachments.Add(file.FileName, file.Content, ContentType.Parse(file.ContentType));
+        mail.Body = body.ToMessageBody();
 
         using var smtp = new SmtpClient();
         await smtp.ConnectAsync(settings.Host, settings.Port, settings.Port == 465 ? SecureSocketOptions.SslOnConnect : SecureSocketOptions.StartTls, ct);
@@ -53,8 +59,8 @@ public class LogOnlyEmailSender(ILogger<LogOnlyEmailSender> log) : IEmailSender
 {
     public Task SendAsync(EmailMessage message, CancellationToken ct = default)
     {
-        log.LogWarning("Email is not set up (Email:Host, Email:From), so this email to {To} was not sent:\n{Subject}\n\n{Text}",
-            message.To, message.Subject, message.Text);
+        log.LogWarning("Email is not set up (Email:Host, Email:From), so this email to {To} was not sent:\n{Subject}\n\n{Text}\n(attached: {Files})",
+            message.To, message.Subject, message.Text, string.Join(", ", (message.Attachments ?? []).Select(a => a.FileName)));
         return Task.CompletedTask;
     }
 }

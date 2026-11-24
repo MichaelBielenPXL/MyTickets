@@ -24,4 +24,6 @@ public class User
     /// <summary>Free text, as people say it: "2nd bachelor", "Master 1".</summary>
     public string? StudyYear { get; set; }
     public DateTime? ProfileUpdatedAt { get; set; }
+    /// <summary>The language they use the app in ("en", "nl"), for the emails they get from this organisation.</summary>
+    public string? Language { get; set; }
 }

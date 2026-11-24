@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using MyTickets.Api.Data;
 using MyTickets.Api.Services;
+using MyTickets.Api.Services.Tickets;
 
 namespace MyTickets.Api.Endpoints;
 
@@ -71,6 +72,18 @@ public static class MeEndpoints
                     OrganisationName = o.Name, OrganisationSlug = o.Slug,
                 }).ToListAsync();
             return Results.Ok(tickets);
+        });
+
+        // One ticket as a PDF to print or keep: the same as in the email after buying.
+        group.MapGet("/tickets/{id:guid}/pdf", async (Guid id, string? lang, HttpContext http, AppDbContext db, TicketDocuments documents) =>
+        {
+            if (http.User.TryUserId() is not { } userId) return Http.Error(404, "Ticket not found.");
+            var ticket = await db.Tickets.AsNoTracking().Where(t => t.Id == id && t.UserId == userId)
+                .Select(t => new { EventName = t.TicketType.Event.Name }).FirstOrDefaultAsync();
+            if (ticket is null) return Http.Error(404, "Ticket not found.");
+            var organisation = await db.Organisations.AsNoTracking().FirstAsync();
+            var pdf = TicketPdf.Render(await documents.PagesAsync([id]), dutch: lang == "nl");
+            return Results.File(pdf, "application/pdf", TicketDocuments.FileName(organisation.Slug, ticket.EventName));
         });
 
         group.MapGet("/cards", async (HttpContext http, AppDbContext db) =>
@@ -150,8 +163,14 @@ public static class MeEndpoints
             return Results.Ok(await PaymentViewAsync(db, id, userId));
         });
 
-        payments.MapPost("/{id:guid}/test-pay", (Guid id, HttpContext http, AppDbContext db, PaymentService service) =>
-            FinishTestPayment(id, http, db, () => service.CompleteAsync(id)));
+        // Paid: what completing it set in motion (the tickets email, say) goes out now, as after a Stripe payment.
+        payments.MapPost("/{id:guid}/test-pay", (Guid id, HttpContext http, AppDbContext db, PaymentService service, OutboxDispatcher outbox) =>
+            FinishTestPayment(id, http, db, async () =>
+            {
+                var done = await service.CompleteAsync(id);
+                if (done) await outbox.ProcessDueAsync();
+                return done;
+            }));
         payments.MapPost("/{id:guid}/test-cancel", (Guid id, HttpContext http, AppDbContext db, PaymentService service) =>
             FinishTestPayment(id, http, db, () => service.FailAsync(id)));
     }

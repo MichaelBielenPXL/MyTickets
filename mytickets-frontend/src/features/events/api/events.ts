@@ -4,6 +4,7 @@ import { organisationKeys } from '@/features/organisations'
 import { ticketKeys } from '@/features/tickets'
 import { walletKeys } from '@/features/wallet'
 import { api } from '@/lib/api-client'
+import { getLanguage } from '@/lib/i18n'
 
 import type { EventDetail, OrderRequest, OrderResult } from '../types'
 
@@ -34,8 +35,9 @@ export function usePublicEvent(slug: string, eventId: string, enabled = true) {
 export function useOrderTickets(slug: string, eventId: string) {
   const queryClient = useQueryClient()
   return useMutation({
+    // The app's language comes along, for the email with the tickets.
     mutationFn: (order: OrderRequest) =>
-      api.post<OrderResult>(`/orgs/${slug}/events/${eventId}/order`, order),
+      api.post<OrderResult>(`/orgs/${slug}/events/${eventId}/order`, { ...order, language: getLanguage() }),
     // Whether it worked or not, availability, credit and "my tickets" may all have changed.
     onSettled: () =>
       Promise.all([

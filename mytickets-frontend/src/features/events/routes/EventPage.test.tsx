@@ -61,7 +61,12 @@ describe('EventPage', () => {
     await user.click(screen.getByRole('button', { name: /^Pay €\s12,50/ }))
 
     expect(await screen.findByText('Now at /checkout/pay-1')).toBeInTheDocument()
-    expect(order).toEqual({ items: [{ ticketTypeId: 'type-regular', quantity: 2 }], payWith: 'online' })
+    // With the app's language, for the email with the tickets.
+    expect(order).toEqual({
+      items: [{ ticketTypeId: 'type-regular', quantity: 2 }],
+      payWith: 'online',
+      language: 'en',
+    })
   })
 
   it('offers paying with tokens only when there are enough of them', async () => {

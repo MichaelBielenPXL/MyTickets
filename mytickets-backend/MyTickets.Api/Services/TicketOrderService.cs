@@ -8,15 +8,16 @@ namespace MyTickets.Api.Services;
 /// A member ordering tickets for an event, paid with tokens or online. The checks and the reservation happen in one
 /// transaction, so two buyers can never get the last ticket both. Refusals are <see cref="AppProblem"/>s.
 /// </summary>
-public class TicketOrderService(AppDbContext db, WalletService wallets, PaymentService payments, TimeProvider clock)
+public class TicketOrderService(AppDbContext db, WalletService wallets, PaymentService payments, OutboxDispatcher outbox, TimeProvider clock)
 {
     public record Item(Guid TicketTypeId, int Quantity);
 
     /// <summary>The tickets are theirs (or held, when <see cref="CheckoutUrl"/> is where to pay for them).</summary>
     public record Result(string? CheckoutUrl, int Tickets, int TotalCents);
 
+    /// <param name="language">The language they use the app in, for the email with their tickets.</param>
     public async Task<Result> OrderAsync(Organisation organisation, Membership? membership, Guid userId, Guid eventId,
-        IEnumerable<Item>? requested, bool payWithWallet)
+        IEnumerable<Item>? requested, bool payWithWallet, string? language = null)
     {
         var now = clock.GetUtcNow().UtcDateTime;
         if (membership is null) throw AppProblem.Forbidden("Join this organisation to buy tickets.");
@@ -54,10 +55,15 @@ public class TicketOrderService(AppDbContext db, WalletService wallets, PaymentS
             await payments.PrepareAsync(payment);
         }
         db.Tickets.AddRange(tickets);
+        if (language is "en" or "nl") await db.Users.Where(u => u.Id == userId).ExecuteUpdateAsync(s => s.SetProperty(u => u.Language, language));
+        // Theirs already (paid with tokens, or free): their tickets are emailed, saved together with the order. Paid
+        // online, that happens once the payment completes (see PaymentService.CompleteAsync).
+        if (payment is null) db.Publish(OutboxEvents.TicketsIssued, new OutboxEvents.TicketsIssuedData(tickets.Select(t => t.Id).ToList()), now);
         await db.SaveChangesAsync();
         await tx.CommitAsync();
         // The tickets are held for this buyer now; open the payment page only after letting go of the database.
         var checkoutUrl = payment is null ? null : await payments.CheckoutAsync(payment.Id);
+        if (payment is null) await outbox.ProcessDueAsync();
         return new Result(checkoutUrl, tickets.Count, total);
     }
 

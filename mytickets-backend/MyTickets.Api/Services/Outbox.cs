@@ -15,6 +15,11 @@ public static class OutboxEvents
 
     public record PaymentCompletedData(Guid PaymentId);
 
+    /// <summary>Tickets became valid (paid, or free): emailed to the buyer, with a PDF (see <see cref="Tickets.TicketMailer"/>).</summary>
+    public const string TicketsIssued = "TicketsIssued";
+
+    public record TicketsIssuedData(List<Guid> TicketIds);
+
     /// <summary>Adds the event to the outbox; it is saved with the caller's other changes.</summary>
     public static void Publish(this AppDbContext db, string type, object data, DateTime now) =>
         db.Outbox.Add(new OutboxMessage
@@ -87,6 +92,10 @@ public class OutboxDispatcher(AppDbContext db, IServiceProvider services, TimePr
             case OutboxEvents.PaymentCompleted:
                 var data = JsonSerializer.Deserialize<OutboxEvents.PaymentCompletedData>(message.Data)!;
                 return await services.GetRequiredService<SettlementService>().SettleAsync(data.PaymentId);
+            case OutboxEvents.TicketsIssued:
+                var issued = JsonSerializer.Deserialize<OutboxEvents.TicketsIssuedData>(message.Data)!;
+                await services.GetRequiredService<Tickets.TicketMailer>().SendAsync(issued.TicketIds);
+                return true;
             default:
                 throw new InvalidOperationException($"No handler for outbox event \"{message.Type}\".");
         }

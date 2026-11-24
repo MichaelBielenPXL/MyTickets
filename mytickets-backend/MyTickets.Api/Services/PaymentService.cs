@@ -165,6 +165,9 @@ public class PaymentService(AppDbContext db, WalletService wallets, MembershipSe
             case PaymentPurpose.Tickets:
                 await db.Tickets.Where(t => t.PaymentId == payment.Id && t.Status == TicketStatus.Reserved)
                     .ExecuteUpdateAsync(s => s.SetProperty(t => t.Status, TicketStatus.Valid));
+                // Theirs now: emailed to them, with the PDF.
+                var issued = await db.Tickets.Where(t => t.PaymentId == payment.Id).Select(t => t.Id).ToListAsync();
+                db.Publish(OutboxEvents.TicketsIssued, new OutboxEvents.TicketsIssuedData(issued), now);
                 break;
             case PaymentPurpose.Membership:
                 var tier = await db.MembershipTiers.FirstAsync(t => t.Id == payment.TierId);

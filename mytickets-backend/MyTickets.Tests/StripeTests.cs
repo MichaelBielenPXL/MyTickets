@@ -202,7 +202,9 @@ public class StripeTests : IClassFixture<StripeTestApp>
         }
 
         // The payment and its "pass it on" event were saved together; the failed try is on the event, to retry later.
-        var waiting = Assert.Single(await OutboxAsync(shop.Slug));
+        // The tickets email went out straight away; passing the money on is what waits.
+        var waiting = Assert.Single(await OutboxAsync(shop.Slug), m => m.Type == OutboxEvents.PaymentCompleted);
+        Assert.NotNull(Assert.Single(await OutboxAsync(shop.Slug), m => m.Type == OutboxEvents.TicketsIssued).ProcessedAt);
         Assert.Equal((OutboxEvents.PaymentCompleted, 1, (DateTime?)null), (waiting.Type, waiting.Attempts, waiting.ProcessedAt));
         Assert.NotNull(waiting.LastError);
         Assert.True(waiting.NextAttemptAt > DateTime.UtcNow);
@@ -211,7 +213,7 @@ public class StripeTests : IClassFixture<StripeTestApp>
         await TidyUpAsync(shop.Slug);
         await TidyUpAsync(shop.Slug);
         Assert.Equal("935", Stripe.TransferFor(paymentId)!["amount"]);
-        var done = Assert.Single(await OutboxAsync(shop.Slug));
+        var done = Assert.Single(await OutboxAsync(shop.Slug), m => m.Type == OutboxEvents.PaymentCompleted);
         Assert.Equal((2, (string?)null), (done.Attempts, done.LastError));
         Assert.NotNull(done.ProcessedAt);
     }

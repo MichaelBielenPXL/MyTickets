@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 
 import { QueryResult } from '@/components'
-import { useAccount } from '@/features/auth'
 import { t } from '@/lib/i18n'
 
 import { useMyTickets } from '../api/tickets'
@@ -19,15 +18,12 @@ export function TicketsPage() {
   const [pastBefore] = useState(() => Date.now() - DAY_MS)
   const { slug = '' } = useParams()
   const tickets = useMyTickets(slug)
-  // The name on the PDF: the account at this organisation.
-  const holderName = useAccount(slug).data?.displayName ?? null
 
   function renderList(list: MyTicket[]) {
     return list.map((ticket) => (
       <TicketCard
         key={ticket.id}
         ticket={ticket}
-        holderName={holderName}
         open={openId === ticket.id}
         onToggle={() => setOpenId(openId === ticket.id ? null : ticket.id)}
       />

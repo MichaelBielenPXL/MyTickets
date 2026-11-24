@@ -3,10 +3,7 @@ import { screen } from '@testing-library/react'
 import { renderApp } from '@/test/render'
 
 import type { MyTicket } from '../types'
-import { downloadTicketPdf } from '../utils/ticket-pdf'
 import { TicketCard } from './TicketCard'
-
-vi.mock('../utils/ticket-pdf', () => ({ downloadTicketPdf: vi.fn(() => Promise.resolve()) }))
 
 const ticket: MyTicket = {
   id: 't1',
@@ -23,13 +20,11 @@ const ticket: MyTicket = {
 }
 
 describe('TicketCard', () => {
-  it('downloads the ticket as a PDF, with the holder’s name', async () => {
-    const { user } = renderApp(
-      <TicketCard ticket={ticket} holderName="Gijs Guest" open onToggle={() => {}} />,
-    )
+  it('downloads the ticket as the PDF the server makes, in the app’s language', () => {
+    renderApp(<TicketCard ticket={ticket} open onToggle={() => {}} />)
 
-    await user.click(screen.getByRole('button', { name: 'Download PDF' }))
-
-    expect(downloadTicketPdf).toHaveBeenCalledWith(ticket, 'Gijs Guest')
+    const link = screen.getByRole('link', { name: 'Download PDF' })
+    expect(link).toHaveAttribute('href', '/api/orgs/night-owls/me/tickets/t1/pdf?lang=en')
+    expect(link).toHaveAttribute('download')
   })
 })

@@ -7,7 +7,8 @@ namespace MyTickets.Api.Endpoints;
 /// <summary>An event's page for a member, with their own prices, and ordering tickets (see <see cref="TicketOrderService"/>).</summary>
 public static class MemberEventEndpoints
 {
-    public record OrderRequest(List<TicketOrderService.Item>? Items, string? PayWith);
+    /// <summary>Language: the one the app is in ("en", "nl"), for the email with the tickets.</summary>
+    public record OrderRequest(List<TicketOrderService.Item>? Items, string? PayWith, string? Language = null);
 
     public static void MapMemberEvents(this RouteGroupBuilder org)
     {
@@ -42,7 +43,7 @@ public static class MemberEventEndpoints
         org.MapPost("/events/{eventId:guid}/order", async (Guid eventId, OrderRequest req, HttpContext http, TicketOrderService orders) =>
         {
             var (organisation, membership) = http.Org();
-            return Results.Ok(await orders.OrderAsync(organisation, membership, http.User.UserId(), eventId, req.Items, req.PayWith == "wallet"));
+            return Results.Ok(await orders.OrderAsync(organisation, membership, http.User.UserId(), eventId, req.Items, req.PayWith == "wallet", req.Language));
         });
     }
 }
