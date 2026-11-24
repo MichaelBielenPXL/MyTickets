@@ -14,7 +14,7 @@ public static class MemberEventEndpoints
         org.MapGet("/events/{eventId:guid}", async (Guid eventId, HttpContext http, AppDbContext db, TimeProvider clock) =>
         {
             var (o, membership) = http.Org();
-            var userId = http.User.UserId();
+            var userId = http.User.TryUserId();
             var now = clock.GetUtcNow().UtcDateTime;
             var ev = await db.Events.AsNoTracking().Include(e => e.TicketTypes)
                 .FirstOrDefaultAsync(e => e.Id == eventId && e.OrganisationId == o.Id && e.Published);

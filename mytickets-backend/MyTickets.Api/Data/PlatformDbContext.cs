@@ -2,11 +2,15 @@ using Microsoft.EntityFrameworkCore;
 
 namespace MyTickets.Api.Data;
 
-/// <summary>The small shared database: the list of organisations and their owners. No guest data lives here.</summary>
+/// <summary>
+/// The small shared database: the organisations, everyone's MyTickets account (email and password), and which
+/// organisations each account has a record at. Everything an organisation knows about someone lives in its own database.
+/// </summary>
 public class PlatformDbContext(DbContextOptions<PlatformDbContext> options) : DbContext(options)
 {
     public DbSet<Tenant> Tenants => Set<Tenant>();
-    public DbSet<OwnerAccount> OwnerAccounts => Set<OwnerAccount>();
+    public DbSet<Account> Accounts => Set<Account>();
+    public DbSet<AccountLink> AccountLinks => Set<AccountLink>();
     public DbSet<TenantOwner> TenantOwners => Set<TenantOwner>();
     public DbSet<CardCode> CardCodes => Set<CardCode>();
 
@@ -18,9 +22,11 @@ public class PlatformDbContext(DbContextOptions<PlatformDbContext> options) : Db
     protected override void OnModelCreating(ModelBuilder b)
     {
         b.Entity<Tenant>().HasIndex(x => x.Slug).IsUnique();
-        b.Entity<OwnerAccount>().HasIndex(x => x.Email).IsUnique();
-        b.Entity<TenantOwner>().HasKey(x => new { x.TenantId, x.OwnerAccountId });
-        b.Entity<TenantOwner>().HasIndex(x => x.OwnerAccountId);
+        b.Entity<Account>().ToTable("Accounts").HasIndex(x => x.Email).IsUnique();
+        b.Entity<AccountLink>().HasKey(x => new { x.AccountId, x.TenantId });
+        b.Entity<AccountLink>().HasIndex(x => x.TenantId);
+        b.Entity<TenantOwner>().HasKey(x => new { x.TenantId, x.AccountId });
+        b.Entity<TenantOwner>().HasIndex(x => x.AccountId);
         b.Entity<CardCode>().HasKey(x => x.Code);
         b.Entity<CardCode>().HasIndex(x => x.TenantId);
     }

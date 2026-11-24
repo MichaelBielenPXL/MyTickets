@@ -10,23 +10,38 @@ public static class MeEndpoints
 
     public static void MapMe(this IEndpointRouteBuilder app)
     {
-        // Everything a person owns belongs to their account at one organisation.
+        // Everything a person has here belongs to their record at this organisation.
         var group = app.MapGroup("/api/orgs/{slug}/me").RequireAuthorization();
 
-        // The details asked when choosing a membership, and which ones this organisation asks.
-        group.MapGet("/profile", async (HttpContext http, AppDbContext db) =>
+        // The details asked when choosing a membership, and which ones this organisation asks. Someone who hasn't
+        // joined yet has no record here: an empty form, with their account's email address.
+        group.MapGet("/profile", async (HttpContext http, AppDbContext db, AccountService accounts) =>
         {
-            var userId = http.User.UserId();
-            var user = await db.Users.AsNoTracking().FirstAsync(u => u.Id == userId);
             var modes = ProfileFields.Read(await db.Organisations.AsNoTracking().FirstAsync());
-            return Results.Ok(new { Fields = modes, Profile = ProfileFields.Of(user), Complete = ProfileFields.IsComplete(user, modes), user.Email });
+            var userId = http.User.TryUserId();
+            var user = userId is null ? null : await db.Users.AsNoTracking().FirstAsync(u => u.Id == userId);
+            if (user is not null)
+                return Results.Ok(new { Fields = modes, Profile = ProfileFields.Of(user), Complete = ProfileFields.IsComplete(user, modes), user.Email });
+            var account = await accounts.FindAsync(AccountIdOf(http));
+            return Results.Ok(new { Fields = modes, Profile = ProfileFields.Empty, Complete = false, account!.Email });
         });
 
-        group.MapPut("/profile", async (ProfileFields.Values values, HttpContext http, AppDbContext db, TimeProvider clock) =>
+        // Bringing over the details given at another organisation they are in, to fill this one's form with. Nothing is
+        // saved: the person checks the form and saves it as usual. Only what this organisation asks comes along.
+        group.MapGet("/profile/copy-sources", async (HttpContext http, TenantContext tenant, ProfileCopyService copy) =>
+            Results.Ok(await copy.SourcesAsync(AccountIdOf(http), tenant.Required.Id)));
+
+        group.MapGet("/profile/copy-from/{fromSlug}", async (string fromSlug, HttpContext http, AppDbContext db, ProfileCopyService copy) =>
+            Results.Ok(ProfileFields.OnlyAsked(await copy.DetailsFromAsync(AccountIdOf(http), fromSlug),
+                ProfileFields.Read(await db.Organisations.AsNoTracking().FirstAsync()))));
+
+        // Saving their details is the first step of joining: their record here is made now if it wasn't yet.
+        group.MapPut("/profile", async (ProfileFields.Values values, HttpContext http, AppDbContext db, TenantContext tenant,
+            AccountService accounts, TimeProvider clock) =>
         {
-            var userId = http.User.UserId();
             var modes = ProfileFields.Read(await db.Organisations.AsNoTracking().FirstAsync());
             if (ProfileFields.Problem(values, modes) is { } problem) return Http.Error(400, problem);
+            var userId = http.User.TryUserId() ?? await accounts.EnsureRecordAtAsync(AccountIdOf(http), tenant.Required);
             var user = await db.Users.FirstAsync(u => u.Id == userId);
             ProfileFields.Apply(user, values, modes, clock.GetUtcNow().UtcDateTime);
             await db.SaveChangesAsync();
@@ -34,12 +49,15 @@ public static class MeEndpoints
         });
 
         // Every membership they have had here, newest first: the years they were a member, and as what.
+        // The lists below are simply empty for someone who hasn't joined yet.
         group.MapGet("/memberships", async (HttpContext http, AppDbContext db, TimeProvider clock) =>
-            Results.Ok(await MembershipService.HistoryAsync(db, http.User.UserId(), clock.GetUtcNow().UtcDateTime)));
+            http.User.TryUserId() is { } userId
+                ? Results.Ok(await MembershipService.HistoryAsync(db, userId, clock.GetUtcNow().UtcDateTime))
+                : Results.Ok(Array.Empty<object>()));
 
         group.MapGet("/tickets", async (HttpContext http, AppDbContext db) =>
         {
-            var userId = http.User.UserId();
+            if (http.User.TryUserId() is not { } userId) return Results.Ok(Array.Empty<object>());
             var tickets = await (
                 from t in db.Tickets.AsNoTracking()
                 join e in db.Events on t.EventId equals e.Id
@@ -57,7 +75,7 @@ public static class MeEndpoints
 
         group.MapGet("/cards", async (HttpContext http, AppDbContext db) =>
         {
-            var userId = http.User.UserId();
+            if (http.User.TryUserId() is not { } userId) return Results.Ok(Array.Empty<object>());
             // Members claim cards by tapping them (see CardEndpoints); they see the printed number, not the chip's serial.
             var cards = await db.NfcCards.AsNoTracking().Where(c => c.Wallet!.UserId == userId).OrderBy(c => c.LinkedAt)
                 .Select(c => new { c.Id, c.Number, c.Label, c.Blocked, c.LinkedAt }).ToListAsync();
@@ -180,4 +198,8 @@ public static class MeEndpoints
         return new MemberPassData(membership.Id, org.Id, org.Name, org.BrandColor, membership.User.DisplayName, membership.Tier.Name,
             membership.ExpiresAt, membership.IsActive(clock.GetUtcNow().UtcDateTime), code, logo, Images.Url(org.LogoKey));
     }
+
+    /// <summary>The MyTickets account of this request (these endpoints are for signed-in people only).</summary>
+    private static Guid AccountIdOf(HttpContext http) =>
+        Sessions.AccountId(http) ?? throw new AppProblem(401, "Sign in first.");
 }

@@ -14,7 +14,7 @@ public static class WalletEndpoints
         org.MapGet("/wallet", async (HttpContext http, AppDbContext db) =>
         {
             var (o, _) = http.Org();
-            var userId = http.User.UserId();
+            var userId = http.User.TryUserId();
             var wallet = await db.Wallets.AsNoTracking().FirstOrDefaultAsync(w => w.UserId == userId && w.OrganisationId == o.Id);
             if (wallet is null) return Http.Error(404, "Join this organisation to get a wallet.");
             var transactions = await db.WalletTransactions.AsNoTracking().Where(t => t.WalletId == wallet.Id)

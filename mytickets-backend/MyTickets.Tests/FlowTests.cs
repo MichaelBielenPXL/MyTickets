@@ -822,54 +822,53 @@ public class FlowTests : IClassFixture<TestApp>
     }
 
     [Fact]
-    public async Task The_same_person_at_two_organisations_has_two_separate_accounts()
+    public async Task One_account_joins_several_organisations_each_keeping_its_own_record()
     {
         var first = await NewOrgAsync();
         var second = await NewOrgAsync();
         var beer = (await second.Admin.PostOkAsync($"{second.Url}/admin/products", new { name = "Beer", priceCents = 100, active = true })).Str("id");
         var email = $"gijs-{Guid.NewGuid():N}@example.com";
 
-        // Registering at the first organisation says nothing about the second.
-        var atFirst = await _app.NewGuestAsync(first.Slug, "Gijs", email);
-        await atFirst.PostOkAsync($"{first.Url}/join", new { tierId = first.FreeTierId });
-        var card = await LinkCardAsync(atFirst, first);
-        await TopUpAsync(atFirst, first, 2000);
-        Assert.Equal(HttpStatusCode.Unauthorized, (await atFirst.GetAsync($"{second.Url}/wallet")).StatusCode);
-        var login = await _app.CreateClient().PostAsJsonAsync("/api/auth/login", new { email, password = "correct horse", acceptTerms = true, organisationSlug = second.Slug });
-        Assert.Equal(HttpStatusCode.Unauthorized, login.StatusCode);
+        var gijs = await _app.NewGuestAsync(first.Slug, "Gijs", email);
+        await gijs.PostOkAsync($"{first.Url}/join", new { tierId = first.FreeTierId });
+        var card = await LinkCardAsync(gijs, first);
+        await TopUpAsync(gijs, first, 2000);
 
-        // The same email address can sign up there too, and starts from nothing.
-        var again = await atFirst.PostAsJsonAsync("/api/auth/register", new { email, password = "another password", acceptTerms = true, displayName = "Gijs", joinOrganisationSlug = second.Slug });
-        Assert.True(again.IsSuccessStatusCode, await again.Content.ReadAsStringAsync());
-        (await atFirst.PutAsJsonAsync($"{second.Url}/me/profile", new { firstName = "Gijs", lastName = "Jazz" })).EnsureSuccessStatusCode();
-        await atFirst.PostOkAsync($"{second.Url}/join", new { tierId = second.FreeTierId });
-        Assert.Equal(2000, await BalanceAsync(atFirst, first));
-        Assert.Equal(0, await BalanceAsync(atFirst, second));
-        Assert.Empty((await atFirst.GetOkAsync($"{second.Url}/me/cards")).AsArray());
+        // Signed in, but not at the second organisation yet: nothing of his there.
+        Assert.Equal(HttpStatusCode.NotFound, (await gijs.GetAsync($"{second.Url}/wallet")).StatusCode);
+        Assert.Empty((await gijs.GetOkAsync($"{second.Url}/me/cards")).AsArray());
+        // One account per address: signing up again is refused, he signs in instead.
+        var again = await _app.CreateClient().PostAsJsonAsync("/api/auth/register", new { email, password = "another password", acceptTerms = true, joinOrganisationSlug = second.Slug });
+        Assert.Equal(HttpStatusCode.Conflict, again.StatusCode);
+        Assert.Contains("account-exists", await again.Content.ReadAsStringAsync());
+
+        // Joining the second makes his record there, which starts from nothing.
+        (await gijs.PutAsJsonAsync($"{second.Url}/me/profile", new { firstName = "Gijs", lastName = "Jazz" })).EnsureSuccessStatusCode();
+        await gijs.PostOkAsync($"{second.Url}/join", new { tierId = second.FreeTierId });
+        Assert.Equal(2000, await BalanceAsync(gijs, first));
+        Assert.Equal(0, await BalanceAsync(gijs, second));
+        Assert.Empty((await gijs.GetOkAsync($"{second.Url}/me/cards")).AsArray());
 
         // The card linked at the first organisation is unknown at the second, until it is linked there as well.
         var charge = new { cardUid = card, items = new[] { new { productId = beer, quantity = 1 } } };
         Assert.Equal(HttpStatusCode.NotFound, (await second.Admin.PostAsJsonAsync($"{second.Url}/staff/charge", charge)).StatusCode);
-        await LinkCardAsync(atFirst, second, card);
+        await LinkCardAsync(gijs, second, card);
         Assert.Equal(HttpStatusCode.PaymentRequired, (await second.Admin.PostAsJsonAsync($"{second.Url}/staff/charge", charge)).StatusCode);
 
-        // The browser is now signed in to both, with a different account at each.
-        var me = await atFirst.GetOkAsync("/api/auth/me");
-        var accounts = me["memberships"]!.AsArray();
-        Assert.Equal(2, accounts.Count);
-        Assert.NotEqual(accounts[0]!.Str("userId"), accounts[1]!.Str("userId"));
+        // One account, a separate record at each organisation.
+        var me = await gijs.GetOkAsync("/api/auth/me");
+        var records = me["memberships"]!.AsArray();
+        Assert.Equal(2, records.Count);
+        Assert.NotEqual(records[0]!.Str("userId"), records[1]!.Str("userId"));
         Assert.False(me["isOwner"]!.GetValue<bool>());
 
-        // Each password only works where it was chosen.
+        // One password, everywhere; signing out is everywhere too.
         var fresh = _app.CreateClient();
-        Assert.Equal(HttpStatusCode.Unauthorized, (await fresh.PostAsJsonAsync("/api/auth/login", new { email, password = "another password", organisationSlug = first.Slug })).StatusCode);
-        Assert.Equal(HttpStatusCode.OK, (await fresh.PostAsJsonAsync("/api/auth/login", new { email, password = "another password", organisationSlug = second.Slug })).StatusCode);
+        await fresh.PostOkAsync("/api/auth/login", new { email, password = "correct horse", organisationSlug = second.Slug });
+        Assert.Equal(2000, await BalanceAsync(fresh, first));
+        (await fresh.PostAsJsonAsync("/api/auth/logout", new { })).EnsureSuccessStatusCode();
+        Assert.Equal(HttpStatusCode.Unauthorized, (await fresh.GetAsync("/api/auth/me")).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await fresh.GetAsync($"{first.Url}/wallet")).StatusCode);
-
-        // Signing out of one organisation leaves the other signed in.
-        (await atFirst.PostAsJsonAsync("/api/auth/logout", new { organisationSlug = second.Slug })).EnsureSuccessStatusCode();
-        Assert.Equal(HttpStatusCode.Unauthorized, (await atFirst.GetAsync($"{second.Url}/wallet")).StatusCode);
-        Assert.Equal(2000, await BalanceAsync(atFirst, first));
     }
 
     [Fact]
@@ -888,34 +887,34 @@ public class FlowTests : IClassFixture<TestApp>
         Assert.Contains((await first.Admin.GetOkAsync($"{first.Url}/admin/members")).AsArray(), m => m!.Str("email") == guestEmail);
         Assert.DoesNotContain((await second.Admin.GetOkAsync($"{second.Url}/admin/members")).AsArray(), m => m!.Str("email") == guestEmail);
 
-        // On disk: one database file per organisation, and the guest's email address is in exactly one of them.
+        // On disk: one database file per organisation, and the guest's record is in exactly one of them. The platform
+        // database has their MyTickets account (to sign in with), but none of what they told the organisation.
         var files = Directory.GetFiles(Path.Combine(_app.DataFolder, "organisations"), "*.db");
         var organisations = (await first.Admin.GetOkAsync("/api/orgs")).AsArray().Count;
         Assert.Equal(organisations, files.Length);
-        Assert.Equal(1, files.Count(file => DatabaseContains(file, guestEmail)));
-        Assert.False(DatabaseContains(Path.Combine(_app.DataFolder, "platform.db"), guestEmail));
+        Assert.Equal(1, files.Count(file => DatabaseContains(file, "Users", guestEmail)));
+        var platform = Path.Combine(_app.DataFolder, "platform.db");
+        Assert.True(DatabaseContains(platform, "Accounts", guestEmail));
+        Assert.False(DatabaseContains(platform, "Users", guestEmail));
     }
 
-    private static bool DatabaseContains(string file, string email)
+    /// <summary>Whether the database file has a row with this email address in that table (false when there is no such table).</summary>
+    private static bool DatabaseContains(string file, string table, string email)
     {
         using var connection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={file};Mode=ReadOnly;Pooling=False");
         connection.Open();
-        using var tables = connection.CreateCommand();
-        tables.CommandText = "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('Users', 'OwnerAccounts')";
-        var names = new List<string>();
-        using (var reader = tables.ExecuteReader()) while (reader.Read()) names.Add(reader.GetString(0));
-        foreach (var table in names)
-        {
-            using var count = connection.CreateCommand();
-            count.CommandText = $"SELECT COUNT(*) FROM \"{table}\" WHERE \"Email\" = $email";
-            count.Parameters.AddWithValue("$email", email);
-            if ((long)count.ExecuteScalar()! > 0) return true;
-        }
-        return false;
+        using var exists = connection.CreateCommand();
+        exists.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = $table";
+        exists.Parameters.AddWithValue("$table", table);
+        if ((long)exists.ExecuteScalar()! == 0) return false;
+        using var count = connection.CreateCommand();
+        count.CommandText = $"SELECT COUNT(*) FROM \"{table}\" WHERE \"Email\" = $email";
+        count.Parameters.AddWithValue("$email", email);
+        return (long)count.ExecuteScalar()! > 0;
     }
 
     [Fact]
-    public async Task Entering_an_email_tells_whether_there_is_an_account_at_that_organisation()
+    public async Task Entering_an_email_tells_whether_there_is_a_MyTickets_account()
     {
         var first = await NewOrgAsync();
         var second = await NewOrgAsync();
@@ -928,14 +927,14 @@ public class FlowTests : IClassFixture<TestApp>
 
         Assert.True(await ExistsAt(first, email));
         Assert.True(await ExistsAt(first, $"  {email.ToUpperInvariant()} "));
-        // An account at one organisation is not an account at another.
-        Assert.False(await ExistsAt(second, email));
+        // One MyTickets account, whichever organisation's page asks.
+        Assert.True(await ExistsAt(second, email));
         Assert.False(await ExistsAt(first, "nobody@example.com"));
         Assert.Equal(HttpStatusCode.BadRequest, (await visitor.PostAsJsonAsync($"/api/public/orgs/{first.Slug}/account-check", new { email = "not an address" })).StatusCode);
     }
 
     [Fact]
-    public async Task One_owner_login_opens_every_organisation_they_created()
+    public async Task One_account_runs_every_organisation_it_started()
     {
         var email = $"olga-{Guid.NewGuid():N}@example.com";
         var owner = _app.CreateClient();
@@ -955,9 +954,11 @@ public class FlowTests : IClassFixture<TestApp>
         Assert.Single((await elsewhere.GetOkAsync($"{first}/admin/products")).AsArray());
         Assert.Empty((await elsewhere.GetOkAsync($"{second}/admin/products")).AsArray());
 
-        // Someone who only has a guest account cannot add organisations, and an owner's email is taken for sign-up.
+        // Starting one takes a MyTickets account (any, unless Organisations:CreatorEmails says who may), and the
+        // address is taken for sign-up.
+        Assert.Equal(HttpStatusCode.Unauthorized, (await _app.CreateClient().PostAsJsonAsync("/api/orgs", new { name = "Sneaky" })).StatusCode);
         var guest = await _app.NewGuestAsync(first.Split('/').Last());
-        Assert.Equal(HttpStatusCode.Forbidden, (await guest.PostAsJsonAsync("/api/orgs", new { name = "Sneaky" })).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await guest.PostAsJsonAsync("/api/orgs", new { name = $"Guest club {Guid.NewGuid():N}"[..20] })).StatusCode);
         var twice = await _app.CreateClient().PostAsJsonAsync("/api/auth/register", new { email, password = "correct horse", acceptTerms = true, displayName = "Olga", organisationName = $"Third {Guid.NewGuid():N}"[..20] });
         Assert.Equal(HttpStatusCode.Conflict, twice.StatusCode);
     }

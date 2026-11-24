@@ -1,7 +1,7 @@
 import { Navigate, Route, Routes, useParams } from 'react-router-dom'
 
 import { AdminPage, MemberPage, PrintCardsPage } from '@/features/admin'
-import { AuthPage } from '@/features/auth'
+import { AuthPage, ForgotPasswordPage, ResetPasswordPage } from '@/features/auth'
 import { CardLinkPage, CardsPage } from '@/features/cards'
 import { EventPage } from '@/features/events'
 import { LegalPage } from '@/features/legal'
@@ -25,6 +25,10 @@ export function AppRoutes() {
         <Route path="/register" element={<AuthPage key="register" mode="register" />} />
         <Route path="/:slug/login" element={<AuthPage key="org-login" mode="login" />} />
         <Route path="/:slug/register" element={<AuthPage key="org-register" mode="register" />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/:slug/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/:slug/reset-password" element={<ResetPasswordPage />} />
       </Route>
       <Route element={<AppShell />}>
         <Route path="/" element={<StartPage />} />

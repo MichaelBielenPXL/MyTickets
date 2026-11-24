@@ -98,6 +98,12 @@ export interface MembershipPeriod {
   current: boolean
 }
 
+/** Another organisation the person is in, where they gave their details, to bring them over from. */
+export interface CopySource {
+  slug: string
+  name: string
+}
+
 export interface ProfileForm {
   fields: Record<ProfileFieldName, FieldMode>
   profile: ProfileValues

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { ApiError, api } from '@/lib/api-client'
+import { getLanguage } from '@/lib/i18n'
 
 import type { AuthResult, Credentials, Me } from '../types'
 
@@ -30,8 +31,8 @@ export function useSignIn(mode: 'login' | 'register') {
 }
 
 /**
- * The account this browser has at one organisation: null when it has none (also when it is signed in
- * somewhere else), undefined while that is still being found out.
+ * The person's record at one organisation: null when they haven't joined it (or aren't signed in), undefined while
+ * that is still being found out. Whether they are signed in at all is `useMe`.
  */
 export function useAccount(slug: string) {
   const me = useMe()
@@ -47,16 +48,34 @@ export function useCheckAccount(slug: string) {
   })
 }
 
-/** Signs out of one organisation when given its address, otherwise out of everything. */
+/** Signs out of MyTickets: one account, so everywhere at once. */
 export function useSignOut() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (organisationSlug?: string) => api.post('/auth/logout', { organisationSlug }),
-    onSuccess: async (_, organisationSlug) => {
+    mutationFn: () => api.post('/auth/logout', {}),
+    onSuccess: () => {
       // Nothing the previous person loaded may be shown to the next one on this device.
       queryClient.removeQueries({ predicate: (query) => query.queryKey[0] !== meQueryKey[0] })
-      if (organisationSlug) await queryClient.invalidateQueries({ queryKey: meQueryKey })
-      else queryClient.setQueryData(meQueryKey, null)
+      queryClient.setQueryData(meQueryKey, null)
     },
+  })
+}
+
+/**
+ * Asks for a link by email to choose a new MyTickets password. Asked at an organisation, the link brings them back
+ * there to sign in. The answer is the same whether or not the address has an account.
+ */
+export function useForgotPassword(organisationSlug?: string) {
+  return useMutation({
+    mutationFn: (email: string) =>
+      api.post('/auth/forgot-password', { email, organisationSlug, language: getLanguage() }),
+  })
+}
+
+/** Sets a new password with the token from the emailed link. Answers with the organisation to sign in at, if any. */
+export function useResetPassword() {
+  return useMutation({
+    mutationFn: (request: { token: string; password: string }) =>
+      api.post<{ organisationSlug: string | null }>('/auth/reset-password', request),
   })
 }

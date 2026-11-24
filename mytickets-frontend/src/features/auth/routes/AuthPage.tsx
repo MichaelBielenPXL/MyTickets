@@ -198,6 +198,15 @@ export function AuthPage({ mode }: AuthPageProps) {
             required
           />
         </Field>
+        {!registering && (
+          <Link
+            to={slug ? `/${slug}/forgot-password` : '/forgot-password'}
+            state={{ email }}
+            className="auth-forgot"
+          >
+            {t('Forgot your password?')}
+          </Link>
+        )}
         {registering && (
           <label className="check auth-terms">
             <input

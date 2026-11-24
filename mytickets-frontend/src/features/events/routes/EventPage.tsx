@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 
 import { ErrorNote, Loading } from '@/components'
-import { useAccount } from '@/features/auth'
+import { useMe } from '@/features/auth'
 import { useOrganisation, usePublicOrganisation } from '@/features/organisations'
 import { useGoToCheckout } from '@/hooks/useGoToCheckout'
 import { t } from '@/lib/i18n'
@@ -17,8 +17,8 @@ export function EventPage() {
   const [quantities, setQuantities] = useState<Record<string, number>>({})
   const navigate = useNavigate()
   const goToCheckout = useGoToCheckout()
-  // The account this browser has here, if any. Being signed in at another organisation does not count.
-  const me = useAccount(slug)
+  // Signed in to MyTickets: the page for them (joined or not yet); otherwise the public page.
+  const me = useMe()
   const eventQuery = useEvent(slug, eventId, Boolean(me.data))
   const publicEventQuery = usePublicEvent(slug, eventId, !me.isPending && !me.data)
   const organisationQuery = useOrganisation(slug, Boolean(me.data))

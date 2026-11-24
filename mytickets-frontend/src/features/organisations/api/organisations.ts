@@ -4,6 +4,7 @@ import { meQueryKey } from '@/features/auth'
 import { api } from '@/lib/api-client'
 
 import type {
+  CopySource,
   JoinResult,
   MemberPass,
   MembershipPeriod,
@@ -101,6 +102,22 @@ export function useMyProfile(slug: string) {
   return useQuery({
     queryKey: organisationKeys.profile(slug),
     queryFn: () => api.get<ProfileForm>(`/orgs/${slug}/me/profile`),
+  })
+}
+
+/** The person's other organisations where they gave their details, the first one joined first. */
+export function useCopySources(slug: string) {
+  return useQuery({
+    queryKey: ['profile-copy-sources', slug],
+    queryFn: () => api.get<CopySource[]>(`/orgs/${slug}/me/profile/copy-sources`),
+  })
+}
+
+/** The details given at another organisation, limited to what this one asks. Only fills the form; saving is separate. */
+export function useCopyDetails(slug: string) {
+  return useMutation({
+    mutationFn: (fromSlug: string) =>
+      api.get<ProfileValues>(`/orgs/${slug}/me/profile/copy-from/${fromSlug}`),
   })
 }
 

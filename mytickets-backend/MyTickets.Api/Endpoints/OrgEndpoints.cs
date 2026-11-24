@@ -18,20 +18,22 @@ public static class OrgEndpoints
         var orgs = app.MapGroup("/api/orgs").RequireAuthorization();
 
         // Every organisation, marked with whether this browser is signed in there.
-        orgs.MapGet("", async (HttpContext http, AppCache cache) =>
+        // Every organisation, marked with whether this account has joined it.
+        orgs.MapGet("", async (HttpContext http, AppCache cache, AccountService accounts) =>
         {
-            var signedInAt = Sessions.Accounts(http).Select(a => a.TenantId).ToHashSet();
+            var joined = Sessions.AccountId(http) is { } accountId
+                ? (await accounts.RecordsAsync(accountId)).Select(r => r.Tenant.Id).ToHashSet()
+                : [];
             var all = await cache.OrganisationsAsync();
-            return Results.Ok(all.Select(o => new { o.Slug, o.Name, o.Description, LogoUrl = Images.Url(o.LogoKey), Joined = signedInAt.Contains(o.Id) }));
+            return Results.Ok(all.Select(o => new { o.Slug, o.Name, o.Description, LogoUrl = Images.Url(o.LogoKey), Joined = joined.Contains(o.Id) }));
         });
 
-        // An owner adds another organisation. It gets its own database; nothing is shared with their other ones.
-        orgs.MapPost("", async (CreateOrgRequest req, HttpContext http, PlatformDbContext platform, OrganisationProvisioner provisioner, IConfiguration config) =>
+        // Starting another organisation. It gets its own database; nothing is shared with the account's other ones.
+        orgs.MapPost("", async (CreateOrgRequest req, HttpContext http, PlatformDbContext platform, OrganisationProvisioner provisioner,
+            AccountService accounts, IConfiguration config) =>
         {
-            var owner = Sessions.OwnerId(http) is { } ownerId
-                ? await platform.OwnerAccounts.AsNoTracking().FirstOrDefaultAsync(o => o.Id == ownerId)
-                : null;
-            if (owner is null) return Http.Error(403, "Sign in with your organiser account to create an organisation.");
+            var owner = Sessions.AccountId(http) is { } accountId ? await accounts.FindAsync(accountId) : null;
+            if (owner is null) return Http.Error(401, "Sign in to start an organisation.");
             if (!OrganisationProvisioner.MayCreate(config, owner.Email)) return Http.Error(403, "You are not allowed to create organisations.");
             var name = req.Name?.Trim() ?? "";
             if (name.Length is < 2 or > 80) return Http.Error(400, "Give the organisation a name of 2 to 80 characters.");
@@ -47,8 +49,7 @@ public static class OrgEndpoints
                 for (var n = 2; await platform.Tenants.AnyAsync(t => t.Slug == slug); n++) slug = $"{baseSlug}-{n}";
                 try
                 {
-                    var (created, adminUserId) = await provisioner.CreateAsync(owner, ownerIsNew: false, name, slug, req.Description?.Trim() ?? "");
-                    await Sessions.SignInAsync(http, Sessions.ForUser(created.Id, adminUserId));
+                    var (created, _) = await provisioner.CreateAsync(owner, ownerIsNew: false, name, slug, req.Description?.Trim() ?? "");
                     return Results.Ok(new { created.Slug, created.Name });
                 }
                 catch (SlugTakenException) { }
@@ -63,12 +64,13 @@ public static class OrgEndpoints
             var zone = MembershipService.LocalZone(config);
             var (o, membership) = http.Org();
             var now = clock.GetUtcNow().UtcDateTime;
-            var userId = http.User.UserId();
+            // Signed in but not joined yet: no record here, so no balance, details or request either.
+            var userId = http.User.TryUserId();
             var tiers = await db.MembershipTiers.AsNoTracking()
                 .Where(t => t.OrganisationId == o.Id && !t.Archived).OrderBy(t => t.SortOrder).ThenBy(t => t.PriceCents).ThenBy(t => t.Name).ToListAsync();
             var balance = await db.Wallets.Where(w => w.UserId == userId && w.OrganisationId == o.Id)
                 .Select(w => (int?)w.BalanceCents).FirstOrDefaultAsync();
-            var user = await db.Users.AsNoTracking().FirstAsync(u => u.Id == userId);
+            var user = userId is null ? null : await db.Users.AsNoTracking().FirstAsync(u => u.Id == userId);
             var request = await db.MembershipRequests.AsNoTracking().Include(r => r.Tier)
                 .Where(r => r.UserId == userId && r.Status != RequestStatus.Completed)
                 .OrderByDescending(r => r.CreatedAt).FirstOrDefaultAsync();
@@ -101,7 +103,7 @@ public static class OrgEndpoints
                 }),
                 // An open request for a membership that needs approval: waiting, approved (ready to pay), or turned down.
                 Request = request is null ? null : new { request.Id, request.TierId, Tier = request.Tier.Name, request.Status, request.CreatedAt },
-                ProfileComplete = ProfileFields.IsComplete(user, ProfileFields.Read(await db.Organisations.AsNoTracking().FirstAsync())),
+                ProfileComplete = user is not null && ProfileFields.IsComplete(user, ProfileFields.Read(await db.Organisations.AsNoTracking().FirstAsync())),
                 HasInviteOnlyTiers = tiers.Any(t => !t.IsPublic && !t.HasEnded(now, zone)),
                 Events = events.Select(e => new { e.Id, e.Name, e.Location, e.StartsAt, e.EndsAt, ImageUrl = Images.Url(e.ImageKey), e.FromPriceCents, e.SoldOut }),
             });

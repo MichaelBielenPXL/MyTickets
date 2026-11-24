@@ -40,6 +40,13 @@ services:
       Payments__UseTestCheckout: ${USE_TEST_CHECKOUT:-true}
       Stripe__SecretKey: ${STRIPE_SECRET_KEY:-}
       Stripe__WebhookSecret: ${STRIPE_WEBHOOK_SECRET:-}
+      # The mail account for emails such as password reset links. Without it they are only written to the log.
+      Email__Host: ${EMAIL_HOST:-}
+      Email__Port: ${EMAIL_PORT:-587}
+      Email__User: ${EMAIL_USER:-}
+      Email__Password: ${EMAIL_PASSWORD:-}
+      Email__From: ${EMAIL_FROM:-}
+      Email__FromName: ${EMAIL_FROM_NAME:-MyTickets}
     volumes:
       - api-data:/data
 

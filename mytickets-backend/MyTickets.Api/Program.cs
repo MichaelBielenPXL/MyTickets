@@ -1,3 +1,4 @@
+using MyTickets.Api.Services.Email;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -35,7 +36,7 @@ else
         builder.Configuration["Storage:Folder"] ?? Path.Combine(builder.Environment.ContentRootPath, "uploaded-images")));
 
 builder.Services.AddSingleton(TimeProvider.System);
-builder.Services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
+builder.Services.AddSingleton<IPasswordHasher<Account>, PasswordHasher<Account>>();
 builder.Services.AddScoped<AppCache>();
 builder.Services.AddScoped<WalletService>();
 builder.Services.AddScoped<MembershipService>();
@@ -47,6 +48,10 @@ builder.Services.AddScoped<JoinService>();
 builder.Services.AddScoped<TicketOrderService>();
 builder.Services.AddScoped<TillService>();
 builder.Services.AddScoped<DoorService>();
+builder.Services.AddScoped<ProfileCopyService>();
+builder.Services.AddScoped<AccountService>();
+builder.Services.AddScoped<PasswordResetService>();
+builder.Services.AddEmail(builder.Configuration);
 builder.Services.AddSingleton<AppleWalletPasses>();
 builder.Services.AddSingleton<GoogleWalletPasses>();
 builder.Services.AddHostedService<PaymentExpiryWorker>();
@@ -125,6 +130,8 @@ using (var scope = app.Services.CreateScope())
     await platform.Database.MigrateAsync();
     await platform.Database.ExecuteSqlRawAsync("PRAGMA journal_mode=WAL;");
 }
+// Records made before MyTickets accounts existed are linked to accounts, once (see AccountMerge).
+await AccountMerge.RunAsync(app.Services, app.Logger);
 
 if (behindProxy) app.UseForwardedHeaders();
 
@@ -154,8 +161,8 @@ app.UseRouting();
 app.UseRateLimiter();
 app.UseAuthentication();
 
-// A request with an organisation in its address works on that organisation's database, and counts as
-// signed in only if this browser has an account at that organisation.
+// A request with an organisation in its address works on that organisation's database, signed in as the account's
+// record there (if it has one).
 app.Use(async (http, next) =>
 {
     if (http.GetRouteValue("slug") is string slug && http.Request.Path.StartsWithSegments("/api"))
@@ -168,7 +175,7 @@ app.Use(async (http, next) =>
         }
         await http.RequestServices.GetRequiredService<TenantDatabases>().EnsureReadyAsync(organisation.Id);
         http.RequestServices.GetRequiredService<TenantContext>().Set(organisation);
-        Sessions.NarrowTo(http, organisation.Id);
+        await Sessions.NarrowToAsync(http, organisation.Id);
     }
     await next();
 });

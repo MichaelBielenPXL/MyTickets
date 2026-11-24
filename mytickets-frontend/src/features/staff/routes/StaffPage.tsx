@@ -1,6 +1,7 @@
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 
 import { QueryResult } from '@/components'
+import { useFullscreen } from '@/hooks/useFullscreen'
 import { t } from '@/lib/i18n'
 
 import { useStaffContext } from '../api/staff'
@@ -30,6 +31,7 @@ export function StaffPage() {
   const [params, setParams] = useSearchParams()
   const chosen = params.get('mode') as Mode | null
   const context = useStaffContext(slug)
+  const fullscreen = useFullscreen()
 
   const tasks = context.data?.tasks ?? []
   const modes = (Object.keys(MODES) as Mode[]).filter((m) => tasks.includes(TASK_OF[m]))
@@ -41,9 +43,22 @@ export function StaffPage() {
       <QueryResult query={context}>
         {(staff) => (
           <>
-            <Link to={`/${slug}`} className="back">
-              ‹ {staff.name}
-            </Link>
+            <div className="staff-top">
+              <Link to={`/${slug}`} className="back">
+                ‹ {staff.name}
+              </Link>
+              {/* At the bar: the till on the whole screen, as on a register. */}
+              {mode === 'bar' && fullscreen.supported && (
+                <button
+                  type="button"
+                  className="btn ghost small"
+                  aria-pressed={fullscreen.active}
+                  onClick={() => void fullscreen.toggle()}
+                >
+                  {fullscreen.active ? t('Exit fullscreen') : t('Fullscreen')}
+                </button>
+              )}
+            </div>
             {modes.length > 1 && (
               <nav className="tabs" aria-label={t('Staff mode')}>
                 {modes.map((key) => (

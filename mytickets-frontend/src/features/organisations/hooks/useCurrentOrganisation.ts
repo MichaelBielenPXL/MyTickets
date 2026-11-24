@@ -4,7 +4,18 @@ import { useLocation } from 'react-router-dom'
 import { type Membership, useMe } from '@/features/auth'
 
 // First parts of an address that are pages of the site itself, never an organisation.
-const SITE_PAGES = new Set(['', 'login', 'register', 'discover', 'platform', 'o'])
+const SITE_PAGES = new Set([
+  '',
+  'login',
+  'register',
+  'forgot-password',
+  'reset-password',
+  'terms',
+  'privacy',
+  'discover',
+  'platform',
+  'o',
+])
 const STORAGE_KEY = 'mytickets:last-organisation'
 
 type CurrentOrganisation = {
@@ -12,7 +23,7 @@ type CurrentOrganisation = {
   slug: string | null
   /** Only set when the address itself is inside an organisation. */
   slugInAddress: string | null
-  /** The account this browser has there, or null when it is just visiting. */
+  /** The person's record there, or null when they haven't joined it (or aren't signed in). */
   membership: Membership | null
 }
 

@@ -17,7 +17,7 @@ export const terms: Record<Language, LegalDocument> = {
       {
         heading: 'Your account',
         body: [
-          'Your account belongs to one organisation. If you join another organisation, you create a separate account there, with its own tickets, tokens and cards.',
+          'You have one MyTickets account: one email address and password for every organisation you join or run. Each organisation keeps its own record of you, with your details for it, your membership, tickets, tokens and cards there.',
           'Give correct details, keep your password to yourself and tell the organisation straight away if your card is lost or someone else uses your account. You are responsible for what happens with your account and your linked cards until you block them.',
         ],
       },
@@ -84,7 +84,7 @@ export const terms: Record<Language, LegalDocument> = {
       {
         heading: 'Je account',
         body: [
-          'Je account hoort bij één organisatie. Word je lid van een andere organisatie, dan maak je daar een apart account, met eigen tickets, tokens en kaarten.',
+          'Je hebt één MyTickets-account: één e-mailadres en wachtwoord voor elke organisatie waar je lid van bent of die je beheert. Elke organisatie houdt haar eigen gegevens over je bij: je gegevens voor haar, je lidmaatschap, tickets, tokens en kaarten daar.',
           'Geef juiste gegevens, houd je wachtwoord voor jezelf en meld het meteen aan de organisatie als je kaart kwijt is of iemand anders je account gebruikt. Je bent verantwoordelijk voor wat er met je account en je gekoppelde kaarten gebeurt tot je ze blokkeert.',
         ],
       },

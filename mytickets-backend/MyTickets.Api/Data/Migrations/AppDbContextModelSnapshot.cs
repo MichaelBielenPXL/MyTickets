@@ -715,10 +715,6 @@ namespace MyTickets.Api.Data.Migrations
                     b.Property<string>("LastName")
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("PasswordHash")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
                     b.Property<string>("Phone")
                         .HasColumnType("TEXT");
 
@@ -735,12 +731,6 @@ namespace MyTickets.Api.Data.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<string>("StudyYear")
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime?>("TermsAcceptedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("TermsVersion")
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");

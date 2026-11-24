@@ -105,6 +105,37 @@ main.narrow {
 }
 .home-page .list,
 .organisation-page .list,
+.auth-forgot {
+  justify-self: start;
+  margin-top: -4px;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+.copy-details {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+.copy-details p {
+  margin: 0;
+}
+.copy-details-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.copy-details-row label {
+  font-weight: 500;
+}
+.copy-details .btn {
+  justify-self: start;
+}
+.ticket-history-toggle {
+  margin-top: 1.2rem;
+}
 .tickets-page .list {
   gap: 10px;
 }
@@ -679,12 +710,27 @@ legend {
   background: var(--bad);
   color: #2b0704;
 }
-.scanner {
+.scanner-frame {
+  position: relative;
   width: 100%;
-  max-height: 50vh;
+  overflow: hidden;
   border-radius: var(--radius);
   background: #000;
+  line-height: 0;
+}
+.scanner {
+  display: block;
+  width: 100%;
+  max-height: 50vh;
+  background: #000;
   object-fit: cover;
+}
+/* The library's scan brackets: always above the picture, with a dark edge so they show on light scenes too. */
+.scanner-frame .scan-region-highlight {
+  z-index: 1;
+}
+.scanner-frame .scan-region-highlight-svg {
+  filter: drop-shadow(0 0 2px rgb(0 0 0 / 70%));
 }
 .card-reader {
   display: flex;
@@ -2279,6 +2325,29 @@ main.staff.till-mode {
   max-width: 1280px;
   padding-bottom: 24px;
 }
+.staff-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+/* Fullscreen at the bar: only the till, edge to edge, on its own dark background. */
+:root:fullscreen .app-header {
+  display: none;
+}
+:root:fullscreen main.staff.till-mode {
+  max-width: none;
+  min-height: 100dvh;
+  padding: 8px 12px 12px;
+  background: #0b0b0c;
+}
+:root:fullscreen main.staff.till-mode .staff-top .back,
+:root:fullscreen main.staff.till-mode .tabs {
+  color: #a1a1aa;
+}
+:root:fullscreen .till {
+  min-height: calc(100dvh - 110px);
+}
 .till {
   --till-bg: #0b0b0c;
   --till-surface: #17171a;
@@ -2648,8 +2717,10 @@ main.staff.till-mode {
     animation: none;
   }
 }
-.charge-screen .scanner {
+.charge-screen .scanner-frame {
   width: min(360px, 100%);
+}
+.charge-screen .scanner {
   max-height: 40vh;
   aspect-ratio: 1;
 }

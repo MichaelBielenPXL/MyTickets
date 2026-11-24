@@ -11,15 +11,15 @@ export const privacy: Record<Language, LegalDocument> = {
         heading: 'Who is responsible',
         body: [
           'Your details as a member are kept for the organisation you joined. That organisation decides what it asks and what it uses it for: it is the controller, and MyTickets processes the data on its behalf.',
-          `For organiser accounts and for running the platform itself, ${OPERATOR.name} is the controller.`,
-          "Every organisation's data is kept in its own separate database. One organisation cannot see your account at another.",
+          `For your MyTickets account (your email address and password) and for running the platform itself, ${OPERATOR.name} is the controller.`,
+          "Every organisation's data is kept in its own separate database. One organisation cannot see what you told another, or your tickets, tokens and cards there. Only you can bring your details from one organisation to another, when you choose to.",
         ],
       },
       {
         heading: 'What we keep',
         body: [
           [
-            'Your account: email address and password (stored only as a secure hash, never readable).',
+            'Your MyTickets account: email address and password (stored only as a secure hash, never readable), and which organisations you are in.',
             'The details the organisation asks when you choose a membership, such as your name, phone number, address, school, faculty and year of study.',
             'Your memberships over the years, your tickets and when they were scanned at the door.',
             'Your token balance and every top-up and purchase, and the numbers of the NFC cards linked to your account.',
@@ -74,15 +74,15 @@ export const privacy: Record<Language, LegalDocument> = {
         heading: 'Wie verantwoordelijk is',
         body: [
           'Je gegevens als lid worden bijgehouden voor de organisatie waar je lid van werd. Die organisatie bepaalt wat ze vraagt en waarvoor ze het gebruikt: zij is de verwerkingsverantwoordelijke, en MyTickets verwerkt de gegevens in haar opdracht.',
-          `Voor accounts van organisatoren en voor het platform zelf is ${OPERATOR.name} de verwerkingsverantwoordelijke.`,
-          'De gegevens van elke organisatie staan in een eigen, aparte database. Een organisatie kan je account bij een andere organisatie niet zien.',
+          `Voor je MyTickets-account (je e-mailadres en wachtwoord) en voor het platform zelf is ${OPERATOR.name} de verwerkingsverantwoordelijke.`,
+          'De gegevens van elke organisatie staan in een eigen, aparte database. Een organisatie kan niet zien wat je aan een andere vertelde, en ook niet je tickets, tokens en kaarten daar. Alleen jij kunt je gegevens van de ene organisatie naar de andere overnemen, als je dat kiest.',
         ],
       },
       {
         heading: 'Wat we bijhouden',
         body: [
           [
-            'Je account: e-mailadres en wachtwoord (alleen als veilige hash bewaard, nooit leesbaar).',
+            'Je MyTickets-account: e-mailadres en wachtwoord (alleen als veilige hash bewaard, nooit leesbaar), en bij welke organisaties je bent.',
             'De gegevens die de organisatie vraagt wanneer je een lidmaatschap kiest, zoals je naam, telefoonnummer, adres, school, faculteit en studiejaar.',
             'Je lidmaatschappen door de jaren heen, je tickets en wanneer ze aan de deur gescand werden.',
             'Je tokensaldo en elke oplading en aankoop, en de nummers van de NFC-kaarten die aan je account gekoppeld zijn.',

@@ -33,14 +33,14 @@ public static class PublicOrgEndpoints
             });
         }).RequireRateLimiting("auth");
 
-        // "Enter your email to continue": tells the page whether to ask for a password or offer sign-up.
+        // "Enter your email to continue": tells the page whether to ask for the MyTickets password or offer sign-up.
         // This says no more than sign-up already does (which refuses an address that has an account),
         // and it is limited per visitor so it can't be used to test long lists of addresses.
-        orgs.MapPost("/{slug}/account-check", async (AccountCheckRequest req, AppDbContext db) =>
+        orgs.MapPost("/{slug}/account-check", async (AccountCheckRequest req, AccountService accounts) =>
         {
-            var email = req.Email?.Trim().ToLowerInvariant() ?? "";
+            var email = AccountService.Normalise(req.Email);
             if (email.Length is < 5 or > 200 || !email.Contains('@')) return Http.Error(400, "Enter a valid email address.");
-            return Results.Ok(new { Exists = await db.Users.AnyAsync(u => u.Email == email) });
+            return Results.Ok(new { Exists = await accounts.FindAsync(email) is not null });
         }).RequireRateLimiting("auth");
 
         orgs.MapGet("/{slug}", async (string slug, AppDbContext db, IConfiguration config, TimeProvider clock) =>

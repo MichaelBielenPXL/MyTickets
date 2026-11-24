@@ -10,7 +10,13 @@ public static class JoinEndpoints
     public static void MapJoin(this RouteGroupBuilder org)
     {
         // Free types apply at once; paid ones go through checkout; some wait for an admin's approval first.
-        org.MapPost("/join", async (JoinRequest req, HttpContext http, JoinService join) =>
-            Results.Ok(await join.JoinAsync(http.Org().Org, http.User.UserId(), req.TierId, req.InviteCode)));
+        // Their record here is made now if saving their details didn't already.
+        org.MapPost("/join", async (JoinRequest req, HttpContext http, JoinService join, AccountService accounts) =>
+        {
+            var organisation = http.Org().Org;
+            var userId = http.User.TryUserId()
+                ?? await accounts.EnsureRecordAtAsync(Sessions.AccountId(http) ?? throw new AppProblem(401, "Sign in first."), organisation);
+            return Results.Ok(await join.JoinAsync(organisation, userId, req.TierId, req.InviteCode));
+        });
     }
 }

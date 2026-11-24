@@ -424,6 +424,28 @@ export const nl: Record<string, string> = {
   'Terms of service': 'Gebruiksvoorwaarden',
   'Privacy policy': 'Privacyverklaring',
   'Last updated {date}': 'Laatst bijgewerkt op {date}',
+  Fullscreen: 'Volledig scherm',
+  'Forgot your password?': 'Wachtwoord vergeten?',
+  "Enter your email address and we'll send you a link to choose a new password.":
+    'Vul je e-mailadres in en we sturen je een link om een nieuw wachtwoord te kiezen.',
+  'If there is an account with {email}, we have sent it a link to choose a new password. It works for an hour.':
+    'Als er een account is met {email}, hebben we er een link naartoe gestuurd om een nieuw wachtwoord te kiezen. Die werkt een uur.',
+  'Send link': 'Link versturen',
+  'Back to sign in': 'Terug naar aanmelden',
+  'Choose a new password': 'Kies een nieuw wachtwoord',
+  'New password': 'Nieuw wachtwoord',
+  'Set new password': 'Nieuw wachtwoord instellen',
+  'Ask for a new link': 'Vraag een nieuwe link',
+  'Your new password is set': 'Je nieuwe wachtwoord is ingesteld',
+  'Sign in with it from now on.': 'Meld je er voortaan mee aan.',
+  'This link has run out or was already used. Ask for a new one.':
+    'Deze link is verlopen of werd al gebruikt. Vraag een nieuwe.',
+  'Download PDF': 'PDF downloaden',
+  Ticket: 'Ticket',
+  'Show this QR code at the door. Each ticket gets you in once.':
+    'Toon deze QR-code aan de deur. Met elk ticket kom je één keer binnen.',
+  'Already used: checked in {when}.': 'Al gebruikt: binnengekomen op {when}.',
+  'Exit fullscreen': 'Volledig scherm sluiten',
   // ---- Manage › Overview ----
   'You get from online payments': 'Je krijgt van online betalingen',
   'Top-ups at the cashier': 'Opladingen aan de kassa',
@@ -639,6 +661,17 @@ export const nl: Record<string, string> = {
   'Your tickets': 'Je tickets',
   'Everything you need for the door, all in one place.': 'Alles wat je aan de deur nodig hebt, op één plek.',
   'No tickets yet.': 'Nog geen tickets.',
+  'No upcoming tickets.': 'Geen komende tickets.',
+  'Already a member somewhere else? Bring over your name, address, phone number and other details you gave there.':
+    'Al lid ergens anders? Neem je naam, adres, telefoonnummer en andere gegevens over die je daar gaf.',
+  'Transfer my details': 'Mijn gegevens overnemen',
+  'Transfer my details from': 'Mijn gegevens overnemen van',
+  Transfer: 'Overnemen',
+  'Filled in from {org}. Check them, then save.':
+    'Ingevuld met je gegevens van {org}. Controleer ze en sla ze op.',
+  'Show ticket history ({count})': 'Ticketgeschiedenis tonen ({count})',
+  'Hide ticket history': 'Ticketgeschiedenis verbergen',
+  'Ticket history': 'Ticketgeschiedenis',
   'Find an event': 'Zoek een evenement',
   Upcoming: 'Komend',
   Past: 'Voorbij',

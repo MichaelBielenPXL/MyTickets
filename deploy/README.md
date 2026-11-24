@@ -57,6 +57,7 @@ in two volumes Coolify keeps: `api-data` (the databases and the sign-in keys) an
 | `STORAGE_SECRET_KEY` | The password of the picture storage. Keep it the same once pictures are uploaded. |
 | `USE_TEST_CHECKOUT` | `true`: a test checkout where no money moves. Live: `false`, with the Stripe keys. |
 | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | Stripe, for real (or Stripe test) payments. The webhook is `https://<site>/api/payments/stripe-webhook`. |
+| `EMAIL_HOST`, `EMAIL_PORT` (587), `EMAIL_USER`, `EMAIL_PASSWORD`, `EMAIL_FROM`, `EMAIL_FROM_NAME` (MyTickets) | The SMTP account emails are sent from, such as password reset links. Any provider works (your mail host, Brevo, Postmark, Mailgun…). Port 465 uses TLS, others STARTTLS. Without `EMAIL_HOST` and `EMAIL_FROM` nothing is sent: the email is written to the API's log instead. |
 
 Wallet passes (Apple/Google) need their keys too, under `WalletPasses__Apple__…` and `WalletPasses__Google__…`; add
 them to the `api` service's environment when you have them.

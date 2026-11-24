@@ -99,7 +99,7 @@ describe('organisation switcher', () => {
   })
 })
 
-describe('accounts are per organisation', () => {
+describe('one MyTickets account', () => {
   beforeEach(() => localStorage.clear())
 
   const publicNightOwls = {
@@ -112,22 +112,27 @@ describe('accounts are per organisation', () => {
     events: [],
   }
 
-  it('treats you as a visitor at an organisation you have no account at, even when signed in elsewhere', async () => {
+  it('shows an organisation you have not joined yet as yours to join, without signing in again', async () => {
     signedInAs(aMe({ isOwner: false, memberships: [jazz] }))
-    server.use(http.get(apiUrl('/public/orgs/night-owls'), () => HttpResponse.json(publicNightOwls)))
+    server.use(
+      http.get(apiUrl('/orgs/night-owls'), () =>
+        HttpResponse.json(anOrganisation({ membership: null, balanceCents: null })),
+      ),
+    )
     renderApp(<AppRoutes />, { at: '/night-owls', path: '*' })
 
-    expect(await screen.findByRole('form', { name: 'Sign in at Night Owls' })).toBeInTheDocument()
-    expect(screen.getByText('Visiting')).toBeInTheDocument()
-    expect(screen.getAllByRole('link', { name: 'Log in' })[0]).toHaveAttribute('href', '/night-owls/login')
-    // No tabs into an account that does not exist here.
+    expect(await screen.findByText('Visiting')).toBeInTheDocument()
+    expect(screen.queryByRole('form', { name: 'Sign in at Night Owls' })).not.toBeInTheDocument()
+    // No tabs into a record that does not exist here yet.
     expect((await tabs()).queryByRole('link', { name: 'Tickets' })).not.toBeInTheDocument()
     expect((await tabs()).queryByRole('link', { name: 'Wallet' })).not.toBeInTheDocument()
   })
 
-  it("sends you to that organisation's sign-in for pages that need an account there", async () => {
-    signedInAs(aMe({ isOwner: false, memberships: [jazz] }))
-    server.use(http.get(apiUrl('/public/orgs/night-owls'), () => HttpResponse.json(publicNightOwls)))
+  it("sends someone who isn't signed in to that organisation's sign-in", async () => {
+    server.use(
+      http.get(apiUrl('/auth/me'), () => HttpResponse.json({}, { status: 401 })),
+      http.get(apiUrl('/public/orgs/night-owls'), () => HttpResponse.json(publicNightOwls)),
+    )
     renderApp(<AppRoutes />, { at: '/night-owls/wallet', path: '*' })
 
     // Signing in there starts with just an email address.
@@ -150,31 +155,50 @@ describe('accounts are per organisation', () => {
     expect(asked).toEqual(['night-owls'])
   })
 
-  it('can sign out of one organisation and stay signed in at the other', async () => {
-    let memberships = [aMembership(), jazz]
-    let signedOutOf: unknown
+  it('signs out of MyTickets, everywhere at once', async () => {
+    let signedIn = true
     server.use(
-      http.get(apiUrl('/auth/me'), () => HttpResponse.json(aMe({ isOwner: false, memberships }))),
+      http.get(apiUrl('/auth/me'), () =>
+        signedIn
+          ? HttpResponse.json(aMe({ isOwner: false, memberships: [aMembership(), jazz] }))
+          : HttpResponse.json({}, { status: 401 }),
+      ),
       http.get(apiUrl('/orgs/:slug'), ({ params }) =>
         HttpResponse.json(anOrganisation({ slug: params.slug })),
       ),
       http.get(apiUrl('/public/orgs/night-owls'), () => HttpResponse.json(publicNightOwls)),
-      http.post(apiUrl('/auth/logout'), async ({ request }) => {
-        signedOutOf = await request.json()
-        memberships = [jazz]
+      http.post(apiUrl('/auth/logout'), () => {
+        signedIn = false
         return new HttpResponse(null, { status: 204 })
       }),
     )
     const { user } = renderApp(<AppRoutes />, { at: '/night-owls', path: '*' })
 
     await user.click(await screen.findByRole('button', { name: 'Account menu' }))
-    await user.click(screen.getByRole('button', { name: 'Sign out of Night Owls' }))
+    expect(screen.queryByRole('button', { name: /Sign out of/ })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Sign out' }))
 
-    expect(await screen.findByText('Visiting')).toBeInTheDocument()
-    expect(signedOutOf).toEqual({ organisationSlug: 'night-owls' })
-    // Still signed in at the other one: it is one click away in the switcher.
-    await user.click(screen.getByRole('button', { name: 'Switch organisation' }))
-    expect(screen.getByRole('link', { name: 'Jazz Cellar' })).toBeInTheDocument()
+    expect(await screen.findByRole('form', { name: 'Sign in at Night Owls' })).toBeInTheDocument()
+  })
+})
+
+describe('starting an organisation', () => {
+  beforeEach(() => localStorage.clear())
+
+  it('is offered on the MyTickets site itself, never from inside an organisation', async () => {
+    signedInAs(aMe({ canCreateOrganisations: true }))
+    server.use(http.get(apiUrl('/orgs'), () => HttpResponse.json([])))
+    const { user } = renderApp(<AppRoutes />, { at: '/night-owls', path: '*' })
+
+    await user.click(await screen.findByRole('button', { name: 'Switch organisation' }))
+    expect(screen.queryByRole('link', { name: 'Create organisation' })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('link', { name: 'Browse organisations' }))
+    await user.click(await screen.findByRole('button', { name: 'Switch organisation' }))
+    expect(screen.getByRole('link', { name: 'Create organisation' })).toHaveAttribute(
+      'href',
+      '/discover?new=1',
+    )
   })
 })
 

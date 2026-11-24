@@ -75,62 +75,43 @@ public class TenantScopes(IServiceScopeFactory scopes, TenantDatabases databases
 }
 
 /// <summary>
-/// The sign-in cookie holds one identity per organisation the browser is signed in to, plus one for an
-/// owner login. Inside an organisation only that organisation's identity counts, so being signed in at
-/// one organisation never gives access to another.
+/// The sign-in cookie holds the MyTickets account only. A request inside an organisation is then signed in as the
+/// account's record at that organisation, if it has one (see <see cref="NarrowToAsync"/>), so everything there works
+/// with that organisation's own user. Without a record the request is still signed in, but as no one there yet.
 /// </summary>
 public static class Sessions
 {
-    private const string TenantClaim = "tenant";
-    private const string OwnerClaim = "owner";
-    private const string Everyone = "mytickets:all-identities";
+    public const string AccountClaim = "account";
+    private const string Everyone = "mytickets:account";
 
-    public static ClaimsIdentity ForUser(Guid tenantId, Guid userId) => new(
-        [new Claim(TenantClaim, tenantId.ToString()), new Claim(ClaimTypes.NameIdentifier, userId.ToString())],
-        CookieAuthenticationDefaults.AuthenticationScheme);
-
-    public static ClaimsIdentity ForOwner(Guid ownerId) => new(
-        [new Claim(OwnerClaim, ownerId.ToString())], CookieAuthenticationDefaults.AuthenticationScheme);
-
-    /// <summary>Every identity in the cookie, also after the request was narrowed to one organisation.</summary>
+    /// <summary>The cookie's own identity, also after the request was narrowed to one organisation.</summary>
     public static ClaimsPrincipal All(HttpContext http) => http.Items[Everyone] as ClaimsPrincipal ?? http.User;
 
-    public static Guid? OwnerId(HttpContext http) =>
-        Guid.TryParse(All(http).FindFirstValue(OwnerClaim), out var id) ? id : null;
+    /// <summary>The MyTickets account this browser is signed in with, if any.</summary>
+    public static Guid? AccountId(HttpContext http) =>
+        Guid.TryParse(All(http).FindFirstValue(AccountClaim), out var id) ? id : null;
 
-    /// <summary>The organisations this browser is signed in to, with the account used at each.</summary>
-    public static IEnumerable<(Guid TenantId, Guid UserId)> Accounts(HttpContext http) =>
-        from identity in All(http).Identities
-        let tenant = identity.FindFirst(TenantClaim)?.Value
-        let user = identity.FindFirst(ClaimTypes.NameIdentifier)?.Value
-        where tenant is not null && user is not null
-        select (Guid.Parse(tenant), Guid.Parse(user));
-
-    /// <summary>From here on the request is "signed in" only as the account it has at this organisation, if any.</summary>
-    public static void NarrowTo(HttpContext http, Guid tenantId)
+    /// <summary>
+    /// From here on the request is signed in as the account's record at this organisation (its user id there), or,
+    /// without one, as the account alone: signed in, but not anyone at this organisation yet.
+    /// </summary>
+    public static async Task NarrowToAsync(HttpContext http, Guid tenantId)
     {
         var all = http.User;
         http.Items[Everyone] = all;
-        var mine = all.Identities.FirstOrDefault(i => i.FindFirst(TenantClaim)?.Value == tenantId.ToString());
-        http.User = new ClaimsPrincipal(mine ?? new ClaimsIdentity());
+        if (AccountId(http) is not { } accountId)
+        {
+            http.User = new ClaimsPrincipal(new ClaimsIdentity());
+            return;
+        }
+        var claims = new List<Claim> { new(AccountClaim, accountId.ToString()) };
+        if (await http.RequestServices.GetRequiredService<AccountService>().RecordAtAsync(accountId, tenantId) is { } userId)
+            claims.Add(new Claim(ClaimTypes.NameIdentifier, userId.ToString()));
+        http.User = new ClaimsPrincipal(new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme));
     }
 
-    /// <summary>Adds identities to the cookie, replacing an earlier sign-in at the same organisation (or as owner).</summary>
-    public static Task SignInAsync(HttpContext http, params ClaimsIdentity[] added)
-    {
-        static string KeyOf(ClaimsIdentity i) => i.FindFirst(TenantClaim)?.Value ?? (i.HasClaim(c => c.Type == OwnerClaim) ? OwnerClaim : "");
-        var replaced = added.Select(KeyOf).ToHashSet();
-        var kept = All(http).Identities.Where(i => i.IsAuthenticated && !replaced.Contains(KeyOf(i)));
-        return WriteAsync(http, [.. kept, .. added]);
-    }
-
-    /// <summary>Signs out of one organisation and keeps the rest.</summary>
-    public static Task SignOutOfAsync(HttpContext http, Guid tenantId)
-    {
-        var kept = All(http).Identities.Where(i => i.IsAuthenticated && i.FindFirst(TenantClaim)?.Value != tenantId.ToString()).ToArray();
-        return kept.Length == 0 ? http.SignOutAsync() : WriteAsync(http, kept);
-    }
-
-    private static Task WriteAsync(HttpContext http, ClaimsIdentity[] identities) =>
-        http.SignInAsync(new ClaimsPrincipal(identities), new AuthenticationProperties { IsPersistent = true });
+    public static Task SignInAsync(HttpContext http, Guid accountId) =>
+        http.SignInAsync(
+            new ClaimsPrincipal(new ClaimsIdentity([new Claim(AccountClaim, accountId.ToString())], CookieAuthenticationDefaults.AuthenticationScheme)),
+            new AuthenticationProperties { IsPersistent = true });
 }

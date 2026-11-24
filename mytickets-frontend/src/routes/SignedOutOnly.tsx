@@ -15,7 +15,7 @@ export function SignedOutOnly() {
   const [params] = useSearchParams()
   const { pathname } = useLocation()
   const me = useMe()
-  const { slugInAddress, membership: account } = useCurrentOrganisation()
+  const { slugInAddress } = useCurrentOrganisation()
 
   if (me.isPending) {
     return (
@@ -24,7 +24,8 @@ export function SignedOutOnly() {
       </main>
     )
   }
-  const alreadyIn = slugInAddress ? Boolean(account) : me.data?.isOwner === true
+  // One MyTickets account: signed in anywhere is signed in here too.
+  const alreadyIn = Boolean(me.data)
   if (alreadyIn) {
     // Someone who just signed up at an organisation goes on to choose a membership.
     const justSignedUp = Boolean(slugInAddress) && pathname.endsWith('/register') && !params.get('next')
