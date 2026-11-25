@@ -425,6 +425,8 @@ export const nl: Record<string, string> = {
   'Privacy policy': 'Privacyverklaring',
   'Last updated {date}': 'Laatst bijgewerkt op {date}',
   Fullscreen: 'Volledig scherm',
+  'Switch to dark mode': 'Donkere modus',
+  'Switch to light mode': 'Lichte modus',
   'Forgot your password?': 'Wachtwoord vergeten?',
   "Enter your email address and we'll send you a link to choose a new password.":
     'Vul je e-mailadres in en we sturen je een link om een nieuw wachtwoord te kiezen.',

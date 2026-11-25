@@ -2,6 +2,26 @@
 @import 'tailwindcss/theme.css' layer(theme);
 @import 'tailwindcss/utilities.css' layer(utilities);
 
+/* Tailwind follows the same theme: bg-surface, text-muted, border-border… and dark: when the switch says dark. */
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-raised: var(--raised);
+  --color-border: var(--border);
+  --color-line-strong: var(--line-strong);
+  --color-text: var(--text);
+  --color-text-2: var(--text-2);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-accent: var(--accent);
+  --color-accent-text: var(--accent-text);
+  --color-fill: var(--fill);
+  --color-good: var(--good);
+  --color-bad: var(--bad);
+}
+
 :root {
   color-scheme: light;
   --bg: #fafafa;
@@ -50,7 +70,7 @@ p {
   margin: 0.2em 0;
 }
 a {
-  color: #171717;
+  color: var(--text);
   text-underline-offset: 3px;
 }
 code {
@@ -145,7 +165,7 @@ main.narrow {
   min-height: 76px;
   border-radius: 14px;
   padding: 18px 20px;
-  background: #fff;
+  background: var(--surface);
   transition:
     border-color 150ms ease,
     transform 150ms ease,
@@ -154,7 +174,7 @@ main.narrow {
 .home-page a.list-item:hover,
 .organisation-page a.list-item:hover,
 .tickets-page button.list-item:hover {
-  border-color: #c4c4c4;
+  border-color: var(--line-strong);
   transform: translateY(-1px);
   box-shadow: 0 8px 22px rgb(0 0 0 / 6%);
 }
@@ -168,7 +188,7 @@ main.narrow {
 .event-heading {
   padding: 32px;
   border-radius: 18px;
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--border);
 }
 .event-heading h1 {
@@ -178,13 +198,13 @@ main.narrow {
   letter-spacing: -0.055em;
 }
 .event-organiser {
-  color: #666666;
+  color: var(--muted);
   font-weight: 650;
 }
 .event-description {
   max-width: 68ch;
   margin: 24px 0;
-  color: #444444;
+  color: var(--text-2);
   line-height: 1.7;
 }
 .event-ticket-section {
@@ -224,15 +244,15 @@ main.narrow {
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 15px;
-  background: #fff;
+  background: var(--surface);
 }
 .tickets-page .ticket .list-item {
   border: 0;
   border-radius: 0;
 }
 .tickets-page .ticket .qr {
-  border-top: 1px dashed #e0e0e0;
-  background: #fafafa;
+  border-top: 1px dashed var(--border);
+  background: var(--surface-2);
 }
 .tickets-page .ticket .qr svg {
   padding: 8px;
@@ -246,7 +266,7 @@ main.narrow {
 .auth-brand {
   display: inline-block;
   margin-bottom: 30px;
-  color: #171717;
+  color: var(--text);
   font-size: 1.05rem;
 }
 .auth-intro h1 {
@@ -259,37 +279,37 @@ main.narrow {
 }
 .auth-form {
   padding: 24px;
-  background: #fff;
+  background: var(--surface);
 }
 .auth-form .btn.primary,
 .customer-page .btn.primary {
-  background: #171717;
-  border-color: #171717;
-  color: #fff;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
 }
 .auth-form .btn.primary:hover:not(:disabled),
 .customer-page .btn.primary:hover:not(:disabled) {
-  background: #383838;
+  background: var(--accent-hover);
 }
 .auth-switch {
   margin-top: 18px;
   text-align: center;
 }
 .auth-switch a {
-  color: #333333;
+  color: var(--text-2);
   font-weight: 650;
 }
 .empty-state {
   padding: 24px;
-  border: 1px dashed #d4d4d4;
+  border: 1px dashed var(--line-strong);
   border-radius: 14px;
-  background: #fff;
+  background: var(--surface);
 }
 
 .public-org-join {
   max-width: 720px;
   padding: 24px;
-  background: #fff;
+  background: var(--surface);
 }
 .public-org-join h2 {
   margin-bottom: 7px;
@@ -829,18 +849,6 @@ legend {
 /* Organiser workspace: Entry's light, restrained visual language, scoped to admin pages. */
 
 main.admin-shell {
-  color-scheme: light;
-  --bg: #fafafa;
-  --surface: #ffffff;
-  --surface-2: #f2f2f2;
-  --border: #eaeaea;
-  --text: #171717;
-  --muted: #666666;
-  --accent: #171717;
-  --accent-text: #ffffff;
-  --good: #167847;
-  --bad: #b42318;
-  --warn: #865d00;
   max-width: none;
   min-height: calc(100vh - 58px);
   margin: 0;
@@ -865,21 +873,21 @@ main.admin-shell {
   margin-bottom: 10px;
 }
 .admin-org-link:hover {
-  color: #171717;
+  color: var(--text);
 }
 .admin-page-description {
-  color: #666666;
+  color: var(--muted);
   font-size: 0.95rem;
 }
 .admin-org-link {
   flex: none;
-  color: #333333;
+  color: var(--text-2);
   font-size: 0.9rem;
   text-decoration: none;
-  border: 1px solid #eaeaea;
+  border: 1px solid var(--border);
   border-radius: 10px;
   padding: 9px 13px;
-  background: #fff;
+  background: var(--surface);
 }
 .admin-sidebar {
   align-self: start;
@@ -894,7 +902,7 @@ main.admin-shell {
   border: 0;
   border-radius: 10px;
   background: transparent;
-  color: #666666;
+  color: var(--muted);
   padding: 10px 12px;
   font: inherit;
   font-size: 0.93rem;
@@ -907,19 +915,19 @@ main.admin-shell {
     color 160ms ease;
 }
 .admin-nav-button:hover {
-  background: #f2f2f2;
-  color: #171717;
+  background: var(--fill);
+  color: var(--text);
 }
 .admin-nav-button[aria-pressed='true'] {
-  background: #171717;
-  color: #fff;
+  background: var(--accent);
+  color: var(--accent-text);
 }
 .admin-nav-button[aria-pressed='true']::after {
   width: 7px;
   height: 7px;
   flex: none;
   border-radius: 50%;
-  background: #ffffff;
+  background: var(--accent-text);
   content: '';
 }
 .admin-section-title {
@@ -929,35 +937,35 @@ main.admin-shell {
   letter-spacing: -0.02em;
 }
 .admin-section-note {
-  color: #666666;
+  color: var(--muted);
   font-size: 0.9rem;
 }
 .admin-shell .panel,
 .admin-shell .list-item,
 .admin-shell .stat {
-  border-color: #eaeaea;
-  background: #fff;
-  color: #171717;
+  border-color: var(--border);
+  background: var(--surface);
+  color: var(--text);
 }
 .admin-shell .tag {
-  background: #f2f2f2;
-  color: #666666;
+  background: var(--surface-2);
+  color: var(--muted);
 }
 .admin-shell .btn.primary {
-  border-color: #171717;
-  background: #171717;
-  color: #fff;
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-text);
 }
 .admin-shell .btn.primary:hover:not(:disabled) {
-  border-color: #383838;
-  background: #383838;
+  border-color: var(--accent-hover);
+  background: var(--accent-hover);
 }
 .admin-shell input,
 .admin-shell select,
 .admin-shell textarea {
-  border-color: #e0e0e0;
-  background: #fff;
-  color: #171717;
+  border-color: var(--border);
+  background: var(--surface);
+  color: var(--text);
 }
 .admin-kpi-number {
   margin: 7px 0 0;
@@ -972,37 +980,37 @@ main.admin-shell {
   justify-content: space-between;
   gap: 16px;
   padding: 12px 0;
-  border-top: 1px solid #ededed;
+  border-top: 1px solid var(--border);
   font-size: 0.92rem;
 }
 /* ---------- Manage › Overview ---------- */
 .admin-card {
   margin: 0;
   padding: 16px 20px;
-  border: 1px solid #e4e4e7;
+  border: 1px solid var(--border);
   border-radius: 16px;
-  background: #ffffff;
+  background: var(--surface);
   min-width: 0;
 }
 .admin-card-title {
   margin: 0 0 4px;
   font-size: 1rem;
   font-weight: 600;
-  color: #18181b;
+  color: var(--text);
 }
 .admin-card-note {
   margin: 6px 0 0;
-  color: #71717a;
+  color: var(--muted);
   font-size: 0.85rem;
   line-height: 1.5;
 }
 .admin-data-row > span {
-  color: #52525b;
+  color: var(--text-2);
 }
 .admin-data-row > strong {
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  color: #18181b;
+  color: var(--text);
 }
 .admin-data-row.indent {
   padding-left: 14px;
@@ -1014,7 +1022,7 @@ main.admin-shell {
   gap: 12px;
 }
 .overview-metric dt {
-  color: #52525b;
+  color: var(--text-2);
   font-size: 0.88rem;
   font-weight: 500;
 }
@@ -1029,7 +1037,7 @@ main.admin-shell {
 }
 .overview-now {
   margin: 14px 0 0;
-  color: #71717a;
+  color: var(--muted);
   font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0.04em;
@@ -1048,7 +1056,7 @@ main.admin-shell {
 .admin-table th,
 .admin-table td {
   padding: 9px 10px;
-  border-top: 1px solid #ededed;
+  border-top: 1px solid var(--border);
   text-align: right;
   white-space: nowrap;
 }
@@ -1059,7 +1067,7 @@ main.admin-shell {
 }
 .admin-table thead th {
   border-top: 0;
-  color: #71717a;
+  color: var(--muted);
   font-size: 0.78rem;
   font-weight: 500;
 }
@@ -1068,7 +1076,7 @@ main.admin-shell {
 }
 .admin-table tfoot th,
 .admin-table tfoot td {
-  border-top: 1px solid #a1a1aa;
+  border-top: 1px solid var(--faint);
   font-weight: 600;
 }
 .payments-table td:nth-child(2) {
@@ -1091,12 +1099,12 @@ main.admin-shell {
 .takings-readout {
   margin: 0;
   min-height: 1.4em;
-  color: #52525b;
+  color: var(--text-2);
   font-size: 0.85rem;
   text-align: right;
 }
 .takings-readout strong {
-  color: #18181b;
+  color: var(--text);
   font-variant-numeric: tabular-nums;
 }
 .takings-plot {
@@ -1108,7 +1116,7 @@ main.admin-shell {
   position: absolute;
   top: 0;
   left: 0;
-  color: #a1a1aa;
+  color: var(--faint);
   font-size: 0.72rem;
   font-variant-numeric: tabular-nums;
 }
@@ -1117,8 +1125,8 @@ main.admin-shell {
   align-items: flex-end;
   gap: 2px;
   height: 160px;
-  border-bottom: 1px solid #d4d4d8;
-  background: repeating-linear-gradient(to top, transparent 0 39px, #f4f4f5 39px 40px);
+  border-bottom: 1px solid var(--line-strong);
+  background: repeating-linear-gradient(to top, transparent 0 39px, var(--surface-2) 39px 40px);
 }
 .takings-bar {
   display: flex;
@@ -1149,7 +1157,7 @@ main.admin-shell {
   display: flex;
   justify-content: space-between;
   margin-top: 6px;
-  color: #a1a1aa;
+  color: var(--faint);
   font-size: 0.72rem;
 }
 .takings-empty {
@@ -1160,7 +1168,7 @@ main.admin-shell {
   font-size: 0.85rem;
 }
 .takings-table summary {
-  color: #52525b;
+  color: var(--text-2);
   cursor: pointer;
 }
 .admin-outline-link {
@@ -1169,29 +1177,29 @@ main.admin-shell {
   align-items: center;
   justify-content: center;
   gap: 9px;
-  border: 1px solid #e5e5e5;
+  border: 1px solid var(--border);
   border-radius: 10px;
-  background: #fff;
-  color: #262626;
+  background: var(--surface);
+  color: var(--text);
   padding: 9px 14px;
   font-size: 0.9rem;
   font-weight: 600;
   text-decoration: none;
 }
 .admin-outline-link:hover {
-  border-color: #c4c4c4;
-  background: #fafafa;
+  border-color: var(--line-strong);
+  background: var(--surface-2);
 }
 .admin-shell .muted {
-  color: #666666;
+  color: var(--muted);
 }
 .admin-shell :focus-visible {
-  outline: 3px solid #171717;
+  outline: 3px solid var(--text);
   outline-offset: 2px;
 }
 .admin-shell ::selection {
-  background: #e5e5e5;
-  color: #171717;
+  background: var(--fill-hover);
+  color: var(--text);
 }
 
 @media (max-width: 1023px) {
@@ -1273,8 +1281,8 @@ main.admin-shell {
   position: sticky;
   top: 0;
   z-index: 20;
-  background: rgb(255 255 255 / 78%);
-  border-bottom: 1px solid rgb(0 0 0 / 8%);
+  background: var(--bar-bg);
+  border-bottom: 1px solid var(--border);
   -webkit-backdrop-filter: saturate(180%) blur(20px);
   backdrop-filter: saturate(180%) blur(20px);
 }
@@ -1301,7 +1309,7 @@ main.admin-shell {
 }
 .header-divider {
   flex: none;
-  color: #d4d4d4;
+  color: var(--line-strong);
 }
 .header-end {
   display: flex;
@@ -1387,7 +1395,7 @@ main.admin-shell {
   padding: 6px;
   border: 1px solid var(--border);
   border-radius: 12px;
-  background: #ffffff;
+  background: var(--surface);
   box-shadow:
     0 1px 2px rgb(0 0 0 / 4%),
     0 12px 32px rgb(0 0 0 / 12%);
@@ -1653,19 +1661,19 @@ h2,
 .btn {
   min-height: 40px;
   border-radius: 8px;
-  background: #ffffff;
+  background: var(--surface);
   font-weight: 500;
   transition:
     background 120ms ease,
     border-color 120ms ease;
 }
 .btn:hover:not(:disabled) {
-  border-color: #c4c4c4;
-  background: #fafafa;
+  border-color: var(--line-strong);
+  background: var(--surface-2);
 }
 .btn.primary:hover:not(:disabled) {
-  border-color: #383838;
-  background: #383838;
+  border-color: var(--accent-hover);
+  background: var(--accent-hover);
 }
 .btn.chosen {
   border-color: var(--text);
@@ -1689,7 +1697,7 @@ select,
 textarea {
   min-height: 40px;
   border-radius: 8px;
-  background: #ffffff;
+  background: var(--surface);
   transition:
     border-color 120ms ease,
     box-shadow 120ms ease;
@@ -1697,7 +1705,7 @@ textarea {
 input:hover:not(:disabled),
 select:hover:not(:disabled),
 textarea:hover:not(:disabled) {
-  border-color: #c4c4c4;
+  border-color: var(--line-strong);
 }
 input:focus-visible,
 select:focus-visible,
@@ -1791,6 +1799,15 @@ input[type='checkbox']:focus-visible {
 /* Header buttons keep their words together; a long organisation name gives way instead. */
 .header-end {
   flex: none;
+}
+/* Narrow phones, signed out: the mark alone, so the theme switch, language and both buttons fit. */
+@media (max-width: 479px) {
+  .logo-text {
+    display: none;
+  }
+  .header-end {
+    gap: 4px;
+  }
 }
 .header-end .btn {
   white-space: nowrap;
@@ -2222,7 +2239,7 @@ input[type='checkbox']:focus-visible {
 }
 .drag-handle:hover,
 .drag-handle:focus-visible {
-  background: rgb(0 0 0 / 5%);
+  background: var(--fill);
   color: var(--text);
 }
 .sortable-row.dragging .drag-handle {
@@ -2829,16 +2846,34 @@ main.staff.till-page .till {
    segmented controls, and small, quick motion.
    ===================================================================================== */
 :root {
+  /* The theme. Light by default; the dark values follow below. Tailwind gets the same colours (@theme). */
+  color-scheme: light;
   --bg: #f5f5f7;
   --surface: #ffffff;
   --surface-2: #f0f0f3;
+  --raised: #ffffff;
   --border: rgb(0 0 0 / 8%);
+  --line-strong: #c4c4c4;
   --text: #1d1d1f;
+  --text-2: #3c3c43;
   --muted: #6e6e73;
+  --faint: #a1a1a6;
   --accent: #1d1d1f;
+  --accent-hover: #3a3a3c;
+  --accent-text: #ffffff;
+  --blue: #007aff;
+  --good: #167847;
+  --bad: #b42318;
+  --danger: #d70015;
+  --warn: #865d00;
   --focus: rgb(0 113 227 / 40%);
   --fill: rgb(118 118 128 / 10%);
   --fill-hover: rgb(118 118 128 / 16%);
+  --bar-bg: rgb(255 255 255 / 96%);
+  --menu-bg: rgb(255 255 255 / 82%);
+  --glass: rgb(255 255 255 / 72%);
+  --glass-edge: rgb(255 255 255 / 70%);
+  --glass-highlight: rgb(255 255 255 / 90%);
   --radius: 14px;
   --card-shadow: 0 1px 1px rgb(0 0 0 / 2%), 0 4px 18px rgb(0 0 0 / 5%);
   --lift-shadow: 0 2px 4px rgb(0 0 0 / 4%), 0 14px 36px rgb(0 0 0 / 10%);
@@ -2851,6 +2886,38 @@ main.staff.till-page .till {
   letter-spacing: -0.011em;
   font-feature-settings: 'kern';
   text-rendering: optimizeLegibility;
+}
+/* Dark: chosen with the switch in the header (data-theme on <html>), or the device's own setting until then. */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #000000;
+  --surface: #1c1c1e;
+  --surface-2: #2c2c2e;
+  --raised: #3a3a3c;
+  --border: rgb(255 255 255 / 11%);
+  --line-strong: rgb(255 255 255 / 24%);
+  --text: #f5f5f7;
+  --text-2: #d1d1d6;
+  --muted: #98989d;
+  --faint: #636366;
+  --accent: #f5f5f7;
+  --accent-hover: #d1d1d6;
+  --accent-text: #1d1d1f;
+  --blue: #0a84ff;
+  --good: #30d158;
+  --bad: #ff6961;
+  --danger: #ff453a;
+  --warn: #ffd60a;
+  --focus: rgb(10 132 255 / 50%);
+  --fill: rgb(118 118 128 / 24%);
+  --fill-hover: rgb(118 118 128 / 32%);
+  --bar-bg: rgb(28 28 30 / 94%);
+  --menu-bg: rgb(44 44 46 / 92%);
+  --glass: rgb(58 58 60 / 72%);
+  --glass-edge: rgb(255 255 255 / 12%);
+  --glass-highlight: rgb(255 255 255 / 10%);
+  --card-shadow: 0 1px 1px rgb(0 0 0 / 40%), 0 4px 18px rgb(0 0 0 / 30%);
+  --lift-shadow: 0 2px 4px rgb(0 0 0 / 40%), 0 14px 36px rgb(0 0 0 / 50%);
 }
 body {
   background: var(--bg);
@@ -2953,10 +3020,10 @@ button.list-item:hover {
 }
 .btn.primary {
   background: var(--text);
-  color: #ffffff;
+  color: var(--accent-text);
 }
 .btn.primary:hover:not(:disabled) {
-  background: #3a3a3c;
+  background: var(--accent-hover);
 }
 .btn.ghost,
 .btn.link {
@@ -2968,11 +3035,11 @@ button.list-item:hover {
 }
 .btn.chosen {
   background: var(--text);
-  color: #ffffff;
+  color: var(--accent-text);
   box-shadow: none;
 }
 .btn.danger {
-  color: #d70015;
+  color: var(--danger);
 }
 .btn.small {
   min-height: 34px;
@@ -3013,12 +3080,12 @@ input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
   border-color: rgb(0 113 227 / 60%);
-  background: #ffffff;
+  background: var(--surface);
   box-shadow: 0 0 0 4px rgb(0 113 227 / 15%);
 }
 input::placeholder,
 textarea::placeholder {
-  color: #a1a1a6;
+  color: var(--faint);
 }
 select {
   appearance: none;
@@ -3041,9 +3108,9 @@ input[type='radio'] {
 
 /* Menus: frosted, softly rounded, and they open with a small grow. */
 .menu {
-  border: 1px solid rgb(0 0 0 / 6%);
+  border: 1px solid var(--border);
   border-radius: 14px;
-  background: rgb(255 255 255 / 82%);
+  background: var(--menu-bg);
   -webkit-backdrop-filter: saturate(180%) blur(24px);
   backdrop-filter: saturate(180%) blur(24px);
   box-shadow:
@@ -3083,7 +3150,7 @@ input[type='radio'] {
 }
 .tab.active {
   border: 0;
-  background: #ffffff;
+  background: var(--raised);
   box-shadow:
     0 1px 2px rgb(0 0 0 / 8%),
     0 3px 8px rgb(0 0 0 / 6%);
@@ -3124,16 +3191,6 @@ main {
   }
 }
 
-/* Manage uses the same canvas, fields and buttons as everything else. */
-main.admin-shell {
-  --bg: #f5f5f7;
-  --surface: #ffffff;
-  --surface-2: #f0f0f3;
-  --border: rgb(0 0 0 / 8%);
-  --text: #1d1d1f;
-  --muted: #6e6e73;
-  --accent: #1d1d1f;
-}
 .admin-shell .panel,
 .admin-shell .list-item,
 .admin-shell .stat {
@@ -3161,7 +3218,7 @@ main.admin-shell {
 .admin-shell select:focus-visible,
 .admin-shell textarea:focus-visible {
   border-color: rgb(0 113 227 / 60%);
-  background-color: #ffffff;
+  background-color: var(--surface);
 }
 .admin-page-header h1 {
   font-size: clamp(1.9rem, 3vw, 2.4rem);
@@ -3171,12 +3228,12 @@ main.admin-shell {
 .admin-outline-link {
   border: 0;
   border-radius: 980px;
-  background: #ffffff;
+  background: var(--surface);
   box-shadow: var(--card-shadow);
 }
 .admin-org-link:hover,
 .admin-outline-link:hover {
-  background: #ffffff;
+  background: var(--surface);
   box-shadow: var(--lift-shadow);
 }
 
@@ -3197,7 +3254,7 @@ fieldset legend {
 }
 fieldset input,
 fieldset select {
-  background: #ffffff;
+  background: var(--surface);
 }
 .colour-picker {
   padding: 0;
@@ -3307,8 +3364,8 @@ fieldset select {
     width: 232px;
     padding: 18px 12px;
     overflow-y: auto;
-    border-right: 1px solid rgb(0 0 0 / 7%);
-    background: rgb(250 250 252 / 85%);
+    border-right: 1px solid var(--border);
+    background: var(--bar-bg);
     -webkit-backdrop-filter: saturate(180%) blur(20px);
     backdrop-filter: saturate(180%) blur(20px);
   }
@@ -3351,7 +3408,7 @@ fieldset select {
     gap: 1px;
     margin: 2px 0 6px 21px;
     padding-left: 12px;
-    border-left: 1px solid rgb(0 0 0 / 9%);
+    border-left: 1px solid var(--border);
   }
   .org-sidebar-sub a {
     padding: 6px 10px;
@@ -3397,8 +3454,8 @@ fieldset select {
   display: flex;
   justify-content: space-around;
   padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
-  border-top: 1px solid rgb(0 0 0 / 8%);
-  background: rgb(250 250 252 / 86%);
+  border-top: 1px solid var(--border);
+  background: var(--bar-bg);
   -webkit-backdrop-filter: saturate(180%) blur(20px);
   backdrop-filter: saturate(180%) blur(20px);
 }
@@ -3411,7 +3468,7 @@ fieldset select {
   min-width: 0;
   padding: 4px 2px;
   border-radius: 10px;
-  color: #8e8e93;
+  color: var(--muted);
   font-size: 0.68rem;
   font-weight: 500;
   text-decoration: none;
@@ -3526,14 +3583,14 @@ body:has(.tab-bar) #root {
   max-width: 520px;
   margin: 0 auto;
   padding: 6px;
-  border: 0.5px solid rgb(255 255 255 / 70%);
+  border: 0.5px solid var(--glass-edge);
   border-radius: 999px;
-  background: rgb(255 255 255 / 62%);
+  background: var(--glass);
   box-shadow:
     0 0 0 0.5px rgb(0 0 0 / 6%),
     0 10px 30px rgb(0 0 0 / 14%),
     0 2px 6px rgb(0 0 0 / 6%),
-    inset 0 1px 0 rgb(255 255 255 / 80%);
+    inset 0 1px 0 var(--glass-highlight);
   -webkit-backdrop-filter: saturate(200%) blur(24px);
   backdrop-filter: saturate(200%) blur(24px);
 }
@@ -3541,7 +3598,7 @@ body:has(.tab-bar) #root {
   gap: 1px;
   padding: 7px 2px 6px;
   border-radius: 999px;
-  color: #3c3c43;
+  color: var(--text-2);
   font-size: 0.625rem;
   font-weight: 600;
   letter-spacing: 0.01em;
@@ -3561,7 +3618,7 @@ body:has(.tab-bar) #root {
 /* The current tab: a soft pill, and its icon filled in and tinted, as iOS does. */
 .tab-bar-item.active {
   background: rgb(0 122 255 / 10%);
-  color: #007aff;
+  color: var(--blue);
 }
 .tab-bar-item.active svg {
   fill: currentColor;
@@ -3602,15 +3659,15 @@ body:has(.tab-bar) #root {
   align-items: center;
   gap: 4px;
   padding: 8px 16px;
-  border: 0.5px solid rgb(255 255 255 / 70%);
+  border: 0.5px solid var(--glass-edge);
   border-radius: 999px;
-  background: rgb(255 255 255 / 72%);
+  background: var(--glass);
   box-shadow:
     0 0 0 0.5px rgb(0 0 0 / 8%),
     0 6px 18px rgb(0 0 0 / 10%),
     0 1px 3px rgb(0 0 0 / 6%),
-    inset 0 1px 0 rgb(255 255 255 / 90%);
-  color: #1d1d1f;
+    inset 0 1px 0 var(--glass-highlight);
+  color: var(--text);
   font-size: 0.9rem;
   font-weight: 600;
   text-decoration: none;
@@ -3626,7 +3683,7 @@ body:has(.tab-bar) #root {
     0 0 0 0.5px rgb(0 0 0 / 10%),
     0 8px 24px rgb(0 0 0 / 14%),
     0 1px 3px rgb(0 0 0 / 8%),
-    inset 0 1px 0 rgb(255 255 255 / 90%);
+    inset 0 1px 0 var(--glass-highlight);
 }
 .back:active,
 .glass-button:active {
@@ -3717,7 +3774,7 @@ body:has(.till) .tab-bar-item.active {
     top: 0;
     right: 0;
     left: 62px;
-    border-top: 0.5px solid rgb(60 60 67 / 22%);
+    border-top: 0.5px solid var(--border);
   }
   .manage-menu-icon {
     display: grid;
@@ -3782,7 +3839,7 @@ body:has(.till) .tab-bar-item.active {
   }
   .manage-menu-chevron {
     flex: none;
-    color: #c4c4c7;
+    color: var(--faint);
   }
   .admin-menu-back {
     display: inline-flex;
@@ -3818,7 +3875,7 @@ body:has(.till) .tab-bar-item.active {
     font-weight: 650;
   }
   .manage-glance-head span {
-    color: #007aff;
+    color: var(--blue);
     font-size: 0.95rem;
   }
   .manage-glance-grid {
@@ -3863,7 +3920,7 @@ body:has(.till) .tab-bar-item.active {
   width: min(340px, 100%);
   padding: 22px 18px 18px;
   border-radius: 32px;
-  background: #fafafc;
+  background: var(--surface);
   box-shadow:
     0 1px 2px rgb(0 0 0 / 6%),
     0 30px 70px -20px rgb(0 0 0 / 35%);
@@ -3884,7 +3941,7 @@ body:has(.till) .tab-bar-item.active {
 }
 .confirm-dialog p {
   margin: 0;
-  color: rgb(60 60 67 / 85%);
+  color: var(--text-2);
   font-size: 0.9rem;
   line-height: 1.4;
   text-wrap: pretty;
@@ -3900,7 +3957,7 @@ body:has(.till) .tab-bar-item.active {
   border: 0;
   border-radius: 999px;
   background: rgb(120 120 128 / 14%);
-  color: #1d1d1f;
+  color: var(--text);
   font: inherit;
   font-size: 1rem;
   font-weight: 600;
@@ -3917,7 +3974,7 @@ body:has(.till) .tab-bar-item.active {
   transform: scale(0.97);
 }
 .confirm-dialog-actions .default {
-  background: #007aff;
+  background: var(--blue);
   color: #ffffff;
 }
 .confirm-dialog-actions .default:hover:not(:disabled) {
@@ -3925,7 +3982,7 @@ body:has(.till) .tab-bar-item.active {
 }
 .confirm-dialog-actions .destructive {
   background: rgb(255 59 48 / 12%);
-  color: #e0281c;
+  color: var(--danger);
 }
 .confirm-dialog-actions .destructive:hover:not(:disabled) {
   background: rgb(255 59 48 / 20%);
@@ -3935,7 +3992,7 @@ body:has(.till) .tab-bar-item.active {
   cursor: default;
 }
 .confirm-dialog-actions button:focus-visible {
-  outline: 2px solid #007aff;
+  outline: 2px solid var(--blue);
   outline-offset: 2px;
 }
 @keyframes confirm-fade {
@@ -3958,24 +4015,24 @@ body:has(.till) .tab-bar-item.active {
 
 /* ---------- Glass, but readable: surfaces are mostly solid with only a hint of what is behind ---------- */
 .app-header {
-  background: rgb(255 255 255 / 96%);
+  background: var(--bar-bg);
 }
 .org-sidebar {
-  background: rgb(250 250 252 / 98%);
+  background: var(--bar-bg);
 }
 /* Menus are for reading: fully solid. */
 .menu {
-  background: #ffffff;
+  background: var(--surface);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
 }
 .tab-bar {
-  background: rgb(255 255 255 / 97%);
+  background: var(--bar-bg);
   -webkit-backdrop-filter: saturate(180%) blur(30px);
   backdrop-filter: saturate(180%) blur(30px);
 }
 .tab-bar-item {
-  color: #1d1d1f;
+  color: var(--text);
 }
 .tab-bar-item:not(.active) {
   opacity: 0.72;
@@ -4022,7 +4079,7 @@ body:has(.till) .tab-bar-item {
   top: 50%;
   right: 14px;
   transform: translateY(-50%);
-  color: #007aff;
+  color: var(--blue);
   font-size: 0.95rem;
   text-decoration: none;
 }
@@ -4307,7 +4364,7 @@ body:has(.till) .tab-bar-item {
 
 .brand-color-warning {
   margin: 0;
-  color: #b42318;
+  color: var(--bad);
   font-size: 0.875rem;
 }
 .brand-color-warning .btn.link {
@@ -4520,7 +4577,7 @@ a.member-card-balance:hover {
   opacity: 0.75;
 }
 .deal-bonus {
-  color: #248a3d;
+  color: var(--good);
   font-size: 0.72rem;
   font-style: normal;
   font-weight: 600;
@@ -4543,7 +4600,7 @@ a.member-card-balance:hover {
   gap: 10px;
   align-items: end;
   padding: 12px;
-  border: 1px solid var(--line, rgb(0 0 0 / 8%));
+  border: 1px solid var(--border);
   border-radius: 14px;
 }
 .topup-deal-row label {
@@ -4561,7 +4618,7 @@ a.member-card-balance:hover {
 }
 .topup-deal-note {
   padding-bottom: 10px;
-  color: #248a3d;
+  color: var(--good);
   font-size: 0.85rem;
 }
 .topup-deals-empty {
@@ -4591,11 +4648,11 @@ a.member-card-balance:hover {
 }
 .event-status.open {
   background: rgb(52 199 89 / 14%);
-  color: #1f7a37;
+  color: var(--good);
 }
 .event-status.upcoming {
   background: rgb(0 122 255 / 10%);
-  color: #0058b9;
+  color: var(--blue);
 }
 .event-status.closed {
   background: var(--fill, #f2f2f7);
@@ -4831,7 +4888,7 @@ a.member-card-balance:hover {
   cursor: pointer;
 }
 .segmented label.chosen {
-  background: #ffffff;
+  background: var(--raised);
   box-shadow: 0 1px 3px rgb(0 0 0 / 12%);
 }
 .segmented input {
@@ -4849,7 +4906,7 @@ a.member-card-balance:hover {
   position: relative;
 }
 .segmented label:has(input:focus-visible) {
-  outline: 2px solid #007aff;
+  outline: 2px solid var(--blue);
   outline-offset: 1px;
 }
 
