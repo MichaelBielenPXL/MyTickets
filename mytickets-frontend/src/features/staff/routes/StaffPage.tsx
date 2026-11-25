@@ -1,7 +1,7 @@
-import { useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 
 import { QueryResult } from '@/components'
+import { useFullscreen } from '@/hooks/useFullscreen'
 import { t } from '@/lib/i18n'
 
 import { useStaffContext } from '../api/staff'
@@ -9,19 +9,29 @@ import { BarMode } from '../components/BarMode'
 import { CashTopUpMode } from '../components/CashTopUpMode'
 import { CheckCardMode } from '../components/CheckCardMode'
 import { DoorMode } from '../components/DoorMode'
+import { MemberInfoMode } from '../components/MemberInfoMode'
 import type { StaffTask } from '../types'
 
-const MODES = { door: 'Door', bar: 'Bar', topup: 'Top up', check: 'Check card' } as const
+const MODES = { door: 'Door', bar: 'Bar', topup: 'Top up', check: 'Check card', members: 'Members' } as const
 type Mode = keyof typeof MODES
 
 /** Which screen does which job; someone only sees the screens for the jobs their role does. */
-const TASK_OF: Record<Mode, StaffTask> = { door: 'Door', bar: 'Bar', topup: 'CashTopUp', check: 'CheckCard' }
+const TASK_OF: Record<Mode, StaffTask> = {
+  door: 'Door',
+  bar: 'Bar',
+  topup: 'CashTopUp',
+  check: 'CheckCard',
+  members: 'MemberInfo',
+}
 
 /** What the people at the door and behind the bar use on their phone. */
 export function StaffPage() {
   const { slug = '' } = useParams()
-  const [chosen, setChosen] = useState<Mode | null>(null)
+  // In the address, so coming back from a member's page lands on the same screen.
+  const [params, setParams] = useSearchParams()
+  const chosen = params.get('mode') as Mode | null
   const context = useStaffContext(slug)
+  const fullscreen = useFullscreen()
 
   const tasks = context.data?.tasks ?? []
   const modes = (Object.keys(MODES) as Mode[]).filter((m) => tasks.includes(TASK_OF[m]))
@@ -33,9 +43,22 @@ export function StaffPage() {
       <QueryResult query={context}>
         {(staff) => (
           <>
-            <Link to={`/${slug}`} className="back">
-              ‹ {staff.name}
-            </Link>
+            <div className="staff-top">
+              <Link to={`/${slug}`} className="back">
+                ‹ {staff.name}
+              </Link>
+              {/* At the bar: the till on the whole screen, as on a register. */}
+              {mode === 'bar' && fullscreen.supported && (
+                <button
+                  type="button"
+                  className="btn ghost small"
+                  aria-pressed={fullscreen.active}
+                  onClick={() => void fullscreen.toggle()}
+                >
+                  {fullscreen.active ? t('Exit fullscreen') : t('Fullscreen')}
+                </button>
+              )}
+            </div>
             {modes.length > 1 && (
               <nav className="tabs" aria-label={t('Staff mode')}>
                 {modes.map((key) => (
@@ -43,7 +66,7 @@ export function StaffPage() {
                     key={key}
                     className={mode === key ? 'tab active' : 'tab'}
                     aria-current={mode === key ? 'page' : undefined}
-                    onClick={() => setChosen(key)}
+                    onClick={() => setParams({ mode: key }, { replace: true })}
                   >
                     {t(MODES[key])}
                   </button>
@@ -61,6 +84,7 @@ export function StaffPage() {
             )}
             {mode === 'topup' && <CashTopUpMode slug={slug} />}
             {mode === 'check' && <CheckCardMode slug={slug} />}
+            {mode === 'members' && <MemberInfoMode slug={slug} />}
           </>
         )}
       </QueryResult>

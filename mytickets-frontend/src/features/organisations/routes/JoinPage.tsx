@@ -7,10 +7,12 @@ import { useGoToCheckout } from '@/hooks/useGoToCheckout'
 import { Trans, t } from '@/lib/i18n'
 
 import { useJoinOrganisation, useMyProfile, useOrganisation, useSaveProfile } from '../api/organisations'
+import { CopyDetails } from '../components/CopyDetails'
 import { ProfileFormFields } from '../components/ProfileFormFields'
 import { TierChoice } from '../components/TierChoice'
 import type { Organisation, ProfileValues } from '../types'
 import { brandStyle } from '../utils/brand'
+import { withCopied } from '../utils/copied-profile'
 import { tierTerms } from '../utils/tier-terms'
 
 /**
@@ -162,6 +164,7 @@ function Details({ org, choiceLabel, needsApproval, paid, choice, onBack, onWait
   const profile = useMyProfile(org.slug)
   const save = useSaveProfile(org.slug)
   const join = useJoinOrganisation(org.slug)
+  const [copied, setCopied] = useState<{ values: ProfileValues; from: string } | null>(null)
 
   async function submit(values: ProfileValues) {
     // Details first: the organisation needs them before anything starts.
@@ -194,9 +197,16 @@ function Details({ org, choiceLabel, needsApproval, paid, choice, onBack, onWait
         </p>
       </header>
       <div className="panel">
+        <CopyDetails slug={org.slug} onCopied={(values, from) => setCopied({ values, from })} />
+        {copied && (
+          <p className="note" role="status">
+            {t('Filled in from {org}. Check them, then save.', { org: copied.from })}
+          </p>
+        )}
         {profile.data ? (
           <ProfileFormFields
-            form={profile.data}
+            key={JSON.stringify(copied?.values ?? null)}
+            form={withCopied(profile.data, copied?.values ?? null)}
             submitLabel={needsApproval ? t('Send request') : paid ? t('Continue to payment') : t('Continue')}
             busy={save.isPending || join.isPending}
             error={save.error ?? join.error}

@@ -1,3 +1,4 @@
+using MyTickets.Api.Services.Email;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -35,11 +36,24 @@ else
         builder.Configuration["Storage:Folder"] ?? Path.Combine(builder.Environment.ContentRootPath, "uploaded-images")));
 
 builder.Services.AddSingleton(TimeProvider.System);
-builder.Services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
+builder.Services.AddSingleton<IPasswordHasher<Account>, PasswordHasher<Account>>();
 builder.Services.AddScoped<AppCache>();
 builder.Services.AddScoped<WalletService>();
 builder.Services.AddScoped<MembershipService>();
 builder.Services.AddScoped<PaymentService>();
+builder.Services.AddScoped<SettlementService>();
+builder.Services.AddScoped<OutboxDispatcher>();
+builder.Services.AddScoped<OverviewService>();
+builder.Services.AddScoped<JoinService>();
+builder.Services.AddScoped<TicketOrderService>();
+builder.Services.AddScoped<TillService>();
+builder.Services.AddScoped<DoorService>();
+builder.Services.AddScoped<ProfileCopyService>();
+builder.Services.AddScoped<AccountService>();
+builder.Services.AddScoped<PasswordResetService>();
+builder.Services.AddScoped<MyTickets.Api.Services.Tickets.TicketDocuments>();
+builder.Services.AddScoped<MyTickets.Api.Services.Tickets.TicketMailer>();
+builder.Services.AddEmail(builder.Configuration);
 builder.Services.AddSingleton<AppleWalletPasses>();
 builder.Services.AddSingleton<GoogleWalletPasses>();
 builder.Services.AddHostedService<PaymentExpiryWorker>();
@@ -59,16 +73,28 @@ builder.Services.AddDataProtection()
     .SetApplicationName("MyTickets")
     .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(dataFolder, "keys")));
 
-// Live, requests pass through proxies first (Vercel for the site's /api, then the server's own). Proxy:ForwardedHops
-// says how many, so the visitor's own address is used for the sign-in limit and https is recognised.
+// Live, requests pass through proxies first. Two ways to find the visitor's own address, for the sign-in limit:
+// Proxy:ClientIpHeader names a header the outermost proxy sets to it (Cloudflare: CF-Connecting-IP), or
+// Proxy:ForwardedHops says how many proxies add themselves to X-Forwarded-For.
+var clientIpHeader = builder.Configuration["Proxy:ClientIpHeader"];
 var forwardedHops = builder.Configuration.GetValue("Proxy:ForwardedHops", 0);
-if (forwardedHops > 0)
+var behindProxy = !string.IsNullOrWhiteSpace(clientIpHeader) || forwardedHops > 0;
+if (behindProxy)
 {
     builder.Services.Configure<ForwardedHeadersOptions>(options =>
     {
         options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
-        options.ForwardLimit = forwardedHops;
-        // The proxies are on the server's private network and at Vercel, whose addresses change: trust the hops counted.
+        if (!string.IsNullOrWhiteSpace(clientIpHeader))
+        {
+            // One address, set by the proxy the visitor talked to.
+            options.ForwardedForHeaderName = clientIpHeader;
+            options.ForwardLimit = 1;
+        }
+        else
+        {
+            options.ForwardLimit = forwardedHops;
+        }
+        // The proxies' own addresses change (Cloudflare, Docker networks): trust the configured chain instead.
         options.KnownIPNetworks.Clear();
         options.KnownProxies.Clear();
     });
@@ -97,6 +123,9 @@ builder.Services.AddRateLimiter(options =>
 
 builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
+// Ticket PDFs (QuestPDF): free under its Community licence for organisations under $1M a year in revenue.
+QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
+
 var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())
@@ -106,13 +135,22 @@ using (var scope = app.Services.CreateScope())
     await platform.Database.MigrateAsync();
     await platform.Database.ExecuteSqlRawAsync("PRAGMA journal_mode=WAL;");
 }
+// Records made before MyTickets accounts existed are linked to accounts, once (see AccountMerge).
+await AccountMerge.RunAsync(app.Services, app.Logger);
 
-if (forwardedHops > 0) app.UseForwardedHeaders();
+if (behindProxy) app.UseForwardedHeaders();
 
-// A payment that can't be started is the buyer's business to know about, not an error page.
+// What can't be done is the person's business to know about, not an error page: a refusal from a service, or a
+// payment that can't be started.
 app.Use(async (http, next) =>
 {
     try { await next(); }
+    catch (AppProblem e) when (!http.Response.HasStarted)
+    {
+        var body = new Dictionary<string, object?>(e.Details) { ["error"] = e.Message };
+        if (e.Code is not null) body["code"] = e.Code;
+        await Results.Json(body, statusCode: e.Status).ExecuteAsync(http);
+    }
     catch (PaymentsNotSetUpException e) when (!http.Response.HasStarted)
     {
         await Http.Error(409, e.Message).ExecuteAsync(http);
@@ -128,8 +166,8 @@ app.UseRouting();
 app.UseRateLimiter();
 app.UseAuthentication();
 
-// A request with an organisation in its address works on that organisation's database, and counts as
-// signed in only if this browser has an account at that organisation.
+// A request with an organisation in its address works on that organisation's database, signed in as the account's
+// record there (if it has one).
 app.Use(async (http, next) =>
 {
     if (http.GetRouteValue("slug") is string slug && http.Request.Path.StartsWithSegments("/api"))
@@ -142,7 +180,7 @@ app.Use(async (http, next) =>
         }
         await http.RequestServices.GetRequiredService<TenantDatabases>().EnsureReadyAsync(organisation.Id);
         http.RequestServices.GetRequiredService<TenantContext>().Set(organisation);
-        Sessions.NarrowTo(http, organisation.Id);
+        await Sessions.NarrowToAsync(http, organisation.Id);
     }
     await next();
 });

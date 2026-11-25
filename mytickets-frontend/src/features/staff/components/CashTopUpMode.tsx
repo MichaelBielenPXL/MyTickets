@@ -81,9 +81,7 @@ export function CashTopUpMode({ slug }: CashTopUpModeProps) {
       <ScanQrButton
         onScan={(payload) => handleCard(cardIdFromQr(payload))}
         disabled={topUp.isPending}
-        cameraProblem={t(
-          'The camera could not start. Allow camera access for this site, or type the card number.',
-        )}
+        cameraProblem={t('The camera could not start. Allow camera access for this site, or tap the card.')}
       />
       <CardReader
         disabled={topUp.isPending}

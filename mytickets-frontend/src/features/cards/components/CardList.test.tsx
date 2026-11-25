@@ -6,13 +6,13 @@ import { server } from '@/test/server'
 
 import { CardList } from './CardList'
 
-const card = { id: 'c1', number: '0042', label: '', blocked: false, linkedAt: '2026-11-01T20:00:00Z' }
+const card = { id: 'c1', number: '42', label: '', blocked: false, linkedAt: '2026-11-01T20:00:00Z' }
 
 describe('CardList', () => {
   it('shows each card by its printed number, with no way to remove it', () => {
     renderApp(<CardList slug="night-owls" cards={[card]} />)
 
-    expect(screen.getByText('Card 0042')).toBeInTheDocument()
+    expect(screen.getByText('Card 42')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Remove' })).not.toBeInTheDocument()
   })
 

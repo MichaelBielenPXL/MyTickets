@@ -19,10 +19,9 @@ export function UserMenu({ me, account }: UserMenuProps) {
   const signOut = useSignOut()
   useDismiss(container, open, close)
 
-  // Accounts differ per organisation, so show the one that is in use right now.
+  // Their name as this organisation knows it (once they joined), and their MyTickets account's address.
   const name = account?.displayName ?? me.displayName
-  const email = account?.email ?? me.email
-  const signedInElsewhere = me.isOwner || me.memberships.length > 1
+  const email = me.email
 
   return (
     <div className="user-menu" ref={container}>
@@ -60,23 +59,13 @@ export function UserMenu({ me, account }: UserMenuProps) {
           </Link>
 
           <div className="menu-separator" />
-          {account && signedInElsewhere && (
-            <button
-              type="button"
-              className="menu-item"
-              onClick={() => signOut.mutate(account.slug)}
-              disabled={signOut.isPending}
-            >
-              {t('Sign out of {org}', { org: account.name })}
-            </button>
-          )}
           <button
             type="button"
             className="menu-item"
-            onClick={() => signOut.mutate(undefined)}
+            onClick={() => signOut.mutate()}
             disabled={signOut.isPending}
           >
-            {signedInElsewhere ? t('Sign out everywhere') : t('Sign out')}
+            {t('Sign out')}
           </button>
         </div>
       )}

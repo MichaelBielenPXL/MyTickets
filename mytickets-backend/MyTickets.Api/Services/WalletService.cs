@@ -10,6 +10,11 @@ namespace MyTickets.Api.Services;
 /// </summary>
 public class WalletService(AppDbContext db, TimeProvider clock)
 {
+    /// <summary>Online top-ups of an amount of your own: at least this much...</summary>
+    public const int MinTopUpCents = 500;
+    /// <summary>...and at most this much, also for a top-up at the cashier.</summary>
+    public const int MaxTopUpCents = 50_000;
+
     public async Task<Wallet> GetOrCreateAsync(Guid userId, Guid organisationId)
     {
         var wallet = await db.Wallets.FirstOrDefaultAsync(w => w.UserId == userId && w.OrganisationId == organisationId);

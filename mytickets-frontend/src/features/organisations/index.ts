@@ -13,7 +13,15 @@ export { OrganisationSwitcher } from './components/OrganisationSwitcher'
 export { useCurrentOrganisation } from './hooks/useCurrentOrganisation'
 export { useBrandTheme } from './hooks/useBrandTheme'
 export { StartPage } from './routes/StartPage'
-export type { FieldMode, MemberPass, Organisation, ProfileFieldName } from './types'
+export type {
+  FieldMode,
+  MemberDetails,
+  MemberPass,
+  MembershipPeriod,
+  Organisation,
+  ProfileFieldName,
+  ProfileValues,
+} from './types'
 export { tierTerms } from './utils/tier-terms'
 export {
   BRAND_PRESETS,
@@ -24,3 +32,6 @@ export {
   readableShade,
 } from './utils/brand'
 export { MemberCard } from './components/MemberCard'
+export { MembershipPeriodList } from './components/MembershipPeriodList'
+export { MemberDetailsList } from './components/MemberDetailsList'
+export { ProfileFormFields } from './components/ProfileFormFields'

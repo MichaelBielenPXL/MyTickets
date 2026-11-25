@@ -1,37 +1,20 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 
-import { ErrorNote, QueryResult } from '@/components'
+import { QueryResult } from '@/components'
 import { t } from '@/lib/i18n'
-import type { Role } from '@/types'
-import { lastValidDay, tokenPrice } from '@/utils/format'
 
-import { useAdminTiers, useAllowExtraCard, useMembers, useUpdateMember } from '../api/admin'
+import { useMembers } from '../api/admin'
 import type { Member } from '../types'
 import { JoinRequests } from './JoinRequests'
-import { MemberDetailsList } from './MemberDetailsList'
 
 type MembersTabProps = {
   slug: string
 }
 
-const ROLES: Role[] = ['Member', 'Barman', 'Doorman', 'Staff', 'Admin']
-
 export function MembersTab({ slug }: MembersTabProps) {
   const [search, setSearch] = useState('')
   const members = useMembers(slug)
-  const tiers = useAdminTiers(slug).data ?? []
-  const update = useUpdateMember(slug)
-  const extraCard = useAllowExtraCard(slug)
-
-  function change(member: Member, changes: Partial<Pick<Member, 'role' | 'tierId'>>) {
-    update.mutate({
-      id: member.id,
-      role: member.role,
-      tierId: member.tierId,
-      expiresAt: member.expiresAt,
-      ...changes,
-    })
-  }
 
   return (
     <div className="stack">
@@ -48,64 +31,32 @@ export function MembersTab({ slug }: MembersTabProps) {
         placeholder={t('Search by name or email')}
         aria-label={t('Search members')}
       />
-      <ErrorNote error={update.error ?? extraCard.error} />
       <QueryResult query={members}>
         {(all) => {
           const shown = all.filter((member) => matches(member, search))
           return (
             <>
-              <div className="list">
+              {/* Just who is who; everything else is on the member's own page. */}
+              <ul className="list member-list">
                 {shown.map((member) => (
-                  <div key={member.id} className="list-item member">
-                    <div>
-                      <strong>{member.displayName}</strong>
-                      <p className="muted">{member.email}</p>
-                      <p className="muted">
-                        {t('Tokens {amount}', { amount: tokenPrice(member.balanceCents) })}
-                        {member.expiresAt &&
-                          ` · ${t('until {date}', { date: lastValidDay(member.expiresAt) })}`}
-                      </p>
-                      <MemberDetailsList details={member} />
-                    </div>
-                    <div className="row wrap">
-                      <select
-                        value={member.tierId}
-                        onChange={(e) => change(member, { tierId: e.target.value })}
-                        aria-label={t('Membership of {name}', { name: member.displayName })}
-                      >
-                        {tiers.map((tier) => (
-                          <option key={tier.id} value={tier.id}>
-                            {tier.name}
-                          </option>
-                        ))}
-                      </select>
-                      <select
-                        value={member.role}
-                        onChange={(e) => change(member, { role: e.target.value as Role })}
-                        aria-label={t('Role of {name}', { name: member.displayName })}
-                      >
-                        {ROLES.map((role) => (
-                          <option key={role} value={role}>
-                            {t(role)}
-                          </option>
-                        ))}
-                      </select>
-                      {/* One new card a year; a member who lost theirs can be allowed one more. */}
-                      <button
-                        type="button"
-                        className="btn ghost small"
-                        aria-pressed={member.extraCardAllowed}
-                        disabled={extraCard.isPending}
-                        onClick={() =>
-                          extraCard.mutate({ memberId: member.id, allowed: !member.extraCardAllowed })
-                        }
-                      >
-                        {member.extraCardAllowed ? t('Extra card allowed') : t('Allow one extra card')}
-                      </button>
-                    </div>
-                  </div>
+                  <li key={member.id}>
+                    <Link
+                      to={`/${slug}/members/${member.id}`}
+                      state={{ from: `/${slug}/admin?tab=members` }}
+                      className="list-item"
+                    >
+                      <span>
+                        <strong>{member.displayName}</strong>
+                        <span className="muted member-list-email">{member.email}</span>
+                      </span>
+                      <span className="muted">
+                        {member.tier}
+                        {member.role !== 'Member' && <span className="tag">{t(member.role)}</span>}
+                      </span>
+                    </Link>
+                  </li>
                 ))}
-              </div>
+              </ul>
               {shown.length === 0 && <p className="muted">{t('Nobody found.')}</p>}
             </>
           )

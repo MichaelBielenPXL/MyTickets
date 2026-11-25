@@ -53,7 +53,8 @@ export function AppHeader() {
                 memberships={me.memberships}
                 current={current && slug ? { slug, name: current.name, logoUrl: current.logoUrl } : null}
                 currentLabel={labelFor(account, visiting)}
-                canCreate={me.canCreateOrganisations}
+                // Starting an organisation is for the MyTickets site itself, never from inside another organisation.
+                canCreate={me.canCreateOrganisations && !slugInAddress}
               />
             </>
           )}

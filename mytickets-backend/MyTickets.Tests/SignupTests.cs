@@ -12,6 +12,34 @@ public class SignupTests : IClassFixture<TestApp>
         extra is null ? new { firstName = first, lastName = last } : extra;
 
     [Fact]
+    public async Task Details_given_at_one_organisation_can_be_brought_over_to_another_by_the_same_person_only()
+    {
+        var first = await _app.NewShopAsync();
+        var second = await _app.NewShopAsync();
+        // The second organisation doesn't ask for a phone number.
+        (await second.Admin.PutAsJsonAsync($"{second.Url}/admin/member-fields", new { phone = "Off", school = "Optional", faculty = "Optional", studyYear = "Optional", address = "Optional" })).EnsureSuccessStatusCode();
+
+        // Gijs gave his details at the first organisation, then opens the second.
+        var gijs = await _app.NewBareGuestAsync(first.Slug);
+        (await gijs.PutAsJsonAsync($"{first.Url}/me/profile", new { firstName = "Gijs", lastName = "Janssens", phone = "0470 12 34 56", school = "KU Leuven" })).EnsureSuccessStatusCode();
+        var source = Assert.Single((await gijs.GetOkAsync($"{second.Url}/me/profile/copy-sources")).AsArray())!;
+        Assert.Equal(first.Slug, source.Str("slug"));
+
+        var copied = await gijs.GetOkAsync($"{second.Url}/me/profile/copy-from/{first.Slug}");
+        Assert.Equal(("Gijs", "Janssens", "KU Leuven"), (copied.Str("firstName"), copied.Str("lastName"), copied.Str("school")));
+        // Only what the second organisation asks comes along, and nothing is saved there until he saves the form.
+        Assert.Null(copied["phone"]);
+        var form = await gijs.GetOkAsync($"{second.Url}/me/profile");
+        Assert.Null(form["profile"]!["firstName"]);
+        Assert.Equal(source.Str("name"), (await gijs.GetOkAsync("/api/auth/me"))["memberships"]!.AsArray().Single()!.Str("name"));
+
+        // Someone else sees nothing to bring over and gets nothing.
+        var other = await _app.NewBareGuestAsync(second.Slug);
+        Assert.Empty((await other.GetOkAsync($"{second.Url}/me/profile/copy-sources")).AsArray());
+        Assert.Equal(HttpStatusCode.NotFound, (await other.GetAsync($"{second.Url}/me/profile/copy-from/{first.Slug}")).StatusCode);
+    }
+
+    [Fact]
     public async Task Signing_up_takes_only_an_email_and_a_password_then_details_come_with_the_membership()
     {
         var shop = await _app.NewShopAsync();

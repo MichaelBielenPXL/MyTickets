@@ -4,8 +4,10 @@ import { meQueryKey } from '@/features/auth'
 import { api } from '@/lib/api-client'
 
 import type {
+  CopySource,
   JoinResult,
   MemberPass,
+  MembershipPeriod,
   Organisation,
   OrganisationSummary,
   ProfileForm,
@@ -14,6 +16,7 @@ import type {
 
 export const organisationKeys = {
   profile: (slug: string) => ['profile', slug] as const,
+  memberships: (slug: string) => ['membership-history', slug] as const,
   list: ['organisations'] as const,
   detail: (slug: string) => ['organisation', slug] as const,
   publicDetail: (slug: string) => ['public-organisation', slug] as const,
@@ -88,6 +91,7 @@ export function useJoinOrganisation(slug: string) {
       Promise.all([
         queryClient.invalidateQueries({ queryKey: organisationKeys.detail(slug) }),
         queryClient.invalidateQueries({ queryKey: organisationKeys.list }),
+        queryClient.invalidateQueries({ queryKey: organisationKeys.memberships(slug) }),
         queryClient.invalidateQueries({ queryKey: meQueryKey }),
       ]),
   })
@@ -98,6 +102,30 @@ export function useMyProfile(slug: string) {
   return useQuery({
     queryKey: organisationKeys.profile(slug),
     queryFn: () => api.get<ProfileForm>(`/orgs/${slug}/me/profile`),
+  })
+}
+
+/** The person's other organisations where they gave their details, the first one joined first. */
+export function useCopySources(slug: string) {
+  return useQuery({
+    queryKey: ['profile-copy-sources', slug],
+    queryFn: () => api.get<CopySource[]>(`/orgs/${slug}/me/profile/copy-sources`),
+  })
+}
+
+/** The details given at another organisation, limited to what this one asks. Only fills the form; saving is separate. */
+export function useCopyDetails(slug: string) {
+  return useMutation({
+    mutationFn: (fromSlug: string) =>
+      api.get<ProfileValues>(`/orgs/${slug}/me/profile/copy-from/${fromSlug}`),
+  })
+}
+
+/** Every membership the signed-in person has had at this organisation, newest first. */
+export function useMyMemberships(slug: string) {
+  return useQuery({
+    queryKey: organisationKeys.memberships(slug),
+    queryFn: () => api.get<MembershipPeriod[]>(`/orgs/${slug}/me/memberships`),
   })
 }
 

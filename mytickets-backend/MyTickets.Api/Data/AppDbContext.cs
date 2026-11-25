@@ -9,6 +9,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<Organisation> Organisations => Set<Organisation>();
     public DbSet<MembershipTier> MembershipTiers => Set<MembershipTier>();
     public DbSet<Membership> Memberships => Set<Membership>();
+    public DbSet<MembershipPeriod> MembershipPeriods => Set<MembershipPeriod>();
     public DbSet<Wallet> Wallets => Set<Wallet>();
     public DbSet<WalletTransaction> WalletTransactions => Set<WalletTransaction>();
     public DbSet<NfcCard> NfcCards => Set<NfcCard>();
@@ -21,6 +22,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<StripeAccount> StripeAccounts => Set<StripeAccount>();
     public DbSet<MembershipRequest> MembershipRequests => Set<MembershipRequest>();
     public DbSet<TopUpDeal> TopUpDeals => Set<TopUpDeal>();
+    public DbSet<BankPayout> BankPayouts => Set<BankPayout>();
+    public DbSet<OutboxMessage> Outbox => Set<OutboxMessage>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder b)
     {
@@ -36,6 +39,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         b.Entity<Membership>().HasIndex(x => new { x.UserId, x.OrganisationId }).IsUnique();
         b.Entity<Membership>().HasIndex(x => x.OrganisationId);
         b.Entity<Membership>().HasIndex(x => x.PassCode).IsUnique();
+        b.Entity<MembershipPeriod>().HasIndex(x => x.UserId);
+        b.Entity<BankPayout>().HasIndex(x => x.PayoutId).IsUnique();
+        b.Entity<OutboxMessage>().HasIndex(x => new { x.ProcessedAt, x.NextAttemptAt });
         b.Entity<TopUpDeal>().HasIndex(x => x.OrganisationId);
         b.Entity<Membership>().HasOne(x => x.Tier).WithMany().OnDelete(DeleteBehavior.Restrict);
         b.Entity<Wallet>().HasIndex(x => new { x.UserId, x.OrganisationId }).IsUnique();

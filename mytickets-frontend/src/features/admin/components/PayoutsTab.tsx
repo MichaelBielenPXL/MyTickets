@@ -108,18 +108,33 @@ function Status({ setup }: { setup: PayoutSetup }) {
 }
 
 /**
- * "MyTickets keeps 5% of each ticket or top-up, at most €1.50 each. On very small or unusual payments it
- * keeps just enough to cover Stripe's cost. You get the rest, straight after each payment."
+ * "MyTickets keeps 5% of each ticket or top-up, at most €1.50 each. On very small or unusual payments it keeps
+ * just enough to cover Stripe's cost. Stripe also charges for paying you out: 0,25% plus €0.10 per payout to your
+ * bank, and €2 for every month with payouts. That is set aside from your payments before they go to you: 0,25% of
+ * each, and a buffer of €2.50 for the rest, so it is always paid in advance. The buffer stays yours."
  */
-function feeTerms({ feePercent, feeMaxCentsPerItem }: PayoutSetup) {
-  return (
+function feeTerms({
+  feePercent,
+  feeMaxCentsPerItem,
+  monthlyAccountFeeCents,
+  payoutFeePercent,
+  payoutFeeFixedCents,
+  payoutBufferCents,
+}: PayoutSetup) {
+  const percent = String(payoutFeePercent).replace('.', ',')
+  return [
     t('MyTickets keeps {percent}% of each ticket or top-up, at most {max} each.', {
       percent: feePercent,
       max: money(feeMaxCentsPerItem),
-    }) +
-    ' ' +
+    }),
+    t("On very small payments it keeps just enough to cover Stripe's cost."),
     t(
-      "On very small payments it keeps just enough to cover Stripe's cost. You get the rest, straight after each payment.",
-    )
-  )
+      'Stripe also charges for paying you out: {percent}% plus {fixed} per payout to your bank, and {fee} for every month with payouts.',
+      { percent, fixed: money(payoutFeeFixedCents), fee: money(monthlyAccountFeeCents) },
+    ),
+    t(
+      'That is set aside from your payments before they go to you: {percent}% of each, and a buffer of {buffer} for the rest, so it is always paid in advance. The buffer stays yours and is settled when your organisation closes.',
+      { percent, buffer: money(payoutBufferCents) },
+    ),
+  ].join(' ')
 }

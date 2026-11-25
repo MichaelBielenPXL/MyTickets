@@ -115,7 +115,7 @@ public class FlowTests : IClassFixture<TestApp>
         using var client = _app.CreateClient();
         var response = await client.PostAsJsonAsync("/api/auth/register", new
         {
-            email = $"founder-{Guid.NewGuid():N}@example.com", password = "correct horse", displayName = "Founder",
+            email = $"founder-{Guid.NewGuid():N}@example.com", password = "correct horse", acceptTerms = true, displayName = "Founder",
             organisationName = "Moonlight Society",
         });
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -129,6 +129,127 @@ public class FlowTests : IClassFixture<TestApp>
     }
 
     [Fact]
+    public async Task Registration_requires_accepting_the_terms_and_privacy_policy()
+    {
+        var org = await NewOrgAsync();
+        using var client = _app.CreateClient();
+        var email = $"terms-{Guid.NewGuid():N}@example.com";
+
+        var member = await client.PostAsJsonAsync("/api/auth/register", new { email, password = "correct horse", joinOrganisationSlug = org.Slug });
+        Assert.Equal(HttpStatusCode.BadRequest, member.StatusCode);
+        Assert.Contains("terms of service", await member.Content.ReadAsStringAsync());
+        var organiser = await client.PostAsJsonAsync("/api/auth/register",
+            new { email, password = "correct horse", acceptTerms = false, displayName = "Founder", organisationName = $"Terms {Guid.NewGuid():N}"[..20] });
+        Assert.Equal(HttpStatusCode.BadRequest, organiser.StatusCode);
+
+        // Nothing was created: the same address can still sign up once the terms are accepted.
+        (await client.PostAsJsonAsync("/api/auth/register",
+            new { email, password = "correct horse", acceptTerms = true, joinOrganisationSlug = org.Slug })).EnsureSuccessStatusCode();
+    }
+
+    [Fact]
+    public async Task Members_see_every_membership_they_had_newest_first()
+    {
+        var org = await NewOrgAsync();
+        var fan = (await org.Admin.PostOkAsync($"{org.Url}/admin/tiers", new { name = "Fan", priceCents = 0, isPublic = true })).Str("id");
+        var guest = await _app.NewGuestAsync(org.Slug, "Hilde");
+        Assert.Empty((await guest.GetOkAsync($"{org.Url}/me/memberships")).AsArray());
+
+        await guest.PostOkAsync($"{org.Url}/join", new { tierId = org.FreeTierId });
+        await guest.PostOkAsync($"{org.Url}/join", new { tierId = fan });
+
+        var history = (await guest.GetOkAsync($"{org.Url}/me/memberships")).AsArray();
+        Assert.Equal(["Fan", "Member"], history.Select(p => p!.Str("tierName")));
+        Assert.True(history[0]!["current"]!.GetValue<bool>());
+        Assert.False(history[1]!["current"]!.GetValue<bool>());
+
+        var member = (await org.Admin.GetOkAsync($"{org.Url}/admin/members")).AsArray().Single(m => m!.Str("displayName").StartsWith("Hilde"))!;
+
+        // An admin ending the membership closes the running period rather than adding one.
+        (await org.Admin.PutAsJsonAsync($"{org.Url}/admin/members/{member.Str("id")}",
+            new { role = "Member", tierId = fan, expiresAt = DateTime.UtcNow.AddMinutes(-1) })).EnsureSuccessStatusCode();
+        history = (await guest.GetOkAsync($"{org.Url}/me/memberships")).AsArray();
+        Assert.Equal(2, history.Count);
+        Assert.False(history[0]!["current"]!.GetValue<bool>());
+    }
+
+    [Fact]
+    public async Task Staff_and_admins_look_members_up_by_name_or_card_and_see_their_details_and_history()
+    {
+        var org = await NewOrgAsync();
+        var fan = (await org.Admin.PostOkAsync($"{org.Url}/admin/tiers", new { name = "Fan", priceCents = 0, isPublic = true })).Str("id");
+        var guest = await _app.NewGuestAsync(org.Slug, "Ingrid");
+        await guest.PostOkAsync($"{org.Url}/join", new { tierId = org.FreeTierId });
+        await guest.PostOkAsync($"{org.Url}/join", new { tierId = fan });
+        var card = await LinkCardAsync(guest, org);
+
+        // By name, in any case; a typed % is just a character, not "everyone".
+        var found = (await org.Admin.GetOkAsync($"{org.Url}/staff/members?search=ingRID")).AsArray();
+        var id = Assert.Single(found)!.Str("id");
+        Assert.Empty((await org.Admin.GetOkAsync($"{org.Url}/staff/members?search=%25")).AsArray());
+        // By card: checking it says which member it is.
+        Assert.Equal(id, (await org.Admin.PostOkAsync($"{org.Url}/staff/lookup", new { cardUid = card })).Str("memberId"));
+
+        var details = await org.Admin.GetOkAsync($"{org.Url}/staff/members/{id}");
+        Assert.Equal("Ingrid", details.Str("firstName"));
+        Assert.Equal("Fan", details.Str("tier"));
+        Assert.Single(details["cards"]!.AsArray());
+        Assert.Equal(["Fan", "Member"], details["history"]!.AsArray().Select(p => p!.Str("tierName")));
+
+        Assert.Equal("Optional", details["fields"]!.Str("phone"));
+        Assert.Equal("Ingrid", details["profile"]!.Str("firstName"));
+
+        // Admins can correct the details, with the same checks as the member's own form; nobody else can.
+        var corrected = new { firstName = "Ingrid", lastName = "Peeters", phone = "0470 12 34 56" };
+        (await org.Admin.PutAsJsonAsync($"{org.Url}/admin/members/{id}/profile", corrected)).EnsureSuccessStatusCode();
+        details = await org.Admin.GetOkAsync($"{org.Url}/staff/members/{id}");
+        Assert.Equal("Ingrid Peeters", details.Str("displayName"));
+        Assert.Equal("0470 12 34 56", details.Str("phone"));
+        Assert.Equal(HttpStatusCode.BadRequest,
+            (await org.Admin.PutAsJsonAsync($"{org.Url}/admin/members/{id}/profile", new { firstName = "", lastName = "" })).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await guest.PutAsJsonAsync($"{org.Url}/admin/members/{id}/profile", corrected)).StatusCode);
+
+        // A barman checks cards but does not look into people's details; nor do members.
+        var barman = await NewMemberAsync(org, "Bram");
+        var bram = (await org.Admin.GetOkAsync($"{org.Url}/admin/members")).AsArray().Single(m => m!.Str("displayName").StartsWith("Bram"))!;
+        (await org.Admin.PutAsJsonAsync($"{org.Url}/admin/members/{bram.Str("id")}",
+            new { role = "Barman", tierId = bram.Str("tierId"), expiresAt = (DateTime?)null })).EnsureSuccessStatusCode();
+        Assert.Equal(HttpStatusCode.Forbidden, (await barman.GetAsync($"{org.Url}/staff/members/{id}")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await barman.GetAsync($"{org.Url}/staff/members?search=Ingrid")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await guest.GetAsync($"{org.Url}/staff/members/{id}")).StatusCode);
+    }
+
+    [Fact]
+    public async Task The_overview_counts_only_the_chosen_period_and_shows_the_bar_day_by_day()
+    {
+        var org = await NewOrgAsync();
+        var beer = (await org.Admin.PostOkAsync($"{org.Url}/admin/products", new { name = "Beer", priceCents = 300, active = true })).Str("id");
+        var guest = await NewMemberAsync(org);
+        var card = await LinkCardAsync(guest, org);
+        await org.Admin.PostOkAsync($"{org.Url}/staff/topup", new { cardUid = card, amountCents = 1000 });
+        await org.Admin.PostOkAsync($"{org.Url}/staff/charge", new { cardUid = card, items = new[] { new { productId = beer, quantity = 2 } } });
+
+        var brussels = TimeZoneInfo.FindSystemTimeZoneById("Europe/Brussels");
+        var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, brussels));
+        var week = await org.Admin.GetOkAsync($"{org.Url}/admin/summary?from={today.AddDays(-6):yyyy-MM-dd}&to={today:yyyy-MM-dd}");
+        Assert.Equal((1, 600), (week["bar"]!.Int("sales"), week["bar"]!.Int("takingsCents")));
+        Assert.Equal((1, 1000), (week["cash"]!.Int("count"), week["cash"]!.Int("cents")));
+        // A week is drawn day by day: seven days, the sale on the last.
+        var points = week["byPeriod"]!["points"]!.AsArray();
+        Assert.Equal("day", week["byPeriod"]!.Str("unit"));
+        Assert.Equal(7, points.Count);
+        Assert.Equal((today.ToString("yyyy-MM-dd"), 600, 1000), (points[6]!.Str("key"), points[6]!.Int("barCents"), points[6]!.Int("moneyInCents")));
+
+        // Last month knew nothing of it; what guests can still spend is about now, whatever the period.
+        var earlier = await org.Admin.GetOkAsync($"{org.Url}/admin/summary?from={today.AddDays(-40):yyyy-MM-dd}&to={today.AddDays(-10):yyyy-MM-dd}");
+        Assert.Equal(0, earlier["bar"]!.Int("takingsCents"));
+        Assert.Equal(400, earlier["tokens"]!.Int("outstandingCents"));
+
+        Assert.Equal(HttpStatusCode.BadRequest, (await org.Admin.GetAsync($"{org.Url}/admin/summary?from=22-11-2026")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await guest.GetAsync($"{org.Url}/admin/summary")).StatusCode);
+    }
+
+    [Fact]
     public async Task Registration_rejects_taken_or_reserved_organisation_names_without_creating_an_account()
     {
         var admin = await _app.NewUserAsync("Existing owner");
@@ -138,7 +259,7 @@ public class FlowTests : IClassFixture<TestApp>
         var email = $"blocked-{Guid.NewGuid():N}@example.com";
         var taken = await client.PostAsJsonAsync("/api/auth/register", new
         {
-            email, password = "correct horse", displayName = "Blocked", organisationName = name,
+            email, password = "correct horse", acceptTerms = true, displayName = "Blocked", organisationName = name,
         });
         Assert.Equal(HttpStatusCode.Conflict, taken.StatusCode);
         var takenLogin = await client.PostAsJsonAsync("/api/auth/login", new { email, password = "correct horse" });
@@ -147,7 +268,7 @@ public class FlowTests : IClassFixture<TestApp>
         var reservedEmail = $"reserved-{Guid.NewGuid():N}@example.com";
         var reserved = await client.PostAsJsonAsync("/api/auth/register", new
         {
-            email = reservedEmail, password = "correct horse", displayName = "Reserved", organisationName = "tickets",
+            email = reservedEmail, password = "correct horse", acceptTerms = true, displayName = "Reserved", organisationName = "tickets",
         });
         Assert.Equal(HttpStatusCode.BadRequest, reserved.StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized,
@@ -165,7 +286,7 @@ public class FlowTests : IClassFixture<TestApp>
         var email = $"invalid-{Guid.NewGuid():N}@example.com";
         var response = await client.PostAsJsonAsync("/api/auth/register", new
         {
-            email, password = "correct horse", displayName = "Invalid name", organisationName,
+            email, password = "correct horse", acceptTerms = true, displayName = "Invalid name", organisationName,
         });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
@@ -186,7 +307,7 @@ public class FlowTests : IClassFixture<TestApp>
         using var visitor = _app.CreateClient();
         var response = await visitor.PostAsJsonAsync("/api/auth/register", new
         {
-            email = $"member-{Guid.NewGuid():N}@example.com", password = "correct horse", displayName = "New member",
+            email = $"member-{Guid.NewGuid():N}@example.com", password = "correct horse", acceptTerms = true, displayName = "New member",
             joinOrganisationSlug = org.Slug,
         });
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -204,11 +325,11 @@ public class FlowTests : IClassFixture<TestApp>
         var orgName = $"Shared {Guid.NewGuid():N}";
         var first = firstClient.PostAsJsonAsync("/api/auth/register", new
         {
-            email = $"first-{Guid.NewGuid():N}@example.com", password = "correct horse", displayName = "First", organisationName = orgName,
+            email = $"first-{Guid.NewGuid():N}@example.com", password = "correct horse", acceptTerms = true, displayName = "First", organisationName = orgName,
         });
         var second = secondClient.PostAsJsonAsync("/api/auth/register", new
         {
-            email = $"second-{Guid.NewGuid():N}@example.com", password = "correct horse", displayName = "Second", organisationName = orgName,
+            email = $"second-{Guid.NewGuid():N}@example.com", password = "correct horse", acceptTerms = true, displayName = "Second", organisationName = orgName,
         });
         var responses = await Task.WhenAll(first, second);
         Assert.Single(responses, r => r.StatusCode == HttpStatusCode.OK);
@@ -234,6 +355,10 @@ public class FlowTests : IClassFixture<TestApp>
         Assert.Equal("Guest Tester", checkedIn.Str("name"));
         var again = await org.Admin.PostAsJsonAsync($"{org.Url}/staff/checkin", new { eventId, cardUid = card });
         Assert.Equal(HttpStatusCode.Conflict, again.StatusCode);
+        // The door shows who it was and when they came in.
+        var body = JsonNode.Parse(await again.Content.ReadAsStringAsync())!;
+        Assert.Equal(("Already checked in.", "Guest Tester"), (body.Str("error"), body.Str("name")));
+        Assert.NotNull(body["checkedInAt"]);
     }
 
     [Fact]
@@ -374,7 +499,7 @@ public class FlowTests : IClassFixture<TestApp>
         // The guest sees it in their history, and the bar's takings no longer count the returned deposits.
         var history = (await guest.GetOkAsync($"{org.Url}/wallet"))["transactions"]!.AsArray();
         Assert.Contains(history, t => t!.Str("type") == "Return" && t!.Int("amountCents") == 100 && t!.Str("description") == "1× Cup returned");
-        Assert.Equal(450, (await org.Admin.GetOkAsync($"{org.Url}/admin/summary")).Int("barRevenueCents"));
+        Assert.Equal(450, (await org.Admin.GetOkAsync($"{org.Url}/admin/summary"))["bar"]!.Int("takingsCents"));
 
         // Only deposits can come back: nobody gets credit for "returning" a beer.
         var beerBack = await org.Admin.PostAsJsonAsync($"{org.Url}/staff/charge", new { cardUid = card, items = new[] { new { productId = beer, quantity = -1 } } });
@@ -414,8 +539,8 @@ public class FlowTests : IClassFixture<TestApp>
 
         // One cup is still out: its euro is held for the guest, not counted as takings.
         var summary = await org.Admin.GetOkAsync($"{org.Url}/admin/summary");
-        Assert.Equal(1400, summary.Int("barRevenueCents"));
-        Assert.Equal(100, summary.Int("depositsHeldCents"));
+        Assert.Equal(1400, summary["bar"]!.Int("takingsCents"));
+        Assert.Equal(100, summary["tokens"]!.Int("depositsHeldCents"));
     }
 
     [Fact]
@@ -507,10 +632,13 @@ public class FlowTests : IClassFixture<TestApp>
         Assert.Equal([500, 2000], deals.Select(d => d!.Int("priceCents")));
         var fiveForSix = deals[0]!.Str("id");
 
-        // Pay €5, get 6 tokens. The overview counts the €5 that came in.
+        // Pay €5, get 6 tokens. The overview counts the €5 that came in, and the token given on top.
         await guest.PayAsync(await guest.PostOkAsync($"{org.Url}/wallet/topup", new { amountCents = 0, dealId = fiveForSix }));
         Assert.Equal(600, await BalanceAsync(guest, org));
-        Assert.Equal(500, (await org.Admin.GetOkAsync($"{org.Url}/admin/summary")).Int("onlineTopUpsCents"));
+        var summary = await org.Admin.GetOkAsync($"{org.Url}/admin/summary");
+        // Paid with the test checkout: listed apart, as no real money.
+        Assert.Equal(500, summary["payout"]!.Int("testCents"));
+        Assert.Equal((600, 500, 100), (summary["tokens"]!.Int("boughtCents"), summary["tokens"]!.Int("paidCents"), summary["tokens"]!.Int("bonusCents")));
 
         // With deals on offer, an amount of your own is not allowed.
         var ownAmount = await guest.PostAsJsonAsync($"{org.Url}/wallet/topup", new { amountCents = 700 });
@@ -585,7 +713,7 @@ public class FlowTests : IClassFixture<TestApp>
 
         // Neither of them manages anything.
         Assert.Equal(HttpStatusCode.Forbidden, (await barman.GetAsync($"{org.Url}/admin/products")).StatusCode);
-        Assert.Equal(["Bar", "Door", "CashTopUp", "CheckCard"], (await org.Admin.GetOkAsync($"{org.Url}/staff/context"))["tasks"]!.AsArray().Select(t => t!.GetValue<string>()));
+        Assert.Equal(["Bar", "Door", "CashTopUp", "CheckCard", "MemberInfo"], (await org.Admin.GetOkAsync($"{org.Url}/staff/context"))["tasks"]!.AsArray().Select(t => t!.GetValue<string>()));
     }
 
     [Fact]
@@ -694,54 +822,53 @@ public class FlowTests : IClassFixture<TestApp>
     }
 
     [Fact]
-    public async Task The_same_person_at_two_organisations_has_two_separate_accounts()
+    public async Task One_account_joins_several_organisations_each_keeping_its_own_record()
     {
         var first = await NewOrgAsync();
         var second = await NewOrgAsync();
         var beer = (await second.Admin.PostOkAsync($"{second.Url}/admin/products", new { name = "Beer", priceCents = 100, active = true })).Str("id");
         var email = $"gijs-{Guid.NewGuid():N}@example.com";
 
-        // Registering at the first organisation says nothing about the second.
-        var atFirst = await _app.NewGuestAsync(first.Slug, "Gijs", email);
-        await atFirst.PostOkAsync($"{first.Url}/join", new { tierId = first.FreeTierId });
-        var card = await LinkCardAsync(atFirst, first);
-        await TopUpAsync(atFirst, first, 2000);
-        Assert.Equal(HttpStatusCode.Unauthorized, (await atFirst.GetAsync($"{second.Url}/wallet")).StatusCode);
-        var login = await _app.CreateClient().PostAsJsonAsync("/api/auth/login", new { email, password = "correct horse", organisationSlug = second.Slug });
-        Assert.Equal(HttpStatusCode.Unauthorized, login.StatusCode);
+        var gijs = await _app.NewGuestAsync(first.Slug, "Gijs", email);
+        await gijs.PostOkAsync($"{first.Url}/join", new { tierId = first.FreeTierId });
+        var card = await LinkCardAsync(gijs, first);
+        await TopUpAsync(gijs, first, 2000);
 
-        // The same email address can sign up there too, and starts from nothing.
-        var again = await atFirst.PostAsJsonAsync("/api/auth/register", new { email, password = "another password", displayName = "Gijs", joinOrganisationSlug = second.Slug });
-        Assert.True(again.IsSuccessStatusCode, await again.Content.ReadAsStringAsync());
-        (await atFirst.PutAsJsonAsync($"{second.Url}/me/profile", new { firstName = "Gijs", lastName = "Jazz" })).EnsureSuccessStatusCode();
-        await atFirst.PostOkAsync($"{second.Url}/join", new { tierId = second.FreeTierId });
-        Assert.Equal(2000, await BalanceAsync(atFirst, first));
-        Assert.Equal(0, await BalanceAsync(atFirst, second));
-        Assert.Empty((await atFirst.GetOkAsync($"{second.Url}/me/cards")).AsArray());
+        // Signed in, but not at the second organisation yet: nothing of his there.
+        Assert.Equal(HttpStatusCode.NotFound, (await gijs.GetAsync($"{second.Url}/wallet")).StatusCode);
+        Assert.Empty((await gijs.GetOkAsync($"{second.Url}/me/cards")).AsArray());
+        // One account per address: signing up again is refused, he signs in instead.
+        var again = await _app.CreateClient().PostAsJsonAsync("/api/auth/register", new { email, password = "another password", acceptTerms = true, joinOrganisationSlug = second.Slug });
+        Assert.Equal(HttpStatusCode.Conflict, again.StatusCode);
+        Assert.Contains("account-exists", await again.Content.ReadAsStringAsync());
+
+        // Joining the second makes his record there, which starts from nothing.
+        (await gijs.PutAsJsonAsync($"{second.Url}/me/profile", new { firstName = "Gijs", lastName = "Jazz" })).EnsureSuccessStatusCode();
+        await gijs.PostOkAsync($"{second.Url}/join", new { tierId = second.FreeTierId });
+        Assert.Equal(2000, await BalanceAsync(gijs, first));
+        Assert.Equal(0, await BalanceAsync(gijs, second));
+        Assert.Empty((await gijs.GetOkAsync($"{second.Url}/me/cards")).AsArray());
 
         // The card linked at the first organisation is unknown at the second, until it is linked there as well.
         var charge = new { cardUid = card, items = new[] { new { productId = beer, quantity = 1 } } };
         Assert.Equal(HttpStatusCode.NotFound, (await second.Admin.PostAsJsonAsync($"{second.Url}/staff/charge", charge)).StatusCode);
-        await LinkCardAsync(atFirst, second, card);
+        await LinkCardAsync(gijs, second, card);
         Assert.Equal(HttpStatusCode.PaymentRequired, (await second.Admin.PostAsJsonAsync($"{second.Url}/staff/charge", charge)).StatusCode);
 
-        // The browser is now signed in to both, with a different account at each.
-        var me = await atFirst.GetOkAsync("/api/auth/me");
-        var accounts = me["memberships"]!.AsArray();
-        Assert.Equal(2, accounts.Count);
-        Assert.NotEqual(accounts[0]!.Str("userId"), accounts[1]!.Str("userId"));
+        // One account, a separate record at each organisation.
+        var me = await gijs.GetOkAsync("/api/auth/me");
+        var records = me["memberships"]!.AsArray();
+        Assert.Equal(2, records.Count);
+        Assert.NotEqual(records[0]!.Str("userId"), records[1]!.Str("userId"));
         Assert.False(me["isOwner"]!.GetValue<bool>());
 
-        // Each password only works where it was chosen.
+        // One password, everywhere; signing out is everywhere too.
         var fresh = _app.CreateClient();
-        Assert.Equal(HttpStatusCode.Unauthorized, (await fresh.PostAsJsonAsync("/api/auth/login", new { email, password = "another password", organisationSlug = first.Slug })).StatusCode);
-        Assert.Equal(HttpStatusCode.OK, (await fresh.PostAsJsonAsync("/api/auth/login", new { email, password = "another password", organisationSlug = second.Slug })).StatusCode);
+        await fresh.PostOkAsync("/api/auth/login", new { email, password = "correct horse", organisationSlug = second.Slug });
+        Assert.Equal(2000, await BalanceAsync(fresh, first));
+        (await fresh.PostAsJsonAsync("/api/auth/logout", new { })).EnsureSuccessStatusCode();
+        Assert.Equal(HttpStatusCode.Unauthorized, (await fresh.GetAsync("/api/auth/me")).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await fresh.GetAsync($"{first.Url}/wallet")).StatusCode);
-
-        // Signing out of one organisation leaves the other signed in.
-        (await atFirst.PostAsJsonAsync("/api/auth/logout", new { organisationSlug = second.Slug })).EnsureSuccessStatusCode();
-        Assert.Equal(HttpStatusCode.Unauthorized, (await atFirst.GetAsync($"{second.Url}/wallet")).StatusCode);
-        Assert.Equal(2000, await BalanceAsync(atFirst, first));
     }
 
     [Fact]
@@ -760,34 +887,34 @@ public class FlowTests : IClassFixture<TestApp>
         Assert.Contains((await first.Admin.GetOkAsync($"{first.Url}/admin/members")).AsArray(), m => m!.Str("email") == guestEmail);
         Assert.DoesNotContain((await second.Admin.GetOkAsync($"{second.Url}/admin/members")).AsArray(), m => m!.Str("email") == guestEmail);
 
-        // On disk: one database file per organisation, and the guest's email address is in exactly one of them.
+        // On disk: one database file per organisation, and the guest's record is in exactly one of them. The platform
+        // database has their MyTickets account (to sign in with), but none of what they told the organisation.
         var files = Directory.GetFiles(Path.Combine(_app.DataFolder, "organisations"), "*.db");
         var organisations = (await first.Admin.GetOkAsync("/api/orgs")).AsArray().Count;
         Assert.Equal(organisations, files.Length);
-        Assert.Equal(1, files.Count(file => DatabaseContains(file, guestEmail)));
-        Assert.False(DatabaseContains(Path.Combine(_app.DataFolder, "platform.db"), guestEmail));
+        Assert.Equal(1, files.Count(file => DatabaseContains(file, "Users", guestEmail)));
+        var platform = Path.Combine(_app.DataFolder, "platform.db");
+        Assert.True(DatabaseContains(platform, "Accounts", guestEmail));
+        Assert.False(DatabaseContains(platform, "Users", guestEmail));
     }
 
-    private static bool DatabaseContains(string file, string email)
+    /// <summary>Whether the database file has a row with this email address in that table (false when there is no such table).</summary>
+    private static bool DatabaseContains(string file, string table, string email)
     {
         using var connection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={file};Mode=ReadOnly;Pooling=False");
         connection.Open();
-        using var tables = connection.CreateCommand();
-        tables.CommandText = "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('Users', 'OwnerAccounts')";
-        var names = new List<string>();
-        using (var reader = tables.ExecuteReader()) while (reader.Read()) names.Add(reader.GetString(0));
-        foreach (var table in names)
-        {
-            using var count = connection.CreateCommand();
-            count.CommandText = $"SELECT COUNT(*) FROM \"{table}\" WHERE \"Email\" = $email";
-            count.Parameters.AddWithValue("$email", email);
-            if ((long)count.ExecuteScalar()! > 0) return true;
-        }
-        return false;
+        using var exists = connection.CreateCommand();
+        exists.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = $table";
+        exists.Parameters.AddWithValue("$table", table);
+        if ((long)exists.ExecuteScalar()! == 0) return false;
+        using var count = connection.CreateCommand();
+        count.CommandText = $"SELECT COUNT(*) FROM \"{table}\" WHERE \"Email\" = $email";
+        count.Parameters.AddWithValue("$email", email);
+        return (long)count.ExecuteScalar()! > 0;
     }
 
     [Fact]
-    public async Task Entering_an_email_tells_whether_there_is_an_account_at_that_organisation()
+    public async Task Entering_an_email_tells_whether_there_is_a_MyTickets_account()
     {
         var first = await NewOrgAsync();
         var second = await NewOrgAsync();
@@ -800,19 +927,19 @@ public class FlowTests : IClassFixture<TestApp>
 
         Assert.True(await ExistsAt(first, email));
         Assert.True(await ExistsAt(first, $"  {email.ToUpperInvariant()} "));
-        // An account at one organisation is not an account at another.
-        Assert.False(await ExistsAt(second, email));
+        // One MyTickets account, whichever organisation's page asks.
+        Assert.True(await ExistsAt(second, email));
         Assert.False(await ExistsAt(first, "nobody@example.com"));
         Assert.Equal(HttpStatusCode.BadRequest, (await visitor.PostAsJsonAsync($"/api/public/orgs/{first.Slug}/account-check", new { email = "not an address" })).StatusCode);
     }
 
     [Fact]
-    public async Task One_owner_login_opens_every_organisation_they_created()
+    public async Task One_account_runs_every_organisation_it_started()
     {
         var email = $"olga-{Guid.NewGuid():N}@example.com";
         var owner = _app.CreateClient();
         var firstName = $"First {Guid.NewGuid():N}"[..20];
-        var registered = await owner.PostOkAsync("/api/auth/register", new { email, password = "correct horse", displayName = "Olga", organisationName = firstName });
+        var registered = await owner.PostOkAsync("/api/auth/register", new { email, password = "correct horse", acceptTerms = true, displayName = "Olga", organisationName = firstName });
         var first = $"/api/orgs/{registered.Str("organisationSlug")}";
         var second = $"/api/orgs/{(await owner.PostOkAsync("/api/orgs", new { name = $"Second {Guid.NewGuid():N}"[..20] })).Str("slug")}";
         await owner.PostOkAsync($"{first}/admin/products", new { name = "Beer", priceCents = 250, active = true });
@@ -827,10 +954,12 @@ public class FlowTests : IClassFixture<TestApp>
         Assert.Single((await elsewhere.GetOkAsync($"{first}/admin/products")).AsArray());
         Assert.Empty((await elsewhere.GetOkAsync($"{second}/admin/products")).AsArray());
 
-        // Someone who only has a guest account cannot add organisations, and an owner's email is taken for sign-up.
+        // Starting one takes a MyTickets account (any, unless Organisations:CreatorEmails says who may), and the
+        // address is taken for sign-up.
+        Assert.Equal(HttpStatusCode.Unauthorized, (await _app.CreateClient().PostAsJsonAsync("/api/orgs", new { name = "Sneaky" })).StatusCode);
         var guest = await _app.NewGuestAsync(first.Split('/').Last());
-        Assert.Equal(HttpStatusCode.Forbidden, (await guest.PostAsJsonAsync("/api/orgs", new { name = "Sneaky" })).StatusCode);
-        var twice = await _app.CreateClient().PostAsJsonAsync("/api/auth/register", new { email, password = "correct horse", displayName = "Olga", organisationName = $"Third {Guid.NewGuid():N}"[..20] });
+        Assert.Equal(HttpStatusCode.OK, (await guest.PostAsJsonAsync("/api/orgs", new { name = $"Guest club {Guid.NewGuid():N}"[..20] })).StatusCode);
+        var twice = await _app.CreateClient().PostAsJsonAsync("/api/auth/register", new { email, password = "correct horse", acceptTerms = true, displayName = "Olga", organisationName = $"Third {Guid.NewGuid():N}"[..20] });
         Assert.Equal(HttpStatusCode.Conflict, twice.StatusCode);
     }
 

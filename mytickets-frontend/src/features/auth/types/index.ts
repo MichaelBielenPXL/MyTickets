@@ -1,14 +1,14 @@
 import type { Role } from '@/types'
 
 /**
- * An account at one organisation. Accounts are not shared: the same person has a separate one,
- * with its own tickets, credit and cards, at every organisation they signed up at.
+ * The person's record at one organisation they joined (or run): their details, membership, tokens and cards there.
+ * They sign in with their one MyTickets account; each organisation keeps its own record of them.
  */
 export interface Membership {
   slug: string
   name: string
   logoUrl: string | null
-  /** Null while the person has an account there but has not picked a membership yet. */
+  /** Null while the person has started joining but has not picked a membership yet. */
   role: Role | null
   tier: string | null
   expiresAt: string | null
@@ -17,14 +17,15 @@ export interface Membership {
   displayName: string
 }
 
-/** Everything this browser is signed in as. */
+/** The MyTickets account this browser is signed in with. */
 export interface Me {
+  id: string
   email: string
   displayName: string
-  /** An organiser's login, which opens every organisation they created. */
+  /** Runs at least one organisation. */
   isOwner: boolean
   canCreateOrganisations: boolean
-  /** One entry per organisation this browser is signed in to. */
+  /** Their record at each organisation they joined or run. */
   memberships: Membership[]
 }
 
@@ -39,6 +40,8 @@ export interface Credentials {
   joinOrganisationSlug?: string
   /** Set when signing in on an organisation's page: the account at that organisation. */
   organisationSlug?: string
+  /** Creating an account: agreed to the terms of service and privacy policy. Required by the server. */
+  acceptTerms?: boolean
 }
 
 export interface AuthResult {

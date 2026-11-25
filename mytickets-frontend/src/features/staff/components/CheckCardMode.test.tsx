@@ -21,6 +21,7 @@ const holder = {
   expiresAt: null,
   balanceCents: 1250,
   drinkDiscountPercent: 0,
+  memberId: 'm1',
 }
 
 describe('scanning a QR code instead of tapping', () => {

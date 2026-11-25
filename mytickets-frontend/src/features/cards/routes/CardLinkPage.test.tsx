@@ -33,7 +33,7 @@ describe('CardLinkPage (a card held to the phone)', () => {
 
   it('forgets the remembered card once the card is reached', async () => {
     sessionStorage.setItem(PENDING_CARD_KEY, code)
-    cardAnswers({ number: '0042', state: 'free', member: true })
+    cardAnswers({ number: '42', state: 'free', member: true })
     open()
 
     await screen.findByText(`Now at /night-owls/wallet?link=${code}`)
@@ -41,21 +41,21 @@ describe('CardLinkPage (a card held to the phone)', () => {
   })
 
   it('opens the wallet for the card owner', async () => {
-    cardAnswers({ number: '0042', state: 'mine', member: true })
+    cardAnswers({ number: '42', state: 'mine', member: true })
     open()
 
     expect(await screen.findByText('Now at /night-owls/wallet')).toBeInTheDocument()
   })
 
   it('offers to link a free card on the wallet', async () => {
-    cardAnswers({ number: '0042', state: 'free', member: true })
+    cardAnswers({ number: '42', state: 'free', member: true })
     open()
 
     expect(await screen.findByText(`Now at /night-owls/wallet?link=${code}`)).toBeInTheDocument()
   })
 
   it("says so when the card is someone else's", async () => {
-    cardAnswers({ number: '0042', state: 'taken', member: true })
+    cardAnswers({ number: '42', state: 'taken', member: true })
     open()
 
     expect(await screen.findByText('This card is linked to another account.')).toBeInTheDocument()

@@ -40,18 +40,18 @@ function serve() {
 }
 
 describe('CardDesignPanel', () => {
-  it('shows the front, and the back with the QR code, the number and the name', async () => {
+  it('shows the front, and the back with the QR code, the name and the number', async () => {
     serve()
     const { user } = renderApp(<CardDesignPanel slug="night-owls" />)
 
     const front = within(await screen.findByRole('figure', { name: 'Card preview' }))
     expect(front.getByText('Night Owls')).toBeInTheDocument()
-    expect(front.queryByTitle('QR code for card 0001')).not.toBeInTheDocument()
+    expect(front.queryByTitle('QR code of the card')).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('radio', { name: 'Back' }))
     const back = within(screen.getByRole('figure', { name: 'Card preview' }))
-    expect(back.getByText('0001')).toBeInTheDocument()
-    expect(back.getByTitle('QR code for card 0001')).toBeInTheDocument()
+    expect(back.getByTitle('QR code of the card')).toBeInTheDocument()
+    expect(back.getByText('1')).toBeInTheDocument()
   })
 
   it('saves each side on its own', async () => {

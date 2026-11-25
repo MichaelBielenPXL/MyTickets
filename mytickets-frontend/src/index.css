@@ -105,6 +105,37 @@ main.narrow {
 }
 .home-page .list,
 .organisation-page .list,
+.auth-forgot {
+  justify-self: start;
+  margin-top: -4px;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+.copy-details {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+.copy-details p {
+  margin: 0;
+}
+.copy-details-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.copy-details-row label {
+  font-weight: 500;
+}
+.copy-details .btn {
+  justify-self: start;
+}
+.ticket-history-toggle {
+  margin-top: 1.2rem;
+}
 .tickets-page .list {
   gap: 10px;
 }
@@ -679,12 +710,27 @@ legend {
   background: var(--bad);
   color: #2b0704;
 }
-.scanner {
+.scanner-frame {
+  position: relative;
   width: 100%;
-  max-height: 50vh;
+  overflow: hidden;
   border-radius: var(--radius);
   background: #000;
+  line-height: 0;
+}
+.scanner {
+  display: block;
+  width: 100%;
+  max-height: 50vh;
+  background: #000;
   object-fit: cover;
+}
+/* The library's scan brackets: always above the picture, with a dark edge so they show on light scenes too. */
+.scanner-frame .scan-region-highlight {
+  z-index: 1;
+}
+.scanner-frame .scan-region-highlight-svg {
+  filter: drop-shadow(0 0 2px rgb(0 0 0 / 70%));
 }
 .card-reader {
   display: flex;
@@ -932,6 +978,194 @@ main.admin-shell {
   padding: 12px 0;
   border-top: 1px solid #ededed;
   font-size: 0.92rem;
+}
+/* ---------- Manage › Overview ---------- */
+.admin-card {
+  margin: 0;
+  padding: 16px 20px;
+  border: 1px solid #e4e4e7;
+  border-radius: 16px;
+  background: #ffffff;
+  min-width: 0;
+}
+.admin-card-title {
+  margin: 0 0 4px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #18181b;
+}
+.admin-card-note {
+  margin: 6px 0 0;
+  color: #71717a;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+.admin-data-row > span {
+  color: #52525b;
+}
+.admin-data-row > strong {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: #18181b;
+}
+.admin-data-row.indent {
+  padding-left: 14px;
+  font-size: 0.86rem;
+}
+.overview-hero {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+.overview-metric dt {
+  color: #52525b;
+  font-size: 0.88rem;
+  font-weight: 500;
+}
+.overview-metric dd {
+  margin-left: 0;
+}
+.overview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+.overview-now {
+  margin: 14px 0 0;
+  color: #71717a;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.admin-table-scroll {
+  margin-top: 10px;
+  overflow-x: auto;
+}
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+  font-variant-numeric: tabular-nums;
+}
+.admin-table th,
+.admin-table td {
+  padding: 9px 10px;
+  border-top: 1px solid #ededed;
+  text-align: right;
+  white-space: nowrap;
+}
+.admin-table th:first-child,
+.admin-table td:first-child {
+  padding-left: 0;
+  text-align: left;
+}
+.admin-table thead th {
+  border-top: 0;
+  color: #71717a;
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+.admin-table tbody th {
+  font-weight: 500;
+}
+.admin-table tfoot th,
+.admin-table tfoot td {
+  border-top: 1px solid #a1a1aa;
+  font-weight: 600;
+}
+.payments-table td:nth-child(2) {
+  max-width: 260px;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+}
+/* One series: the palette's first blue, rounded data-ends, 2px gaps between bars. */
+.takings-chart {
+  --takings-bar: #2a78d6;
+}
+.takings-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 6px 16px;
+}
+.takings-readout {
+  margin: 0;
+  min-height: 1.4em;
+  color: #52525b;
+  font-size: 0.85rem;
+  text-align: right;
+}
+.takings-readout strong {
+  color: #18181b;
+  font-variant-numeric: tabular-nums;
+}
+.takings-plot {
+  position: relative;
+  margin-top: 12px;
+  padding-top: 18px;
+}
+.takings-max {
+  position: absolute;
+  top: 0;
+  left: 0;
+  color: #a1a1aa;
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+}
+.takings-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 160px;
+  border-bottom: 1px solid #d4d4d8;
+  background: repeating-linear-gradient(to top, transparent 0 39px, #f4f4f5 39px 40px);
+}
+.takings-bar {
+  display: flex;
+  flex: 1 1 0;
+  align-items: flex-end;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: default;
+}
+.takings-bar > span {
+  display: block;
+  width: 100%;
+  border-radius: 4px 4px 0 0;
+  background: var(--takings-bar);
+}
+.takings-bar.shown > span,
+.takings-bar:focus-visible > span {
+  background: #1c5fae;
+}
+.takings-bar:focus-visible {
+  outline: 2px solid #1c5fae;
+  outline-offset: 1px;
+}
+.takings-axis {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+  color: #a1a1aa;
+  font-size: 0.72rem;
+}
+.takings-empty {
+  margin: 18px 0 6px;
+}
+.takings-table {
+  margin-top: 12px;
+  font-size: 0.85rem;
+}
+.takings-table summary {
+  color: #52525b;
+  cursor: pointer;
 }
 .admin-outline-link {
   display: inline-flex;
@@ -1714,6 +1948,74 @@ input[type='checkbox']:focus-visible {
 .join-heading h1 {
   margin: 2px 0 4px;
 }
+.membership-history {
+  margin-top: 1.2rem;
+}
+.membership-history h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+.membership-periods {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.membership-periods li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 16px;
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+}
+.membership-periods li:first-child {
+  border-top: 0;
+}
+.membership-periods-name {
+  font-weight: 600;
+}
+.member-list,
+.member-info-results {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.member-list .list-item,
+.member-info-results .list-item {
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+.member-list-email {
+  display: block;
+  font-size: 0.88rem;
+}
+.member-page .panel {
+  margin-top: 1rem;
+}
+.member-page h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+.member-page-extra-card {
+  align-self: flex-start;
+}
+.auth-terms {
+  align-items: flex-start;
+  font-size: 0.9rem;
+}
+.auth-terms input {
+  margin-top: 3px;
+}
+.legal-page {
+  max-width: 720px;
+}
+.legal-page h2 {
+  font-size: 1.15rem;
+  margin-bottom: 0.4rem;
+}
+.legal-page li + li {
+  margin-top: 0.3rem;
+}
 .step {
   margin: 0;
   color: var(--muted);
@@ -2022,6 +2324,29 @@ input[type='checkbox']:focus-visible {
 main.staff.till-mode {
   max-width: 1280px;
   padding-bottom: 24px;
+}
+.staff-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+/* Fullscreen at the bar: only the till, edge to edge, on its own dark background. */
+:root:fullscreen .app-header {
+  display: none;
+}
+:root:fullscreen main.staff.till-mode {
+  max-width: none;
+  min-height: 100dvh;
+  padding: 8px 12px 12px;
+  background: #0b0b0c;
+}
+:root:fullscreen main.staff.till-mode .staff-top .back,
+:root:fullscreen main.staff.till-mode .tabs {
+  color: #a1a1aa;
+}
+:root:fullscreen .till {
+  min-height: calc(100dvh - 110px);
 }
 .till {
   --till-bg: #0b0b0c;
@@ -2392,29 +2717,16 @@ main.staff.till-mode {
     animation: none;
   }
 }
-.charge-screen .scanner {
+.charge-screen .scanner-frame {
   width: min(360px, 100%);
+}
+.charge-screen .scanner {
   max-height: 40vh;
   aspect-ratio: 1;
 }
 .charge-prompt .charge-problem {
   max-width: 360px;
   color: #fca5a5;
-}
-.charge-typed {
-  display: flex;
-  gap: 8px;
-  width: min(360px, 100%);
-}
-.charge-typed input {
-  flex: 1;
-  min-width: 0;
-  min-height: 44px;
-  padding: 8px 12px;
-  border: 1px solid #3f3f46;
-  border-radius: 10px;
-  background: #17171a;
-  color: #f5f5f5;
 }
 .charge-screen .till-ghost {
   color: #f5f5f5;
@@ -4420,12 +4732,14 @@ a.member-card-balance:hover {
   font-size: 7.5pt;
   opacity: 0.85;
 }
-.card-face-number {
-  margin-top: 2mm;
-  font-size: 17pt;
-  font-weight: 700;
+/* Small and faint in the corner: for telling cards apart, not something to read out. */
+.card-face > .card-face-number {
+  position: absolute;
+  right: 5mm;
+  bottom: 2.5mm;
+  font-size: 10pt;
   font-variant-numeric: tabular-nums;
-  letter-spacing: 0.05em;
+  opacity: 0.55;
 }
 .card-face-qr {
   flex: none;
@@ -4526,4 +4840,16 @@ a.member-card-balance:hover {
 }
 .card-face.front.on-picture::before {
   background: radial-gradient(circle at center, rgb(0 0 0 / 45%), rgb(0 0 0 / 10%) 75%);
+}
+
+/* Installed as an app on a phone, the page runs to the very edges (viewport-fit=cover): the strip behind the home
+   indicator shows the page's own background, and the bars keep clear of it with env(safe-area-inset-*). */
+html {
+  background-color: var(--bg);
+}
+html:has(.till) {
+  background-color: #0b0b0c;
+}
+.app-header {
+  padding-top: env(safe-area-inset-top);
 }

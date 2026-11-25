@@ -3,23 +3,6 @@ using MyTickets.Api.Data;
 
 namespace MyTickets.Api.Services;
 
-/// <summary>Stand-in for a real payment page, for trying things out: a page with "Pay" and "Cancel". No money moves.</summary>
-public static class TestCheckout
-{
-    public const string ProviderName = "Fake";
-
-    /// <summary>Only on a developer's machine, or when explicitly switched on. Never quietly on a live site.</summary>
-    public static bool Allowed(IConfiguration config, IHostEnvironment environment) =>
-        config.GetValue<bool?>("Payments:UseTestCheckout") ?? environment.IsDevelopment();
-}
-
-/// <summary>This organisation can't take online payments. The message tells the buyer what is going on.</summary>
-public class PaymentsNotSetUpException(string message) : Exception(message)
-{
-    public static PaymentsNotSetUpException For(string organisationName) =>
-        new($"{organisationName} can't take online payments yet. Pay with your tokens, or ask the organisers.");
-}
-
 /// <summary>
 /// Takes payments with Stripe Connect: the buyer pays on Stripe's page, the organisation is the seller and
 /// gets the money (minus the platform fee), and Stripe pays it out to their bank. Each payment is also
@@ -27,7 +10,7 @@ public class PaymentsNotSetUpException(string message) : Exception(message)
 /// </summary>
 public class PaymentService(AppDbContext db, WalletService wallets, MembershipService memberships, TenantContext tenant,
     StripeClient stripe, IConfiguration config, IHostEnvironment environment,
-    IHttpContextAccessor httpContext, ILogger<PaymentService> log, TimeProvider clock)
+    IHttpContextAccessor httpContext, ILogger<PaymentService> log, TimeProvider clock, OutboxDispatcher outbox)
 {
     /// <summary>The smallest amount Stripe accepts.</summary>
     public const int MinimumOnlinePaymentCents = 50;
@@ -128,45 +111,11 @@ public class PaymentService(AppDbContext db, WalletService wallets, MembershipSe
         var session = await stripe.GetCheckoutAsync(payment.ProviderReference);
         if (session.IsPaid)
         {
-            await CompleteAsync(payment.Id);
-            await SettleAsync(payment.Id);
+            // Completing publishes the event that passes the money on; handle it now rather than at the next sweep.
+            if (await CompleteAsync(payment.Id)) await outbox.ProcessDueAsync();
         }
         else if (session.IsExpired) await FailAsync(payment.Id);
         return await StatusOf(payment.Id);
-    }
-
-    /// <summary>
-    /// Passes the organisation its money for a paid Stripe payment: the amount minus the platform fee, worked
-    /// out from what Stripe actually charged. Safe to call again and again: it only ever transfers once.
-    /// If Stripe can't be reached, or has not booked the charge yet, it is simply tried again later.
-    /// Returns whether the payment is settled.
-    /// </summary>
-    public async Task<bool> SettleAsync(Guid paymentId)
-    {
-        var payment = await db.Payments.FirstAsync(p => p.Id == paymentId);
-        if (payment.Provider != StripeClient.ProviderName || payment.Status != PaymentStatus.Paid) return false;
-        if (payment.TransferId is not null) return true;
-
-        try
-        {
-            var charge = await stripe.GetChargeAsync(payment.ProviderReference!);
-            if (charge is null) return false;
-            var account = await db.StripeAccounts.AsNoTracking().FirstAsync();
-            var items = await ItemPricesAsync(payment);
-            var fee = PlatformFee(items, payment.AmountCents, charge.StripeFeeCents, CurrentFeeRules());
-
-            payment.ChargeId = charge.Id;
-            payment.StripeFeeCents = charge.StripeFeeCents;
-            payment.PlatformFeeCents = fee;
-            payment.TransferId = await stripe.TransferAsync(account.AccountId, payment.AmountCents - fee, charge.Id, payment.Id);
-            await db.SaveChangesAsync();
-            return true;
-        }
-        catch (StripeException e)
-        {
-            log.LogWarning("Passing on payment {PaymentId} to the organisation failed, will try again: {Message}", paymentId, e.Message);
-            return false;
-        }
     }
 
     /// <summary>The buyer pressed "back" on Stripe's page: close it there, so it can't be paid later, and release what it held.</summary>
@@ -216,12 +165,18 @@ public class PaymentService(AppDbContext db, WalletService wallets, MembershipSe
             case PaymentPurpose.Tickets:
                 await db.Tickets.Where(t => t.PaymentId == payment.Id && t.Status == TicketStatus.Reserved)
                     .ExecuteUpdateAsync(s => s.SetProperty(t => t.Status, TicketStatus.Valid));
+                // Theirs now: emailed to them, with the PDF.
+                var issued = await db.Tickets.Where(t => t.PaymentId == payment.Id).Select(t => t.Id).ToListAsync();
+                db.Publish(OutboxEvents.TicketsIssued, new OutboxEvents.TicketsIssuedData(issued), now);
                 break;
             case PaymentPurpose.Membership:
                 var tier = await db.MembershipTiers.FirstAsync(t => t.Id == payment.TierId);
                 await memberships.ApplyTierAsync(payment.UserId, payment.OrganisationId, tier);
                 break;
         }
+        // In the same transaction: paid, credited (or tickets, or membership), and the money still to pass on.
+        db.Publish(OutboxEvents.PaymentCompleted, new OutboxEvents.PaymentCompletedData(payment.Id), now);
+        await db.SaveChangesAsync();
         await tx.CommitAsync();
         return true;
     }
@@ -276,40 +231,7 @@ public class PaymentService(AppDbContext db, WalletService wallets, MembershipSe
             }
         }
 
-        // Paid, but the organisation's share was not passed on yet (Stripe was down, or slow to book the charge).
-        var unsettled = await db.Payments
-            .Where(p => p.Status == PaymentStatus.Paid && p.Provider == StripeClient.ProviderName && p.TransferId == null)
-            .OrderBy(p => p.CompletedAt).Select(p => p.Id).Take(50).ToListAsync();
-        foreach (var id in unsettled) await SettleAsync(id);
         return expired;
-    }
-
-    /// <summary>How the platform fee is worked out. See <see cref="PlatformFee"/>.</summary>
-    public record FeeRules(decimal PercentPerItem, int MaxCentsPerItem, int MinimumMarginCents);
-
-    private FeeRules CurrentFeeRules() => new(
-        config.GetValue("Stripe:PlatformFeePercent", 5m),
-        config.GetValue("Stripe:PlatformFeeMaxCentsPerItem", 150),
-        config.GetValue("Stripe:MinimumMarginCents", 5));
-
-    /// <summary>
-    /// The platform's cut of one payment: a percentage of every item (each ticket, or the top-up or membership)
-    /// with a cap per item, but never less than what Stripe charged for the payment plus a small margin, so the
-    /// platform never pays to process a payment. Whole cents, rounded down, never more than the payment.
-    /// </summary>
-    public static int PlatformFee(IReadOnlyCollection<int> itemPriceCents, int amountCents, int stripeFeeCents, FeeRules rules)
-    {
-        var commission = itemPriceCents.Sum(price => Math.Min((int)Math.Floor(price * rules.PercentPerItem / 100m), rules.MaxCentsPerItem));
-        var fee = Math.Max(commission, stripeFeeCents + rules.MinimumMarginCents);
-        return Math.Clamp(fee, 0, amountCents);
-    }
-
-    /// <summary>The prices the fee is counted on: each ticket separately, otherwise the whole payment as one item.</summary>
-    private async Task<IReadOnlyCollection<int>> ItemPricesAsync(Payment payment)
-    {
-        if (payment.Purpose != PaymentPurpose.Tickets) return [payment.AmountCents];
-        var prices = await db.Tickets.Where(t => t.PaymentId == payment.Id).Select(t => t.PricePaidCents).ToListAsync();
-        return prices.Count > 0 ? prices : [payment.AmountCents];
     }
 
     private Task<PaymentStatus> StatusOf(Guid paymentId) => db.Payments.Where(p => p.Id == paymentId).Select(p => p.Status).FirstAsync();
@@ -321,37 +243,5 @@ public class PaymentService(AppDbContext db, WalletService wallets, MembershipSe
         var request = httpContext.HttpContext?.Request
             ?? throw new InvalidOperationException("Set App:PublicUrl so payments started outside a web request know where to send buyers back to.");
         return $"{request.Scheme}://{request.Host}";
-    }
-}
-
-public class PaymentExpiryWorker(IServiceScopeFactory scopes, TenantScopes tenants, ILogger<PaymentExpiryWorker> log) : BackgroundService
-{
-    public static readonly TimeSpan ReservationTime = TimeSpan.FromMinutes(20);
-
-    protected override async Task ExecuteAsync(CancellationToken stop)
-    {
-        using var timer = new PeriodicTimer(TimeSpan.FromMinutes(1));
-        while (await timer.WaitForNextTickAsync(stop))
-        {
-            List<Organisation> organisations;
-            await using (var scope = scopes.CreateAsyncScope())
-                organisations = (await scope.ServiceProvider.GetRequiredService<PlatformDbContext>().Tenants.AsNoTracking().ToListAsync(stop))
-                    .Select(t => t.ToOrganisation()).ToList();
-
-            // Each organisation has its own database, so each is tidied on its own. One failing does not stop the rest.
-            foreach (var organisation in organisations)
-            {
-                try
-                {
-                    await using var scope = await tenants.OpenAsync(organisation);
-                    var n = await scope.ServiceProvider.GetRequiredService<PaymentService>().ExpireStaleAsync(ReservationTime);
-                    if (n > 0) log.LogInformation("Closed {Count} unfinished payments at {Slug}", n, organisation.Slug);
-                }
-                catch (Exception ex) when (ex is not OperationCanceledException)
-                {
-                    log.LogError(ex, "Tidying unfinished payments failed for {Slug}", organisation.Slug);
-                }
-            }
-        }
     }
 }

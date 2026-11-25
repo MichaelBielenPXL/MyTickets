@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Identity;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using MyTickets.Api.Data;
@@ -7,16 +6,23 @@ namespace MyTickets.Api.Services;
 
 public class SlugTakenException() : Exception("This organisation page address is already taken.");
 
-/// <summary>Creates an organisation: its entry in the shared list, its own database, and the owner's admin account in it.</summary>
+/// <summary>Creates an organisation: its entry in the shared list, its own database, and the owner's admin record in it.</summary>
 public class OrganisationProvisioner(PlatformDbContext platform, TenantDatabases databases, TenantScopes scopes,
     AppCache cache, TimeProvider clock, ILogger<OrganisationProvisioner> log)
 {
+    /// <summary>Anyone may create an organisation unless Organisations:CreatorEmails lists who may.</summary>
+    public static bool MayCreate(IConfiguration config, string email)
+    {
+        var allowed = config.GetSection("Organisations:CreatorEmails").Get<string[]>() ?? [];
+        return allowed.Length == 0 || allowed.Contains(email, StringComparer.OrdinalIgnoreCase);
+    }
+
     /// <summary>
-    /// The owner is saved together with the organisation when they are new (first sign-up), so a refused
-    /// organisation name never leaves an owner account behind. Throws <see cref="SlugTakenException"/>
-    /// when someone else got the address first.
+    /// The owner's MyTickets account is saved together with the organisation when it is new (signing up as an
+    /// organiser), so a refused organisation name never leaves an account behind. Throws
+    /// <see cref="SlugTakenException"/> when someone else got the address first.
     /// </summary>
-    public async Task<(Organisation Organisation, Guid AdminUserId)> CreateAsync(OwnerAccount owner, bool ownerIsNew,
+    public async Task<(Organisation Organisation, Guid AdminUserId)> CreateAsync(Account owner, bool ownerIsNew,
         string name, string slug, string description)
     {
         var tenant = new Tenant
@@ -24,9 +30,10 @@ public class OrganisationProvisioner(PlatformDbContext platform, TenantDatabases
             Id = Guid.NewGuid(), Slug = slug, Name = name, Description = description, CreatedAt = clock.GetUtcNow().UtcDateTime,
         };
         var adminUserId = Guid.NewGuid();
-        if (ownerIsNew) platform.OwnerAccounts.Add(owner);
+        if (ownerIsNew) platform.Accounts.Add(owner);
         platform.Tenants.Add(tenant);
-        platform.TenantOwners.Add(new TenantOwner { TenantId = tenant.Id, OwnerAccountId = owner.Id, UserId = adminUserId });
+        platform.TenantOwners.Add(new TenantOwner { TenantId = tenant.Id, AccountId = owner.Id });
+        platform.AccountLinks.Add(new AccountLink { AccountId = owner.Id, TenantId = tenant.Id, UserId = adminUserId, CreatedAt = tenant.CreatedAt });
         try
         {
             // Claims the address first. The unique index makes sure two sign-ups at the same moment can't both get it.
@@ -47,13 +54,8 @@ public class OrganisationProvisioner(PlatformDbContext platform, TenantDatabases
             var tier = new MembershipTier { Id = Guid.NewGuid(), OrganisationId = tenant.Id, Name = "Member", Description = "Free membership" };
             db.Organisations.Add(tenant.ToOrganisation());
             db.MembershipTiers.Add(tier);
-            // The owner's account inside the organisation. It carries the same password, so the owner can
-            // also sign in on the organisation's own page.
-            db.Users.Add(new User
-            {
-                Id = adminUserId, Email = owner.Email, DisplayName = owner.DisplayName, PasswordHash = owner.PasswordHash,
-                CreatedAt = tenant.CreatedAt,
-            });
+            // The owner's record inside the organisation, as its first admin.
+            db.Users.Add(new User { Id = adminUserId, Email = owner.Email, DisplayName = owner.DisplayName, CreatedAt = tenant.CreatedAt });
             await db.SaveChangesAsync();
             await scope.ServiceProvider.GetRequiredService<MembershipService>().ApplyTierAsync(adminUserId, tenant.Id, tier, OrgRole.Admin);
         }
@@ -63,21 +65,14 @@ public class OrganisationProvisioner(PlatformDbContext platform, TenantDatabases
             log.LogError(e, "Setting up the database for organisation {Slug} failed; removing it again", slug);
             platform.ChangeTracker.Clear();
             await platform.TenantOwners.Where(o => o.TenantId == tenant.Id).ExecuteDeleteAsync();
+            await platform.AccountLinks.Where(l => l.TenantId == tenant.Id).ExecuteDeleteAsync();
             await platform.Tenants.Where(t => t.Id == tenant.Id).ExecuteDeleteAsync();
-            if (ownerIsNew) await platform.OwnerAccounts.Where(o => o.Id == owner.Id).ExecuteDeleteAsync();
+            if (ownerIsNew) await platform.Accounts.Where(o => o.Id == owner.Id).ExecuteDeleteAsync();
             databases.Discard(tenant.Id);
             throw;
         }
 
         await cache.OrganisationChangedAsync(slug);
         return (organisation, adminUserId);
-    }
-
-    public static OwnerAccount NewOwner(string email, string displayName, string password, TimeProvider clock)
-    {
-        var owner = new OwnerAccount { Id = Guid.NewGuid(), Email = email, DisplayName = displayName, CreatedAt = clock.GetUtcNow().UtcDateTime };
-        // Hashed the same way as accounts inside an organisation, so the copy made there verifies too.
-        owner.PasswordHash = new PasswordHasher<User>().HashPassword(null!, password);
-        return owner;
     }
 }

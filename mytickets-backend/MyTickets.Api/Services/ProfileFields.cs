@@ -38,6 +38,21 @@ public static partial class ProfileFields
     public record Values(string? FirstName, string? LastName, string? Phone, string? Street, string? PostalCode, string? City,
         string? School, string? Faculty, string? StudyYear);
 
+    /// <summary>The same details with the ones this organisation doesn't ask left out.</summary>
+    public static Values OnlyAsked(Values v, Dictionary<string, FieldMode> modes)
+    {
+        string? IfAsked(string field, string? value) => modes.GetValueOrDefault(field) == FieldMode.Off ? null : value;
+        return v with
+        {
+            Phone = IfAsked(Phone, v.Phone), Street = IfAsked(Address, v.Street), PostalCode = IfAsked(Address, v.PostalCode),
+            City = IfAsked(Address, v.City), School = IfAsked(School, v.School), Faculty = IfAsked(Faculty, v.Faculty),
+            StudyYear = IfAsked(StudyYear, v.StudyYear),
+        };
+    }
+
+    /// <summary>Nothing filled in yet.</summary>
+    public static readonly Values Empty = new(null, null, null, null, null, null, null, null, null);
+
     public static Values Of(User user) =>
         new(user.FirstName, user.LastName, user.Phone, user.Street, user.PostalCode, user.City, user.School, user.Faculty, user.StudyYear);
 

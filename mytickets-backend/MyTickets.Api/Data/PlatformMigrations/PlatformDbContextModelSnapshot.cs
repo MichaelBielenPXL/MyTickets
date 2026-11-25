@@ -17,22 +17,7 @@ namespace MyTickets.Api.Data.PlatformMigrations
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.14");
 
-            modelBuilder.Entity("MyTickets.Api.Data.CardCode", b =>
-                {
-                    b.Property<string>("Code")
-                        .HasColumnType("TEXT");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Code");
-
-                    b.HasIndex("TenantId");
-
-                    b.ToTable("CardCodes");
-                });
-
-            modelBuilder.Entity("MyTickets.Api.Data.OwnerAccount", b =>
+            modelBuilder.Entity("MyTickets.Api.Data.Account", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -53,12 +38,54 @@ namespace MyTickets.Api.Data.PlatformMigrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<DateTime?>("TermsAcceptedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("TermsVersion")
+                        .HasColumnType("TEXT");
+
                     b.HasKey("Id");
 
                     b.HasIndex("Email")
                         .IsUnique();
 
-                    b.ToTable("OwnerAccounts");
+                    b.ToTable("Accounts", (string)null);
+                });
+
+            modelBuilder.Entity("MyTickets.Api.Data.AccountLink", b =>
+                {
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("AccountId", "TenantId");
+
+                    b.HasIndex("TenantId");
+
+                    b.ToTable("AccountLinks");
+                });
+
+            modelBuilder.Entity("MyTickets.Api.Data.CardCode", b =>
+                {
+                    b.Property<string>("Code")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Code");
+
+                    b.HasIndex("TenantId");
+
+                    b.ToTable("CardCodes");
                 });
 
             modelBuilder.Entity("MyTickets.Api.Data.Tenant", b =>
@@ -98,15 +125,12 @@ namespace MyTickets.Api.Data.PlatformMigrations
                     b.Property<Guid>("TenantId")
                         .HasColumnType("TEXT");
 
-                    b.Property<Guid>("OwnerAccountId")
+                    b.Property<Guid>("AccountId")
                         .HasColumnType("TEXT");
 
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("TEXT");
+                    b.HasKey("TenantId", "AccountId");
 
-                    b.HasKey("TenantId", "OwnerAccountId");
-
-                    b.HasIndex("OwnerAccountId");
+                    b.HasIndex("AccountId");
 
                     b.ToTable("TenantOwners");
                 });

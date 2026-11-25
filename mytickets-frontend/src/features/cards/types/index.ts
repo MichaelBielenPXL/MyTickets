@@ -1,6 +1,6 @@
 export interface Card {
   id: string
-  /** The number printed on the card, e.g. "0042". */
+  /** The card's number, counting up from 1, e.g. "42". */
   number: string
   label: string
   blocked: boolean

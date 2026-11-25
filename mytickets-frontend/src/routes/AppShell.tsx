@@ -7,13 +7,13 @@ import { useCurrentOrganisation } from '@/features/organisations'
 import { AppHeader } from './AppHeader'
 
 /**
- * Frame around the pages that need an account. Inside an organisation that means an account at that
- * organisation: being signed in somewhere else does not count, and the visitor is sent to sign in there.
+ * Frame around the pages that need someone signed in to MyTickets. Inside an organisation a visitor is sent to that
+ * organisation's sign-in page; someone signed in who hasn't joined it yet gets the pages, which offer to join.
  */
 export function AppShell() {
   const location = useLocation()
   const me = useMe()
-  const { slugInAddress, membership: account } = useCurrentOrganisation()
+  const { slugInAddress } = useCurrentOrganisation()
 
   if (me.isPending) {
     return (
@@ -23,8 +23,10 @@ export function AppShell() {
     )
   }
   const comeBackTo = encodeURIComponent(location.pathname + location.search)
-  if (slugInAddress && !account) return <Navigate to={`/${slugInAddress}/login?next=${comeBackTo}`} replace />
-  if (!me.data) return <Navigate to={`/login?next=${comeBackTo}`} replace />
+  if (!me.data) {
+    const signIn = slugInAddress ? `/${slugInAddress}/login` : '/login'
+    return <Navigate to={`${signIn}?next=${comeBackTo}`} replace />
+  }
 
   return (
     <>

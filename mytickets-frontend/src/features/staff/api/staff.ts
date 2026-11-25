@@ -10,10 +10,16 @@ import type {
   CheckInRequest,
   CheckInResult,
   EventStatus,
+  MemberInfo,
+  MemberSummary,
   StaffContext,
 } from '../types'
 
-export const staffKeys = { context: (slug: string) => ['staff', slug] as const }
+export const staffKeys = {
+  context: (slug: string) => ['staff', slug] as const,
+  members: (slug: string, search: string) => ['staff', slug, 'members', search] as const,
+  member: (slug: string, id: string) => ['staff', slug, 'member', id] as const,
+}
 
 export function useStaffContext(slug: string) {
   return useQuery({
@@ -60,5 +66,23 @@ export function useEventDoors(slug: string, eventId: string) {
         // The admin's event list shows the status too.
         queryClient.invalidateQueries({ queryKey: ['admin', slug, 'events'] }),
       ]),
+  })
+}
+
+/** Members whose name or email contains the search; the first ones alphabetically when it is empty. */
+export function useStaffMembers(slug: string, search: string) {
+  return useQuery({
+    queryKey: staffKeys.members(slug, search),
+    queryFn: () =>
+      api.get<MemberSummary[]>(`/orgs/${slug}/staff/members?search=${encodeURIComponent(search)}`),
+    // Keeps the last results up while the next ones load, so the list doesn't flicker while typing.
+    placeholderData: (previous) => previous,
+  })
+}
+
+export function useStaffMember(slug: string, id: string) {
+  return useQuery({
+    queryKey: staffKeys.member(slug, id),
+    queryFn: () => api.get<MemberInfo>(`/orgs/${slug}/staff/members/${id}`),
   })
 }

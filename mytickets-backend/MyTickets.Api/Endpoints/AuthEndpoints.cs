@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using MyTickets.Api.Data;
@@ -8,18 +7,20 @@ using MyTickets.Api.Services;
 namespace MyTickets.Api.Endpoints;
 
 /// <summary>
-/// Accounts belong to one organisation: the same email address can register at two organisations and
-/// gets two separate accounts. The one exception is an organiser's owner login, which opens every
-/// organisation that person created.
+/// Signing up and in with a MyTickets account: one email address and password per person, for every organisation.
+/// An organisation keeps its own record of someone (their details, membership, tokens, tickets), made when they join.
 /// </summary>
 public static class AuthEndpoints
 {
-    public record RegisterRequest(string? Email, string? Password, string? DisplayName, string? OrganisationName, string? JoinOrganisationSlug);
+    public record RegisterRequest(string? Email, string? Password, string? DisplayName, string? OrganisationName, string? JoinOrganisationSlug, bool? AcceptTerms);
     public record LoginRequest(string? Email, string? Password, string? OrganisationSlug);
     public record LogoutRequest(string? OrganisationSlug);
+    /// <summary>The organisation is where the link brings them back to sign in. Language "nl" for a Dutch email.</summary>
+    public record ForgotPasswordRequest(string? Email, string? OrganisationSlug, string? Language);
+    public record ResetPasswordRequest(string? Token, string? Password);
 
-    /// <summary>One organisation this browser is signed in to, and the account it uses there.</summary>
-    public record SignedInAccount(string Slug, string Name, string? LogoUrl, OrgRole? Role, string? Tier, DateTime? ExpiresAt,
+    /// <summary>An organisation the account has a record at: their role and membership there, and the record itself.</summary>
+    public record OrganisationRecord(string Slug, string Name, string? LogoUrl, OrgRole? Role, string? Tier, DateTime? ExpiresAt,
         Guid UserId, string Email, string DisplayName);
 
     private const string WrongLogin = "Wrong email address or password.";
@@ -28,157 +29,126 @@ public static class AuthEndpoints
     {
         var group = app.MapGroup("/api/auth");
 
+        // From an organisation's page: just the account; their record there is made when they join.
+        // From the front page: the account and the organisation they start, together or not at all.
         group.MapPost("/register", async (RegisterRequest req, HttpContext http, PlatformDbContext platform, AppCache cache,
-            TenantScopes scopes, OrganisationProvisioner provisioner, IPasswordHasher<User> hasher, IConfiguration config, TimeProvider clock) =>
+            AccountService accounts, OrganisationProvisioner provisioner, IConfiguration config) =>
         {
-            var email = req.Email?.Trim().ToLowerInvariant() ?? "";
+            var email = AccountService.Normalise(req.Email);
             var name = req.DisplayName?.Trim() ?? "";
             if (email.Length is < 5 or > 200 || !email.Contains('@')) return Http.Error(400, "Enter a valid email address.");
-            // A name is only asked of organisers here; members give theirs with their other details later.
+            // A name is only asked of organisers here; members give theirs with their other details when they join.
             var organiserSignUp = string.IsNullOrWhiteSpace(req.JoinOrganisationSlug);
             if (organiserSignUp && name.Length is < 2 or > 80) return Http.Error(400, "Enter your name.");
             if (name.Length > 80) return Http.Error(400, "Your name is too long.");
-            if ((req.Password?.Length ?? 0) < 8) return Http.Error(400, "Choose a password of at least 8 characters.");
+            if ((req.Password?.Length ?? 0) < AccountService.MinimumPasswordLength) return Http.Error(400, "Choose a password of at least 8 characters.");
+            if (req.AcceptTerms != true) return Http.Error(400, Legal.NotAccepted);
 
-            // Signing up from an organisation's page: a member account in that organisation, and nothing else.
-            if (!string.IsNullOrWhiteSpace(req.JoinOrganisationSlug))
+            if (!organiserSignUp)
             {
-                var organisation = await cache.OrganisationBySlugAsync(req.JoinOrganisationSlug.Trim());
+                var organisation = await cache.OrganisationBySlugAsync(req.JoinOrganisationSlug!.Trim());
                 if (organisation is null) return Http.Error(404, "Organisation not found.");
-                await using var scope = await scopes.OpenAsync(organisation);
-                var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-                if (await db.Users.AnyAsync(u => u.Email == email))
-                    return Http.Error(409, $"There is already an account with this email address at {organisation.Name}.");
-
-                // Until they give their name, staff see the first part of their email address.
-                var user = new User
-                {
-                    Id = Guid.NewGuid(), Email = email, DisplayName = name.Length > 0 ? name : email.Split('@')[0],
-                    CreatedAt = clock.GetUtcNow().UtcDateTime,
-                };
-                user.PasswordHash = hasher.HashPassword(user, req.Password!);
-                db.Users.Add(user);
-                try { await db.SaveChangesAsync(); }
-                catch (DbUpdateException e) when (e.InnerException is SqliteException { SqliteErrorCode: 19 })
-                {
-                    return Http.Error(409, $"There is already an account with this email address at {organisation.Name}.");
-                }
-                await Sessions.SignInAsync(http, Sessions.ForUser(organisation.Id, user.Id));
-                return Results.Ok(new { user.Id, user.Email, user.DisplayName, OrganisationSlug = organisation.Slug });
+                var member = accounts.New(email, name, req.Password!);
+                await accounts.CreateAsync(member);
+                await Sessions.SignInAsync(http, member.Id);
+                return Results.Ok(new { member.Id, member.Email, member.DisplayName, OrganisationSlug = organisation.Slug });
             }
 
-            // Signing up from the front page: an owner login and their first organisation, together or not at all.
-            if (!OrgEndpoints.MayCreateOrganisation(config, email))
-                return Http.Error(403, "You are not allowed to create organisations.");
+            if (!OrganisationProvisioner.MayCreate(config, email)) return Http.Error(403, "You are not allowed to create organisations.");
             var orgName = req.OrganisationName?.Trim() ?? "";
             if (orgName.Length is < 2 or > 80) return Http.Error(400, "Give the organisation a name of 2 to 80 characters.");
             var slug = OrganisationSlug.FromName(orgName);
             if (slug.Length == 0) return Http.Error(400, "This name cannot be used for an organisation page.");
             if (OrganisationSlug.IsReserved(slug)) return Http.Error(400, "This organisation page address is reserved.");
-            if (await platform.Tenants.AnyAsync(t => t.Slug == slug))
-                return Http.Error(409, "This organisation page address is already taken.");
-            if (await platform.OwnerAccounts.AnyAsync(o => o.Email == email))
-                return Http.Error(409, "There is already an organiser account with this email address. Sign in to add another organisation.");
+            if (await platform.Tenants.AnyAsync(t => t.Slug == slug)) return Http.Error(409, "This organisation page address is already taken.");
+            if (await accounts.FindAsync(email) is not null) return AccountExists("Sign in to start another organisation.");
 
-            var owner = OrganisationProvisioner.NewOwner(email, name, req.Password!, clock);
+            var owner = accounts.New(email, name, req.Password!);
             try
             {
-                var (created, adminUserId) = await provisioner.CreateAsync(owner, ownerIsNew: true, orgName, slug, description: "");
-                await Sessions.SignInAsync(http, Sessions.ForOwner(owner.Id), Sessions.ForUser(created.Id, adminUserId));
-                return Results.Ok(new { Id = adminUserId, owner.Email, owner.DisplayName, OrganisationSlug = created.Slug });
+                var (created, _) = await provisioner.CreateAsync(owner, ownerIsNew: true, orgName, slug, description: "");
+                await Sessions.SignInAsync(http, owner.Id);
+                return Results.Ok(new { owner.Id, owner.Email, owner.DisplayName, OrganisationSlug = created.Slug });
             }
             catch (SlugTakenException e) { return Http.Error(409, e.Message); }
             catch (DbUpdateException e) when (e.InnerException is SqliteException { SqliteErrorCode: 19 })
             {
-                return Http.Error(409, "There is already an organiser account with this email address. Sign in to add another organisation.");
+                return AccountExists("Sign in to start another organisation.");
             }
         }).RequireRateLimiting("auth");
 
-        group.MapPost("/login", async (LoginRequest req, HttpContext http, PlatformDbContext platform, AppCache cache,
-            TenantScopes scopes, IPasswordHasher<User> hasher) =>
+        // The same account everywhere. Signing in at an organisation's page brings them back there; on the front page,
+        // to the first organisation they run, if any.
+        group.MapPost("/login", async (LoginRequest req, HttpContext http, PlatformDbContext platform, AccountService accounts) =>
         {
-            var email = req.Email?.Trim().ToLowerInvariant() ?? "";
-            var password = req.Password ?? "";
-
-            // On an organisation's page: the account at that organisation.
-            if (!string.IsNullOrWhiteSpace(req.OrganisationSlug))
-            {
-                var organisation = await cache.OrganisationBySlugAsync(req.OrganisationSlug.Trim());
-                if (organisation is null) return Http.Error(404, "Organisation not found.");
-                await using var scope = await scopes.OpenAsync(organisation);
-                var user = await scope.ServiceProvider.GetRequiredService<AppDbContext>().Users.AsNoTracking().FirstOrDefaultAsync(u => u.Email == email);
-                if (user is null || hasher.VerifyHashedPassword(user, user.PasswordHash, password) == PasswordVerificationResult.Failed)
-                    return Http.Error(401, WrongLogin);
-                await Sessions.SignInAsync(http, Sessions.ForUser(organisation.Id, user.Id));
-                return Results.Ok(new { user.Id, user.Email, user.DisplayName, OrganisationSlug = organisation.Slug });
-            }
-
-            // On the front page: an owner, who is then signed in to every organisation they created.
-            var owner = await platform.OwnerAccounts.AsNoTracking().FirstOrDefaultAsync(o => o.Email == email);
-            if (owner is null || hasher.VerifyHashedPassword(null!, owner.PasswordHash, password) == PasswordVerificationResult.Failed)
-                return Http.Error(401, $"{WrongLogin} If you joined an organisation, sign in on that organisation's page.");
-            var owned = await (
-                from link in platform.TenantOwners.AsNoTracking()
-                join tenant in platform.Tenants.AsNoTracking() on link.TenantId equals tenant.Id
-                where link.OwnerAccountId == owner.Id
-                orderby tenant.CreatedAt
-                select new { tenant.Id, tenant.Slug, link.UserId }).ToListAsync();
-            await Sessions.SignInAsync(http, [Sessions.ForOwner(owner.Id), .. owned.Select(o => Sessions.ForUser(o.Id, o.UserId))]);
-            return Results.Ok(new { owner.Id, owner.Email, owner.DisplayName, OrganisationSlug = owned.FirstOrDefault()?.Slug });
+            var account = await accounts.VerifyAsync(req.Email ?? "", req.Password ?? "");
+            if (account is null) return Http.Error(401, WrongLogin);
+            await Sessions.SignInAsync(http, account.Id);
+            var slug = string.IsNullOrWhiteSpace(req.OrganisationSlug)
+                ? await (
+                    from owned in platform.TenantOwners.AsNoTracking()
+                    join tenant in platform.Tenants.AsNoTracking() on owned.TenantId equals tenant.Id
+                    where owned.AccountId == account.Id
+                    orderby tenant.CreatedAt
+                    select tenant.Slug).FirstOrDefaultAsync()
+                : req.OrganisationSlug.Trim();
+            return Results.Ok(new { account.Id, account.Email, account.DisplayName, OrganisationSlug = slug });
         }).RequireRateLimiting("auth");
 
-        // Without a body: sign out everywhere. With an organisation: sign out there and stay signed in elsewhere.
-        group.MapPost("/logout", async (LogoutRequest? req, HttpContext http, AppCache cache) =>
+        // "Forgot your password?": always the same answer, so it never tells whether an address has an account.
+        group.MapPost("/forgot-password", async (ForgotPasswordRequest req, HttpContext http, PasswordResetService resets, IConfiguration config) =>
         {
-            var organisation = string.IsNullOrWhiteSpace(req?.OrganisationSlug) ? null : await cache.OrganisationBySlugAsync(req.OrganisationSlug.Trim());
-            if (organisation is null) await http.SignOutAsync();
-            else await Sessions.SignOutOfAsync(http, organisation.Id);
+            var email = req.Email?.Trim() ?? "";
+            if (email.Length is < 5 or > 200 || !email.Contains('@')) return Http.Error(400, "Enter a valid email address.");
+            await resets.RequestAsync(email, req.OrganisationSlug, Http.SiteAddress(http, config), req.Language);
+            return Results.NoContent();
+        }).RequireRateLimiting("auth");
+
+        group.MapPost("/reset-password", async (ResetPasswordRequest req, PasswordResetService resets) =>
+            Results.Ok(new { OrganisationSlug = await resets.ResetAsync(req.Token, req.Password) }))
+            .RequireRateLimiting("auth");
+
+        // One account, so signing out is everywhere at once.
+        group.MapPost("/logout", async (LogoutRequest? _, HttpContext http) =>
+        {
+            await http.SignOutAsync();
             return Results.NoContent();
         });
 
-        // Who this browser is signed in as: possibly an owner, and an account at each organisation it signed in to.
-        group.MapGet("/me", async (HttpContext http, PlatformDbContext platform, TenantScopes scopes, IConfiguration config) =>
+        // Who is signed in, and their record at each organisation they joined or run.
+        group.MapGet("/me", async (HttpContext http, PlatformDbContext platform, AccountService accounts, TenantScopes scopes, IConfiguration config) =>
         {
-            var owner = Sessions.OwnerId(http) is { } ownerId
-                ? await platform.OwnerAccounts.AsNoTracking().FirstOrDefaultAsync(o => o.Id == ownerId)
-                : null;
-
-            var accounts = Sessions.Accounts(http).ToList();
-            var tenantIds = accounts.Select(a => a.TenantId).ToList();
-            var tenants = await platform.Tenants.AsNoTracking().Where(t => tenantIds.Contains(t.Id)).ToDictionaryAsync(t => t.Id);
-            var memberships = new List<SignedInAccount>();
-            string? firstName = null, firstEmail = null;
-            foreach (var (tenantId, userId) in accounts)
+            var account = Sessions.AccountId(http) is { } accountId ? await accounts.FindAsync(accountId) : null;
+            if (account is null)
             {
-                // An organisation or account that no longer exists is simply left out.
-                if (!tenants.TryGetValue(tenantId, out var tenant)) continue;
+                // An old cookie (from before MyTickets accounts) or a removed account: start over.
+                if (http.User.Identity?.IsAuthenticated == true) await http.SignOutAsync();
+                return Http.Error(401, "Not signed in.");
+            }
+
+            var records = new List<OrganisationRecord>();
+            foreach (var (tenant, userId) in await accounts.RecordsAsync(account.Id))
+            {
                 await using var scope = await scopes.OpenAsync(tenant.ToOrganisation());
                 var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
                 var user = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
                 if (user is null) continue;
+                // Role and tier stay empty until the person has picked a membership.
                 var membership = await db.Memberships.AsNoTracking().Where(m => m.UserId == userId)
                     .Select(m => new { m.Role, Tier = m.Tier.Name, m.ExpiresAt }).FirstOrDefaultAsync();
-                firstName ??= user.DisplayName;
-                firstEmail ??= user.Email;
-                // Role and tier stay empty until the person has picked a membership: they may have an account
-                // but not have joined yet.
-                memberships.Add(new SignedInAccount(tenant.Slug, tenant.Name, Images.Url(tenant.LogoKey),
+                records.Add(new OrganisationRecord(tenant.Slug, tenant.Name, Images.Url(tenant.LogoKey),
                     membership?.Role, membership?.Tier, membership?.ExpiresAt, user.Id, user.Email, user.DisplayName));
-            }
-
-            if (owner is null && memberships.Count == 0)
-            {
-                if (http.User.Identity?.IsAuthenticated == true) await http.SignOutAsync();
-                return Http.Error(401, "Not signed in.");
             }
             return Results.Ok(new
             {
-                Id = owner?.Id, Email = owner?.Email ?? firstEmail, DisplayName = owner?.DisplayName ?? firstName,
-                IsOwner = owner is not null,
-                Memberships = memberships.OrderBy(m => m.Name),
-                // Only an owner login can add organisations; everyone else starts with organiser sign-up.
-                CanCreateOrganisations = owner is not null && OrgEndpoints.MayCreateOrganisation(config, owner.Email),
+                account.Id, account.Email, account.DisplayName,
+                IsOwner = await platform.TenantOwners.AnyAsync(o => o.AccountId == account.Id),
+                Memberships = records.OrderBy(m => m.Name),
+                CanCreateOrganisations = OrganisationProvisioner.MayCreate(config, account.Email),
             });
         });
     }
+
+    private static IResult AccountExists(string then) =>
+        Results.Json(new { error = $"There is already a MyTickets account with this email address. {then}", code = "account-exists" }, statusCode: 409);
 }

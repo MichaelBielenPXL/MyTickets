@@ -29,21 +29,23 @@ const gijs = {
 }
 
 describe('MembersTab', () => {
-  it('lets a member who lost their card link one more this year', async () => {
-    const sent: unknown[] = []
+  it("lists just who is who, each opening the member's own page", async () => {
     server.use(
-      http.get(apiUrl('/orgs/night-owls/admin/members'), () => HttpResponse.json([gijs])),
-      http.get(apiUrl('/orgs/night-owls/admin/tiers'), () => HttpResponse.json([])),
+      http.get(apiUrl('/orgs/night-owls/admin/members'), () =>
+        HttpResponse.json([gijs, { ...gijs, id: 'm2', displayName: 'Bart Barman', role: 'Barman' }]),
+      ),
       http.get(apiUrl('/orgs/night-owls/admin/requests'), () => HttpResponse.json([])),
-      http.put(apiUrl('/orgs/night-owls/admin/members/m1/extra-card'), async ({ request }) => {
-        sent.push(await request.json())
-        return new HttpResponse(null, { status: 204 })
-      }),
     )
     const { user } = renderApp(<MembersTab slug="night-owls" />)
 
-    await user.click(await screen.findByRole('button', { name: 'Allow one extra card' }))
+    const gijsRow = await screen.findByRole('link', { name: /Gijs Guest/ })
+    expect(gijsRow).toHaveAttribute('href', '/night-owls/members/m1')
+    expect(screen.getByRole('link', { name: /Bart Barman/ })).toHaveTextContent('Barman')
+    // No editing in the list itself.
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Allow one extra card' })).not.toBeInTheDocument()
 
-    await vi.waitFor(() => expect(sent).toEqual([{ allowed: true }]))
+    await user.type(screen.getByRole('searchbox', { name: 'Search members' }), 'bart')
+    expect(screen.queryByRole('link', { name: /Gijs Guest/ })).not.toBeInTheDocument()
   })
 })

@@ -30,7 +30,7 @@ The owner is building MyTickets as an alternative to a ticketing service whose p
 
 - Organisers create events with a fixed ticket inventory and can choose membership access types.
 - Organiser registration currently creates the first organisation; its display name is required at signup and its description/image can be added later.
-- Guest registration from an organisation page creates an account scoped to that organisation and does not automatically join a paid tier.
+- Everyone has one MyTickets account (email and password) for every organisation they join or run. Signing up from an organisation page creates that account; the organisation's own record of the person (details, membership, tokens, tickets) is made when they join, and does not automatically join a paid tier.
 - Main-page event discovery across all organisations is undecided and not part of the current page request; guests are expected to follow an organisation page link.
 - Who may create an organisation is still an open product decision.
 

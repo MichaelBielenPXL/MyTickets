@@ -26,9 +26,16 @@ public static class StripeEndpoints
             // What the organisation keeps of every online payment, shown so there are no surprises.
             var feePercent = config.GetValue("Stripe:PlatformFeePercent", 5m);
             var feeMaxCentsPerItem = config.GetValue("Stripe:PlatformFeeMaxCentsPerItem", 150);
-            if (!stripe.Configured) return Results.Ok(new { Status = "unavailable", RequirementsDue = 0, feePercent, feeMaxCentsPerItem });
+            // Stripe's fee for the payout account, in any month the organisation is paid out; it pays it from that money.
+            var monthlyAccountFeeCents = config.GetValue("Stripe:MonthlyAccountFeeCents", 200);
+            // Stripe's fee on each payout to the bank, which the organisation pays from its next money.
+            var payoutFeePercent = config.GetValue("Stripe:PayoutFeePercent", 0.25m);
+            var payoutFeeFixedCents = config.GetValue("Stripe:PayoutFeeFixedCents", 10);
+            // Held back from the organisation's money so Stripe's payout costs are paid before Stripe charges them.
+            var payoutBufferCents = config.GetValue("Stripe:PayoutBufferCents", 250);
+            if (!stripe.Configured) return Results.Ok(new { Status = "unavailable", RequirementsDue = 0, feePercent, feeMaxCentsPerItem, monthlyAccountFeeCents, payoutFeePercent, payoutFeeFixedCents, payoutBufferCents });
             var account = await db.StripeAccounts.FirstOrDefaultAsync();
-            if (account is null) return Results.Ok(new { Status = "not-started", RequirementsDue = 0, feePercent, feeMaxCentsPerItem });
+            if (account is null) return Results.Ok(new { Status = "not-started", RequirementsDue = 0, feePercent, feeMaxCentsPerItem, monthlyAccountFeeCents, payoutFeePercent, payoutFeeFixedCents, payoutBufferCents });
 
             var remote = await stripe.GetAccountAsync(account.AccountId);
             account.ChargesEnabled = remote.ChargesEnabled;
@@ -36,7 +43,7 @@ public static class StripeEndpoints
             account.DetailsSubmitted = remote.DetailsSubmitted;
             account.CheckedAt = clock.GetUtcNow().UtcDateTime;
             await db.SaveChangesAsync();
-            return Results.Ok(new { Status = StatusOf(account), remote.RequirementsDue, feePercent, feeMaxCentsPerItem });
+            return Results.Ok(new { Status = StatusOf(account), remote.RequirementsDue, feePercent, feeMaxCentsPerItem, monthlyAccountFeeCents, payoutFeePercent, payoutFeeFixedCents, payoutBufferCents });
         });
 
         // Sends the admin to Stripe's sign-up pages. The organisation's Stripe account is made once and reused.

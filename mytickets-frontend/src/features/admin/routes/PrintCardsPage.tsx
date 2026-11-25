@@ -18,7 +18,7 @@ const SIDES: { value: Sides; label: string }[] = [
 
 /**
  * The cards still to be printed, one credit-card-sized page (85.6 × 54 mm) per side, in the organisation's card
- * design; the back always has its name, the card number and the QR of the card's link. Both sides alternate, front
+ * design; the back always has its name, the QR of the card's link and, small, its number. Both sides alternate, front
  * then back, for a printer that prints both sides; or one side at a time, for a printer that prints only one.
  * Print it straight to a card printer, or save it as a PDF for a print shop.
  */

@@ -36,7 +36,7 @@ public class CardTests : IClassFixture<TestApp>
     [Fact]
     public void Display_pads_to_four_digits()
     {
-        Assert.Equal("0042", CardCodes.Display(42));
+        Assert.Equal("42", CardCodes.Display(42));
         Assert.Equal("12345", CardCodes.Display(12345));
     }
 
@@ -62,11 +62,11 @@ public class CardTests : IClassFixture<TestApp>
 
         var created = (await org.Admin.PostOkAsync($"{org.Url}/admin/cards", new { count = 3 })).AsArray();
 
-        Assert.Equal(["0001", "0002", "0003"], created.Select(c => c!.Str("number")).Order());
+        Assert.Equal(["1", "2", "3"], created.Select(c => c!.Str("number")).Order());
         Assert.All(created, c => Assert.Matches("^https://tickets\\.test/c/[A-Z2-9]{10}$", c!.Str("url")));
         Assert.All(created, c => Assert.Null(c!["uid"]));
         var listed = (await org.Admin.GetOkAsync($"{org.Url}/admin/cards")).AsArray();
-        Assert.Equal("0003", listed[0]!.Str("number"));
+        Assert.Equal("3", listed[0]!.Str("number"));
         var csv = await org.Admin.GetStringAsync($"{org.Url}/admin/cards/export");
         var lines = csv.Trim().Split('\n');
         Assert.Equal("number,code,url", lines[0].Trim());
@@ -100,7 +100,7 @@ public class CardTests : IClassFixture<TestApp>
     {
         var org = await NewOrgAsync(_app);
         var blank = await org.Admin.PostOkAsync($"{org.Url}/admin/cards/blank", new { });
-        Assert.Equal("0001", blank.Str("number"));
+        Assert.Equal("1", blank.Str("number"));
 
         Assert.Equal(HttpStatusCode.NoContent, (await org.Admin.DeleteAsync($"{org.Url}/admin/cards/{blank.Str("id")}")).StatusCode);
         var again = await org.Admin.PostOkAsync($"{org.Url}/admin/cards/blank", new { });
@@ -145,13 +145,13 @@ public class CardTests : IClassFixture<TestApp>
 
         var before = await member.GetOkAsync($"{org.Url}/cards/{code.ToLowerInvariant()}");
         Assert.Equal("free", before.Str("state"));
-        Assert.Equal("0001", before.Str("number"));
+        Assert.Equal("1", before.Str("number"));
         Assert.True(before["member"]!.GetValue<bool>());
 
-        Assert.Equal("0001", (await member.PostOkAsync($"{org.Url}/cards/{code}/link", new { })).Str("number"));
+        Assert.Equal("1", (await member.PostOkAsync($"{org.Url}/cards/{code}/link", new { })).Str("number"));
         Assert.Equal("mine", (await member.GetOkAsync($"{org.Url}/cards/{code}")).Str("state"));
         var mine = (await member.GetOkAsync($"{org.Url}/me/cards")).AsArray();
-        Assert.Equal("0001", Assert.Single(mine)!.Str("number"));
+        Assert.Equal("1", Assert.Single(mine)!.Str("number"));
         Assert.Null(mine[0]!["uid"]);
         Assert.Equal("Guest Tester", (await org.Admin.GetOkAsync($"{org.Url}/admin/cards"))[0]!["linkedTo"]!.Str("name"));
     }
@@ -243,7 +243,7 @@ public class CardTests : IClassFixture<TestApp>
         (await member.PutAsJsonAsync($"{org.Url}/me/cards/{cardId}/blocked", new { blocked = true })).EnsureSuccessStatusCode();
     }
 
-    /// <summary>Charges one €1 beer to whatever staff tapped, scanned or typed; 402 means the card was found but is empty.</summary>
+    /// <summary>Charges one €1 beer to whatever staff tapped or scanned; 402 means the card was found but is empty.</summary>
     private static async Task<HttpStatusCode> ChargeAsync(Org org, string card)
     {
         var beer = (await org.Admin.PostOkAsync($"{org.Url}/admin/products", new { name = "Beer", priceCents = 100, active = true })).Str("id");
@@ -252,7 +252,7 @@ public class CardTests : IClassFixture<TestApp>
     }
 
     [Fact]
-    public async Task Bar_finds_a_card_by_chip_link_or_number()
+    public async Task Bar_finds_a_card_by_chip_or_link_but_never_by_its_number()
     {
         var org = await NewOrgAsync(_app);
         var (_, code, uid) = await ReadyCardAsync(org);
@@ -261,7 +261,8 @@ public class CardTests : IClassFixture<TestApp>
 
         Assert.Equal(HttpStatusCode.PaymentRequired, await ChargeAsync(org, uid));
         Assert.Equal(HttpStatusCode.PaymentRequired, await ChargeAsync(org, $"https://tickets.test/c/{code}"));
-        Assert.Equal(HttpStatusCode.PaymentRequired, await ChargeAsync(org, "0001"));
+        // The number counts up from 1, so it could be guessed: typing it finds nothing.
+        Assert.Equal(HttpStatusCode.NotFound, await ChargeAsync(org, "1"));
         Assert.Equal("Guest Tester", (await org.Admin.PostOkAsync($"{org.Url}/staff/lookup", new { cardUid = code })).Str("name"));
     }
 

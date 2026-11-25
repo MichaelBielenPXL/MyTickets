@@ -44,7 +44,7 @@ export function useCardTaps(onCard: (uid: string) => void, ignore = false) {
       )
       setListening(true)
     } catch {
-      setProblem(t('The card reader could not start. Allow NFC for this site, or type the card number.'))
+      setProblem(t("The card reader could not start. Allow NFC for this site, or scan the card's QR code."))
     }
   }
 

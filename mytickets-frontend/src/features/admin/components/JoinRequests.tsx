@@ -1,9 +1,9 @@
 import { ErrorNote } from '@/components'
+import { MemberDetailsList } from '@/features/organisations'
 import { Trans, t } from '@/lib/i18n'
 import { dateTime, money } from '@/utils/format'
 
 import { useDecideRequest, useJoinRequests } from '../api/admin'
-import { MemberDetailsList } from './MemberDetailsList'
 
 /** People asking for a membership that needs approval, with what they told the organisation. */
 export function JoinRequests({ slug }: { slug: string }) {

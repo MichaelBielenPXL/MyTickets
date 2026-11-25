@@ -1,9 +1,10 @@
 import { Navigate, Route, Routes, useParams } from 'react-router-dom'
 
-import { AdminPage, PrintCardsPage } from '@/features/admin'
-import { AuthPage } from '@/features/auth'
+import { AdminPage, MemberPage, PrintCardsPage } from '@/features/admin'
+import { AuthPage, ForgotPasswordPage, ResetPasswordPage } from '@/features/auth'
 import { CardLinkPage, CardsPage } from '@/features/cards'
 import { EventPage } from '@/features/events'
+import { LegalPage } from '@/features/legal'
 import { HomePage, JoinPage, OrganisationPage, ProfilePage, StartPage } from '@/features/organisations'
 import { CheckoutPage } from '@/features/payments'
 import { StaffPage } from '@/features/staff'
@@ -24,6 +25,10 @@ export function AppRoutes() {
         <Route path="/register" element={<AuthPage key="register" mode="register" />} />
         <Route path="/:slug/login" element={<AuthPage key="org-login" mode="login" />} />
         <Route path="/:slug/register" element={<AuthPage key="org-register" mode="register" />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/:slug/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/:slug/reset-password" element={<ResetPasswordPage />} />
       </Route>
       <Route element={<AppShell />}>
         <Route path="/" element={<StartPage />} />
@@ -37,6 +42,7 @@ export function AppRoutes() {
         <Route path="/:slug/checkout/:paymentId" element={<CheckoutPage />} />
         <Route path="/:slug/wallet" element={<WalletPage />} />
         <Route path="/:slug/staff" element={<StaffPage />} />
+        <Route path="/:slug/members/:memberId" element={<MemberPage />} />
         <Route path="/:slug/admin" element={<AdminPage />} />
         <Route path="/:slug/admin/cards/print" element={<PrintCardsPage />} />
         <Route path="*" element={<NotFoundPage />} />
@@ -44,6 +50,8 @@ export function AppRoutes() {
       <Route element={<PublicShell />}>
         {/* Where a phone lands when a card is held to it: the link written on the chip and printed as its QR. */}
         <Route path="/c/:code" element={<CardLinkPage />} />
+        <Route path="/terms" element={<LegalPage key="terms" document="terms" />} />
+        <Route path="/privacy" element={<LegalPage key="privacy" document="privacy" />} />
         <Route path="/:slug" element={<OrganisationPage />} />
         <Route path="/:slug/events/:eventId" element={<EventPage />} />
       </Route>

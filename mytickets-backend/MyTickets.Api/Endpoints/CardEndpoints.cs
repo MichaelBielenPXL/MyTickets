@@ -42,7 +42,7 @@ public static class CardEndpoints
             var card = await FindByCodeAsync(db, code);
             if (card is null) return Http.Error(404, "This card is not known here.");
             var access = http.Org();
-            var userId = http.User.UserId();
+            var userId = http.User.TryUserId();
             var state = card.Blocked ? "blocked"
                 : card.Wallet is null ? "free"
                 : card.Wallet.UserId == userId ? "mine"

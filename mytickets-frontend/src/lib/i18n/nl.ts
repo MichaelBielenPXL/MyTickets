@@ -5,18 +5,15 @@
  */
 export const nl: Record<string, string> = {
   // ---- The app ----
-  'or type the card number': 'of typ het kaartnummer',
-  'Card number': 'Kaartnummer',
-  Use: 'Gebruik',
-  'Tapping cards works in Chrome on an Android phone. Here you can type the number.':
-    'Kaarten scannen werkt in Chrome op een Android-telefoon. Hier kun je het nummer typen.',
+  "Tapping cards works in Chrome on an Android phone. Here, scan the card's QR code.":
+    'Kaarten scannen werkt in Chrome op een Android-telefoon. Scan hier de QR-code van de kaart.',
   'Start card reader': 'Kaartlezer starten',
   Cancel: 'Annuleren',
   'One moment…': 'Even geduld…',
   'Loading…': 'Laden…',
   'Move {name}': '{name} verplaatsen',
-  'The card reader could not start. Allow NFC for this site, or type the card number.':
-    'De kaartlezer kon niet starten. Sta NFC toe voor deze site, of typ het kaartnummer.',
+  "The card reader could not start. Allow NFC for this site, or scan the card's QR code.":
+    'De kaartlezer kon niet starten. Sta NFC toe voor deze site, of scan de QR-code van de kaart.',
   Categories: 'Categorieën',
   'Tabs across the top of the till, such as Beer, Soft drinks and Food. Drag them into the order you want.':
     'Tabbladen bovenaan de kassa, zoals Bier, Frisdrank en Eten. Sleep ze in de volgorde die je wilt.',
@@ -137,8 +134,6 @@ export const nl: Record<string, string> = {
     'Online betalingen gaan rechtstreeks naar je Stripe-account en worden automatisch naar je bank uitbetaald. Je Stripe-dashboard toont elke betaling, uitbetaling en je bankrekening.',
   'MyTickets keeps {percent}% of each ticket or top-up, at most {max} each.':
     'MyTickets houdt {percent}% van elk ticket of elke oplading, maximaal {max} per stuk.',
-  "On very small payments it keeps just enough to cover Stripe's cost. You get the rest, straight after each payment.":
-    'Bij heel kleine betalingen houdt het net genoeg om de kosten van Stripe te dekken. Jij krijgt de rest, meteen na elke betaling.',
   Hidden: 'Verborgen',
   Hide: 'Verbergen',
   Show: 'Tonen',
@@ -423,6 +418,135 @@ export const nl: Record<string, string> = {
     'Voor {choice}. {org} bekijkt elke aanvraag voor het lidmaatschap start.',
   'For {choice}. {org} asks this of its members.': 'Voor {choice}. {org} vraagt dit aan zijn leden.',
   'My details': 'Mijn gegevens',
+  'I agree to the {terms} and the {privacy}.': 'Ik ga akkoord met de {terms} en de {privacy}.',
+  'terms of service': 'gebruiksvoorwaarden',
+  'privacy policy': 'privacyverklaring',
+  'Terms of service': 'Gebruiksvoorwaarden',
+  'Privacy policy': 'Privacyverklaring',
+  'Last updated {date}': 'Laatst bijgewerkt op {date}',
+  Fullscreen: 'Volledig scherm',
+  'Forgot your password?': 'Wachtwoord vergeten?',
+  "Enter your email address and we'll send you a link to choose a new password.":
+    'Vul je e-mailadres in en we sturen je een link om een nieuw wachtwoord te kiezen.',
+  'If there is an account with {email}, we have sent it a link to choose a new password. It works for an hour.':
+    'Als er een account is met {email}, hebben we er een link naartoe gestuurd om een nieuw wachtwoord te kiezen. Die werkt een uur.',
+  'Send link': 'Link versturen',
+  'Back to sign in': 'Terug naar aanmelden',
+  'Choose a new password': 'Kies een nieuw wachtwoord',
+  'New password': 'Nieuw wachtwoord',
+  'Set new password': 'Nieuw wachtwoord instellen',
+  'Ask for a new link': 'Vraag een nieuwe link',
+  'Your new password is set': 'Je nieuwe wachtwoord is ingesteld',
+  'Sign in with it from now on.': 'Meld je er voortaan mee aan.',
+  'This link has run out or was already used. Ask for a new one.':
+    'Deze link is verlopen of werd al gebruikt. Vraag een nieuwe.',
+  'Download PDF': 'PDF downloaden',
+  Ticket: 'Ticket',
+  'Show this QR code at the door. Each ticket gets you in once.':
+    'Toon deze QR-code aan de deur. Met elk ticket kom je één keer binnen.',
+  'Already used: checked in {when}.': 'Al gebruikt: binnengekomen op {when}.',
+  'Exit fullscreen': 'Volledig scherm sluiten',
+  // ---- Manage › Overview ----
+  'You get from online payments': 'Je krijgt van online betalingen',
+  'Top-ups at the cashier': 'Opladingen aan de kassa',
+  '{count} top-ups, cash or card': '{count} opladingen, cash of met kaart',
+  "Guests pay online through MyTickets. Each payment is passed on to your Stripe account minus MyTickets' fee, which includes the card costs Stripe charges, and minus what is set aside for Stripe's costs of paying you out: a fee on each payout to your bank and {fee} for every month with payouts. Those are paid in advance from a small buffer of {buffer}, which stays yours.":
+    'Gasten betalen online via MyTickets. Elke betaling gaat naar je Stripe-account min de vergoeding van MyTickets, waarin de kaartkosten van Stripe zitten, en min wat opzij gaat voor de kosten die Stripe rekent om je uit te betalen: kosten per uitbetaling naar je bank en {fee} voor elke maand met uitbetalingen. Die worden vooraf betaald uit een kleine buffer van {buffer}, die van jou blijft.',
+  'Set aside for payouts': 'Opzij voor uitbetalingen',
+  'Buffer for your next payouts': 'Buffer voor je volgende uitbetalingen',
+  '{amount} in payout costs comes off your next money.':
+    '{amount} aan uitbetalingskosten gaat af van je volgende geld.',
+  "On very small payments it keeps just enough to cover Stripe's cost.":
+    'Bij heel kleine betalingen houdt het net genoeg om de kosten van Stripe te dekken.',
+  'Stripe also charges for paying you out: {percent}% plus {fixed} per payout to your bank, and {fee} for every month with payouts.':
+    'Stripe rekent ook kosten om je uit te betalen: {percent}% plus {fixed} per uitbetaling naar je bank, en {fee} voor elke maand met uitbetalingen.',
+  'That is set aside from your payments before they go to you: {percent}% of each, and a buffer of {buffer} for the rest, so it is always paid in advance. The buffer stays yours and is settled when your organisation closes.':
+    'Dat gaat opzij van je betalingen voor ze naar jou gaan: {percent}% van elke betaling, en een buffer van {buffer} voor de rest, zodat het altijd vooraf betaald is. De buffer blijft van jou en wordt verrekend wanneer je organisatie stopt.',
+  "Guests pay online through MyTickets. Each payment is passed on to your Stripe account minus MyTickets' fee, which includes the card costs Stripe charges. What Stripe charges for paying you out comes off too, from the money after it: a fee on each payout to your bank, and {fee} for every month with payouts.":
+    'Gasten betalen online via MyTickets. Elke betaling gaat naar je Stripe-account min de vergoeding van MyTickets, waarin de kaartkosten van Stripe zitten. Wat Stripe rekent om je uit te betalen gaat er ook af, van het geld erna: kosten per uitbetaling naar je bank, en {fee} voor elke maand met uitbetalingen.',
+  "The first payout of each month also carries Stripe's {fee} monthly fee for your payout account.":
+    'De eerste uitbetaling van elke maand draagt ook de maandelijkse {fee} van Stripe voor je uitbetalingsaccount.',
+  'Payouts to your bank': 'Uitbetalingen naar je bank',
+  'No payouts in this period.': 'Geen uitbetalingen in deze periode.',
+  'fee {fee}': 'kosten {fee}',
+  'Paid out': 'Uitbetaald',
+  'Payout fees': 'Uitbetalingskosten',
+  'Paid to you this month': 'Deze maand voor jou',
+  'Active members': 'Actieve leden',
+  'Active now': 'Nu actief',
+  'All time': 'Altijd',
+  'Average per sale': 'Gemiddeld per verkoop',
+  'Bar takings': 'Opbrengst bar',
+  'Bar takings per day': 'Opbrengst bar per dag',
+  'Bar takings per month': 'Opbrengst bar per maand',
+  Bought: 'Gekocht',
+  'Checked in': 'Binnengekomen',
+  Day: 'Dag',
+  'Deposits given back': 'Waarborg teruggegeven',
+  'Deposits taken': 'Waarborg ontvangen',
+  'Extra from top-up deals': 'Extra via opladingsaanbiedingen',
+  For: 'Voor',
+  From: 'Van',
+  'Guest paid': 'Gast betaalde',
+  'Guests paid': 'Gasten betaalden',
+  'Guests pay the bar in tokens they bought earlier, so this money is already counted above.':
+    'Gasten betalen aan de bar met tokens die ze eerder kochten, dus dit geld is hierboven al geteld.',
+  'In tokens, without deposits.': 'In tokens, zonder waarborg.',
+  'Joined or renewed': 'Lid geworden of verlengd',
+  'Last month': 'Vorige maand',
+  'Money in': 'Geld binnen',
+  Month: 'Maand',
+  'MyTickets fee': 'Vergoeding MyTickets',
+  'No bar sales in this period.': 'Geen verkoop aan de bar in deze periode.',
+  'No online payments in this period.': 'Geen online betalingen in deze periode.',
+  'Not yet spent': 'Nog niet besteed',
+  Paid: 'Betaald',
+  'Paid for them': 'Betaald ervoor',
+  Payments: 'Betalingen',
+  Period: 'Periode',
+  'Point at a bar for its figures.': 'Wijs een staaf aan voor de cijfers.',
+  'Right now': 'Op dit moment',
+  Sales: 'Verkopen',
+  'Show as a table': 'Als tabel tonen',
+  Sold: 'Verkocht',
+  'Spent at the bar': 'Besteed aan de bar',
+  'Spent on tickets': 'Besteed aan tickets',
+  Status: 'Status',
+  'Stripe pays it out to your bank account.': 'Stripe betaalt het uit op je bankrekening.',
+  Takings: 'Opbrengst',
+  Test: 'Test',
+  'The newest {shown} of {total} payments. The totals above count them all.':
+    'De nieuwste {shown} van {total} betalingen. De totalen hierboven tellen ze allemaal.',
+  'This month': 'Deze maand',
+  'This year': 'Dit jaar',
+  'Tickets paid with tokens bring in no new money: the tokens were paid for when bought.':
+    'Tickets betaald met tokens brengen geen nieuw geld op: de tokens werden betaald toen ze gekocht werden.',
+  'Token top-ups online': 'Online tokens opladen',
+  'Tokens not yet spent were paid for, but guests can still use them.':
+    'Tokens die nog niet besteed zijn, zijn betaald, maar gasten kunnen ze nog gebruiken.',
+  'What you get paid': 'Wat je uitbetaald krijgt',
+  Worth: 'Waarde',
+  'You get': 'Jij krijgt',
+  '{amount} money in': '{amount} binnen',
+  '{amount} was paid with the test checkout on this server: no real money.':
+    '{amount} werd betaald met de testbetaling op deze server: geen echt geld.',
+  '{count} joined or renewed in this period': '{count} lid geworden of verlengd in deze periode',
+  '{count} sales': '{count} verkopen',
+  '{count} sales, paid in tokens': '{count} verkopen, betaald met tokens',
+  'My memberships': 'Mijn lidmaatschappen',
+  'No memberships yet.': 'Nog geen lidmaatschappen.',
+  'Membership history': 'Lidmaatschapsgeschiedenis',
+  'No details given.': 'Geen gegevens opgegeven.',
+  Details: 'Gegevens',
+  'Membership type': 'Soort lidmaatschap',
+  '{name} (ended)': '{name} (afgelopen)',
+  Role: 'Rol',
+  'Joined {date}': 'Lid geworden op {date}',
+  'No cards linked.': 'Geen kaarten gekoppeld.',
+  'linked {date}': 'gekoppeld op {date}',
+  'Tap a card to see whose it is': 'Scan een kaart om te zien van wie ze is',
+  '{from} to {until}': '{from} tot {until}',
+  'since {date}': 'sinds {date}',
   'Save details': 'Gegevens opslaan',
   '{price} until {date}': '{price} tot {date}',
   'Confirming your payment…': 'Je betaling wordt bevestigd…',
@@ -475,7 +599,7 @@ export const nl: Record<string, string> = {
   'To pay': 'Te betalen',
   'Check tokens': 'Tokens bekijken',
   'Hold the card to the back of the phone': 'Houd de kaart tegen de achterkant van de telefoon',
-  'Type the card number': 'Typ het kaartnummer',
+  "Scan the card's QR code": 'Scan de QR-code van de kaart',
   expired: 'verlopen',
   'Tap a card to see who it belongs to and how many tokens are on it':
     'Scan een kaart om te zien van wie ze is en hoeveel tokens erop staan',
@@ -490,8 +614,8 @@ export const nl: Record<string, string> = {
   'Hold the QR code in front of the camera': 'Houd de QR-code voor de camera',
   "Take the cash first, then tap the guest's card or scan their QR code.":
     'Neem eerst het cash aan, tik dan de kaart van de gast of scan de QR-code.',
-  'The camera could not start. Allow camera access for this site, or type the card number.':
-    'De camera kon niet starten. Sta cameratoegang toe voor deze site, of typ het kaartnummer.',
+  'The camera could not start. Allow camera access for this site, or tap the card.':
+    'De camera kon niet starten. Sta cameratoegang toe voor deze site, of scan de kaart met NFC.',
   'Ready. Hold a card against the back of the phone.':
     'Klaar. Houd een kaart tegen de achterkant van de telefoon.',
   'or type the ticket code': 'of typ de ticketcode',
@@ -537,6 +661,17 @@ export const nl: Record<string, string> = {
   'Your tickets': 'Je tickets',
   'Everything you need for the door, all in one place.': 'Alles wat je aan de deur nodig hebt, op één plek.',
   'No tickets yet.': 'Nog geen tickets.',
+  'No upcoming tickets.': 'Geen komende tickets.',
+  'Already a member somewhere else? Bring over your name, address, phone number and other details you gave there.':
+    'Al lid ergens anders? Neem je naam, adres, telefoonnummer en andere gegevens over die je daar gaf.',
+  'Transfer my details': 'Mijn gegevens overnemen',
+  'Transfer my details from': 'Mijn gegevens overnemen van',
+  Transfer: 'Overnemen',
+  'Filled in from {org}. Check them, then save.':
+    'Ingevuld met je gegevens van {org}. Controleer ze en sla ze op.',
+  'Show ticket history ({count})': 'Ticketgeschiedenis tonen ({count})',
+  'Hide ticket history': 'Ticketgeschiedenis verbergen',
+  'Ticket history': 'Ticketgeschiedenis',
   'Find an event': 'Zoek een evenement',
   Upcoming: 'Komend',
   Past: 'Voorbij',
@@ -663,6 +798,8 @@ export const nl: Record<string, string> = {
   'Choose an end date within the next ten years.': 'Kies een einddatum binnen de komende tien jaar.',
   'Choose a password of at least 8 characters.': 'Kies een wachtwoord van minstens 8 tekens.',
   'Choose a picture to upload.': 'Kies een afbeelding om te uploaden.',
+  'Accept the terms of service and privacy policy to create an account.':
+    'Ga akkoord met de gebruiksvoorwaarden en de privacyverklaring om een account te maken.',
   'Choose at least one ticket.': 'Kies minstens één ticket.',
   'Choose one of your categories.': 'Kies een van je categorieën.',
   'Choose one of your deposits.': 'Kies een van je waarborgen.',
@@ -706,8 +843,8 @@ export const nl: Record<string, string> = {
   'Send the new order.': 'Stuur de nieuwe volgorde.',
   'Sign in with your organiser account to create an organisation.':
     'Meld je aan met je organisatoraccount om een organisatie aan te maken.',
-  'Tap a card, scan a member QR code, or enter its number.':
-    'Scan een kaart of een QR-code van een lid, of vul het nummer in.',
+  'Tap a card, or scan its QR code or a member QR code.':
+    'Scan een kaart, of scan de QR-code ervan of een QR-code van een lid.',
   "That doesn't look like a card number. It is 8 to 20 letters and digits (0-9, A-F).":
     'Dat lijkt geen kaartnummer. Het bestaat uit 8 tot 20 letters en cijfers (0-9, A-F).',
   'That invite code is not valid.': 'Die uitnodigingscode is niet geldig.',
@@ -856,11 +993,9 @@ export const nl: Record<string, string> = {
     'Elke kaart is een eigen pagina op bankkaartformaat. Kies je kaartprinter, of bewaar als PDF.',
   'Print {count} cards': '{count} kaarten printen',
   'Every card is already written.': 'Alle kaarten zijn al geschreven.',
-  'QR code for card {number}': 'QR-code van kaart {number}',
+  'QR code of the card': 'QR-code van de kaart',
   'Print cards with QR codes': 'Kaarten printen met QR-code',
   'Card design': 'Kaartontwerp',
-  'The QR code, the card number and your name are always on the card, in the same place, so it always scans.':
-    'De QR-code, het kaartnummer en jullie naam staan altijd op de kaart, op dezelfde plek, zodat ze altijd scant.',
   'Card preview': 'Voorbeeld van de kaart',
   Background: 'Achtergrond',
   'Brand colour': 'Merkkleur',
@@ -884,8 +1019,8 @@ export const nl: Record<string, string> = {
   'Side of the card': 'Kant van de kaart',
   '{side}: give the colour as a code like #0b3d2e.': '{side}: geef de kleur als code, zoals #0b3d2e.',
   '{side}: upload a picture first.': '{side}: laad eerst een afbeelding op.',
-  'Design the front and the back. The back always has the QR code, the card number and your name, in the same place, so it always scans.':
-    'Ontwerp de voor- en achterkant. Op de achterkant staan altijd de QR-code, het kaartnummer en jullie naam, op dezelfde plek, zodat ze altijd scant.',
+  'Design the front and the back. The back always has the QR code and your name, in the same place, so it always scans.':
+    'Ontwerp de voor- en achterkant. Op de achterkant staan altijd de QR-code en jullie naam, op dezelfde plek, zodat ze altijd scant.',
   'Landscape, at least 1012 × 638 pixels. Text on it gets a soft shade so it stays readable.':
     'Liggend, minstens 1012 × 638 pixels. Tekst erop krijgt een zachte schaduw zodat ze leesbaar blijft.',
   'Both sides': 'Beide kanten',

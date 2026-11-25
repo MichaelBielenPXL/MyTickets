@@ -1,6 +1,6 @@
 import { QRCodeSVG } from 'qrcode.react'
 
-import { t } from '@/lib/i18n'
+import { getLanguage, t } from '@/lib/i18n'
 import { dateTime } from '@/utils/format'
 
 import type { MyTicket } from '../types'
@@ -40,6 +40,14 @@ export function TicketCard({ ticket, open, onToggle }: TicketCardProps) {
           />
           <code>{ticket.code}</code>
           <p className="muted">{t('Show this at the door, or tap your card.')}</p>
+          {/* Made by the server: the same PDF as in the email after buying. */}
+          <a
+            className="btn small"
+            href={`/api/orgs/${ticket.organisationSlug}/me/tickets/${ticket.id}/pdf?lang=${getLanguage()}`}
+            download
+          >
+            {t('Download PDF')}
+          </a>
         </div>
       )}
     </div>

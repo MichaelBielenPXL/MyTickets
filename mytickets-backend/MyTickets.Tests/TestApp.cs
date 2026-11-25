@@ -3,7 +3,10 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.DependencyInjection;
+using MyTickets.Api.Services.Email;
 
 namespace MyTickets.Tests;
 
@@ -26,7 +29,12 @@ public class TestApp : WebApplicationFactory<Program>
         builder.UseSetting("Storage:Folder", _dbPath + "-images");
         // Where issued cards' links point; writing cards is refused without it.
         builder.UseSetting("App:PublicUrl", PublicUrl);
+        // Emails are kept for the test to read instead of being sent.
+        builder.ConfigureTestServices(services => services.AddSingleton<IEmailSender>(Emails));
     }
+
+    /// <summary>Every email the app sent during this run.</summary>
+    public CapturedEmails Emails { get; } = new();
 
     /// <summary>The site's public address in tests; empty to test what happens before it is set.</summary>
     protected virtual string PublicUrl => "https://tickets.test";
@@ -45,7 +53,7 @@ public class TestApp : WebApplicationFactory<Program>
         var client = CreateClient();
         var response = await client.PostAsJsonAsync("/api/auth/register", new
         {
-            email = email ?? $"{name.ToLowerInvariant()}-{Guid.NewGuid():N}@example.com", password = "correct horse",
+            email = email ?? $"{name.ToLowerInvariant()}-{Guid.NewGuid():N}@example.com", password = "correct horse", acceptTerms = true,
             displayName = name, joinOrganisationSlug = organisationSlug,
         });
         Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
@@ -60,7 +68,7 @@ public class TestApp : WebApplicationFactory<Program>
         var client = CreateClient();
         var response = await client.PostAsJsonAsync("/api/auth/register", new
         {
-            email = $"bare-{Guid.NewGuid():N}@example.com", password = "correct horse", joinOrganisationSlug = organisationSlug,
+            email = $"bare-{Guid.NewGuid():N}@example.com", password = "correct horse", acceptTerms = true, joinOrganisationSlug = organisationSlug,
         });
         Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
         return client;
@@ -73,7 +81,7 @@ public class TestApp : WebApplicationFactory<Program>
         var response = await client.PostAsJsonAsync("/api/auth/register",
             new
             {
-                email = $"{name.ToLowerInvariant()}-{Guid.NewGuid():N}@example.com", password = "correct horse", displayName = name,
+                email = $"{name.ToLowerInvariant()}-{Guid.NewGuid():N}@example.com", password = "correct horse", acceptTerms = true, displayName = name,
                 organisationName = $"Test {Guid.NewGuid():N}",
             });
         response.EnsureSuccessStatusCode();
@@ -110,4 +118,19 @@ public static class HttpExtensions
 
     public static string Str(this JsonNode node, string key) => node[key]!.GetValue<string>();
     public static int Int(this JsonNode node, string key) => node[key]!.GetValue<int>();
+}
+
+/// <summary>Keeps the emails the app sends, so tests can read them (and follow their links).</summary>
+public class CapturedEmails : IEmailSender
+{
+    private readonly System.Collections.Concurrent.ConcurrentQueue<EmailMessage> _sent = new();
+
+    public Task SendAsync(EmailMessage message, CancellationToken ct = default)
+    {
+        _sent.Enqueue(message);
+        return Task.CompletedTask;
+    }
+
+    /// <summary>The emails sent to this address, oldest first.</summary>
+    public List<EmailMessage> To(string address) => _sent.Where(m => m.To == address).ToList();
 }

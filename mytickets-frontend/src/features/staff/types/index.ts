@@ -1,3 +1,12 @@
+import type {
+  FieldMode,
+  MemberDetails,
+  MembershipPeriod,
+  ProfileFieldName,
+  ProfileValues,
+} from '@/features/organisations'
+import type { Role } from '@/types'
+
 /** Upcoming until it starts or is opened early, open until it ends or is closed. Only open events let people in. */
 export type EventStatus = 'Upcoming' | 'Open' | 'Closed'
 
@@ -27,7 +36,7 @@ export interface MenuCategory {
 
 /** What the door and bar screens need to start: tonight's events and the bar menu. */
 /** The jobs at an event; each person only gets the ones their role does. */
-export type StaffTask = 'Bar' | 'Door' | 'CashTopUp' | 'CheckCard'
+export type StaffTask = 'Bar' | 'Door' | 'CashTopUp' | 'CheckCard' | 'MemberInfo'
 
 export interface StaffContext {
   name: string
@@ -45,6 +54,39 @@ export interface CardHolder {
   expiresAt: string | null
   balanceCents: number
   drinkDiscountPercent: number
+  /** Their membership, to look them up further under Members. */
+  memberId: string
+}
+
+/** A member in the search results of the Members screen. */
+export interface MemberSummary {
+  id: string
+  displayName: string
+  email: string
+  tier: string
+  membershipActive: boolean
+}
+
+/** Everything staff and admins see about one member under Members. */
+export interface MemberInfo extends MemberDetails {
+  id: string
+  displayName: string
+  email: string
+  role: Role
+  tierId: string
+  tier: string
+  joinedAt: string
+  expiresAt: string | null
+  membershipActive: boolean
+  balanceCents: number
+  /** An admin let them link one more card within the year (a lost one). */
+  extraCardAllowed: boolean
+  /** Which details the organisation asks, and what they gave: for an admin's edit form. */
+  fields: Record<ProfileFieldName, FieldMode>
+  profile: ProfileValues
+  cards: { number: string; label: string; blocked: boolean; linkedAt: string | null }[]
+  /** Their memberships over the years, newest first. */
+  history: MembershipPeriod[]
 }
 
 export interface CheckInRequest {

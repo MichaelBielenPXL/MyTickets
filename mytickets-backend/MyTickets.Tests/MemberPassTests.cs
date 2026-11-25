@@ -134,7 +134,7 @@ public class MemberPassTests : IClassFixture<TestApp>
         var admin = app.CreateClient();
         (await admin.PostAsJsonAsync("/api/auth/register", new
         {
-            email = $"admin-{Guid.NewGuid():N}@example.com", password = "correct horse", displayName = "Admin", organisationName = $"Wallet {Guid.NewGuid():N}"[..20],
+            email = $"admin-{Guid.NewGuid():N}@example.com", password = "correct horse", acceptTerms = true, displayName = "Admin", organisationName = $"Wallet {Guid.NewGuid():N}"[..20],
         })).EnsureSuccessStatusCode();
         var slug = (await admin.GetOkAsync("/api/orgs"))!.AsArray().First(o => o!["joined"]!.GetValue<bool>())!.Str("slug");
         var url = $"/api/orgs/{slug}";
@@ -143,7 +143,7 @@ public class MemberPassTests : IClassFixture<TestApp>
         var member = app.CreateClient(options ?? new WebApplicationFactoryClientOptions());
         (await member.PostAsJsonAsync("/api/auth/register", new
         {
-            email = $"pass-{Guid.NewGuid():N}@example.com", password = "correct horse", displayName = "Pass", joinOrganisationSlug = slug,
+            email = $"pass-{Guid.NewGuid():N}@example.com", password = "correct horse", acceptTerms = true, displayName = "Pass", joinOrganisationSlug = slug,
         })).EnsureSuccessStatusCode();
         (await member.PutAsJsonAsync($"{url}/me/profile", new { firstName = "Pass", lastName = "Tester" })).EnsureSuccessStatusCode();
         await member.PostOkAsync($"{url}/join", new { tierId });

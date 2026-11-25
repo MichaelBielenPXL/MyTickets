@@ -12,7 +12,19 @@ public static class Http
 {
     public static IResult Error(int status, string message) => Results.Json(new { error = message }, statusCode: status);
 
-    public static Guid UserId(this ClaimsPrincipal user) => Guid.Parse(user.FindFirstValue(ClaimTypes.NameIdentifier)!);
+    /// <summary>The address people reach this site at, for links in emails: App:PublicUrl when set, otherwise this request's.</summary>
+    public static string SiteAddress(HttpContext http, IConfiguration config) =>
+        config["App:PublicUrl"] is { Length: > 0 } configured ? configured.TrimEnd('/') : $"{http.Request.Scheme}://{http.Request.Host}";
+
+    /// <summary>
+    /// The signed-in account's record at this organisation. Someone signed in without one hasn't joined yet: what needs
+    /// a record answers "Join this organisation first."
+    /// </summary>
+    public static Guid UserId(this ClaimsPrincipal user) => user.TryUserId() ?? throw AppProblem.Forbidden("Join this organisation first.");
+
+    /// <summary>The account's record at this organisation, or null when they haven't joined it (yet).</summary>
+    public static Guid? TryUserId(this ClaimsPrincipal user) =>
+        Guid.TryParse(user.FindFirstValue(ClaimTypes.NameIdentifier), out var id) ? id : null;
 
     public static OrgAccess Org(this HttpContext http) => (OrgAccess)http.Items["org"]!;
 
@@ -38,8 +50,8 @@ public static class Http
         var slug = http.Request.RouteValues["slug"] as string;
         var org = await http.RequestServices.GetRequiredService<AppCache>().OrganisationBySlugAsync(slug ?? "");
         if (org is null) return Error(404, "Organisation not found.");
-        var userId = http.User.UserId();
-        var membership = await db.Memberships.AsNoTracking().Include(m => m.Tier)
+        var userId = http.User.TryUserId();
+        var membership = userId is null ? null : await db.Memberships.AsNoTracking().Include(m => m.Tier)
             .FirstOrDefaultAsync(m => m.OrganisationId == org.Id && m.UserId == userId);
         if (minimumRole is { } min)
         {
@@ -54,8 +66,6 @@ public static class Http
         value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(value, DateTimeKind.Utc) : value.ToUniversalTime();
 
     public static DateTime? Utc(DateTime? value) => value is { } v ? Utc(v) : null;
-
-    public static int Discounted(int priceCents, int percent) => (priceCents * (100 - percent) + 50) / 100;
 
     /// <summary>Card serial numbers arrive as "04:a2:1b:..." from phones or typed by hand; store one canonical form.</summary>
     public static string? NormaliseCardUid(string? raw)

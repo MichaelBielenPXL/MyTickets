@@ -37,5 +37,11 @@ export function QrScanner({ onScan, onError }: QrScannerProps) {
     return () => scanner.destroy()
   }, [])
 
-  return <video ref={video} className="scanner" muted playsInline />
+  // The library draws its yellow scan brackets in a layer next to the video, placed relative to the nearest
+  // positioned parent: this frame, so they always sit on the video wherever the scanner is shown.
+  return (
+    <div className="scanner-frame">
+      <video ref={video} className="scanner" muted playsInline />
+    </div>
+  )
 }
