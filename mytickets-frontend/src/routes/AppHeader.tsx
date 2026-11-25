@@ -13,6 +13,7 @@ import { t } from '@/lib/i18n'
 import { LanguagePicker } from './LanguagePicker'
 import { OrganisationSidebar } from './OrganisationSidebar'
 import { OrganisationTabs } from './OrganisationTabs'
+import { ThemeToggle } from './ThemeToggle'
 import { UserMenu } from './UserMenu'
 
 /**
@@ -69,6 +70,7 @@ export function AppHeader() {
           )}
 
           <div className="header-end">
+            <ThemeToggle />
             <LanguagePicker />
             {/* At an organisation both lead to that organisation's own sign-in, which starts with the email step. */}
             {slugInAddress && (!me || visiting) && (

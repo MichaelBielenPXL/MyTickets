@@ -58,7 +58,7 @@ export function AdminPage() {
       <ManageMenu slug={slug} />
 
       <div className="admin-workspace mx-auto grid w-full max-w-[1320px] grid-cols-1 gap-5 lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-8">
-        <aside className="admin-sidebar rounded-2xl border border-zinc-200 bg-white p-3">
+        <aside className="admin-sidebar rounded-2xl border border-border bg-surface p-3">
           <nav aria-label={t('Organisation management')} className="flex gap-1 overflow-x-auto lg:flex-col">
             {(Object.keys(TABS) as Tab[]).map((key) => (
               <button
@@ -72,7 +72,7 @@ export function AdminPage() {
               </button>
             ))}
           </nav>
-          <div className="mt-3 hidden border-t border-zinc-200 pt-3 lg:block">
+          <div className="mt-3 hidden border-t border-border pt-3 lg:block">
             <Link to={`/${slug}/staff`} className="admin-outline-link w-full">
               {t('Open door & bar')}
               <ArrowIcon />
