@@ -862,11 +862,8 @@ main.admin-shell {
   letter-spacing: -0.035em;
 }
 .admin-back {
-  color: #666666;
-  font-size: 0.9rem;
-  text-decoration: none;
+  margin-bottom: 10px;
 }
-.admin-back:hover,
 .admin-org-link:hover {
   color: #171717;
 }
@@ -3472,7 +3469,7 @@ body:has(.tab-bar) #root {
   .admin-page-header {
     margin-bottom: 14px;
   }
-  .admin-back,
+  .admin-page-header .admin-back,
   .admin-org-link,
   .admin-page-description {
     display: none;
@@ -3635,6 +3632,13 @@ body:has(.tab-bar) #root {
 .glass-button:active {
   transform: scale(0.96);
 }
+/* Only an arrow: a round glass button. */
+.back.icon-only {
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+}
 /* On the dark till page the glass turns dark, as the tab bar does over the till. */
 main.staff.till-page .back {
   border-color: rgb(255 255 255 / 12%);
@@ -3781,11 +3785,8 @@ body:has(.till) .tab-bar-item.active {
     color: #c4c4c7;
   }
   .admin-menu-back {
-    display: inline-block;
-    margin-bottom: 8px;
-    color: #007aff;
-    font-size: 1rem;
-    text-decoration: none;
+    display: inline-flex;
+    margin-bottom: 10px;
   }
 }
 

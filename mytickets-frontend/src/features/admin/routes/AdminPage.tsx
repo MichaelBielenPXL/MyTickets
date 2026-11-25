@@ -44,8 +44,8 @@ export function AdminPage() {
     <main className={sectionChosen ? 'admin-shell has-section' : 'admin-shell at-menu'}>
       <header className="admin-page-header">
         <div>
-          <Link to={`/${slug}`} className="admin-back">
-            {t('‹ Back to organisation')}
+          <Link to={`/${slug}`} className="back icon-only admin-back" aria-label={t('Back to organisation')}>
+            <BackIcon />
           </Link>
           <h1>{t('Manage')}</h1>
           <p className="admin-page-description">{t('Your organisation’s events, memberships and sales.')}</p>
@@ -82,8 +82,12 @@ export function AdminPage() {
 
         <section className="min-w-0" aria-labelledby="admin-section-title">
           <header className="mb-5">
-            <Link to={`/${slug}/admin`} className="admin-menu-back">
-              {t('‹ Manage')}
+            <Link
+              to={`/${slug}/admin`}
+              className="back icon-only admin-menu-back"
+              aria-label={t('Back to Manage')}
+            >
+              <BackIcon />
             </Link>
             <h2 id="admin-section-title" className="admin-section-title">
               {t(TABS[tab])}
@@ -102,6 +106,20 @@ export function AdminPage() {
         </section>
       </div>
     </main>
+  )
+}
+
+function BackIcon() {
+  return (
+    <svg aria-hidden="true" width="18" height="18" viewBox="0 0 16 16" fill="none">
+      <path
+        d="M10 3.5 5.5 8l4.5 4.5"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   )
 }
 
