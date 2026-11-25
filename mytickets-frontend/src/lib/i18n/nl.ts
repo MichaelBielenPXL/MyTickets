@@ -445,7 +445,6 @@ export const nl: Record<string, string> = {
   'Show this QR code at the door. Each ticket gets you in once.':
     'Toon deze QR-code aan de deur. Met elk ticket kom je één keer binnen.',
   'Already used: checked in {when}.': 'Al gebruikt: binnengekomen op {when}.',
-  'Exit fullscreen': 'Volledig scherm sluiten',
   // ---- Manage › Overview ----
   'You get from online payments': 'Je krijgt van online betalingen',
   'Top-ups at the cashier': 'Opladingen aan de kassa',

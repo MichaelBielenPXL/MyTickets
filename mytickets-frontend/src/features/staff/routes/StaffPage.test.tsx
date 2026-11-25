@@ -48,4 +48,15 @@ describe('StaffPage', () => {
     expect(await screen.findByRole('navigation', { name: 'Staff mode' })).toBeInTheDocument()
     expect(modeNames()).toEqual(['Door', 'Bar', 'Top up', 'Check card'])
   })
+
+  it('offers the till on the whole screen from the bar only', async () => {
+    serveContext(['Bar', 'Door', 'CashTopUp', 'CheckCard'])
+    const { user } = renderApp(<StaffPage />, page)
+
+    expect(await screen.findByRole('navigation', { name: 'Staff mode' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Fullscreen' })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Bar' }))
+    expect(screen.getByRole('link', { name: 'Fullscreen' })).toHaveAttribute('href', '/night-owls/staff/till')
+  })
 })

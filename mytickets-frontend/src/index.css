@@ -328,7 +328,6 @@ main.narrow {
   display: inline-block;
   color: var(--muted);
   text-decoration: none;
-  padding: 6px 0;
 }
 .big-number {
   font-size: 2.2rem;
@@ -2331,22 +2330,15 @@ main.staff.till-mode {
   justify-content: space-between;
   gap: 12px;
 }
-/* Fullscreen at the bar: only the till, edge to edge, on its own dark background. */
-:root:fullscreen .app-header {
-  display: none;
-}
-:root:fullscreen main.staff.till-mode {
+/* The till page: only the till, edge to edge, on its own dark background. */
+main.staff.till-page {
   max-width: none;
   min-height: 100dvh;
   padding: 8px 12px 12px;
   background: #0b0b0c;
 }
-:root:fullscreen main.staff.till-mode .staff-top .back,
-:root:fullscreen main.staff.till-mode .tabs {
-  color: #a1a1aa;
-}
-:root:fullscreen .till {
-  min-height: calc(100dvh - 110px);
+main.staff.till-page .till {
+  min-height: calc(100dvh - 70px);
 }
 .till {
   --till-bg: #0b0b0c;
@@ -3605,6 +3597,53 @@ body:has(.tab-bar) #root {
   body:has(.tab-bar) #root {
     padding-bottom: 0;
   }
+}
+/* Small glass buttons, like the tab bar: back links and the till's Fullscreen. */
+.back,
+.glass-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 16px;
+  border: 0.5px solid rgb(255 255 255 / 70%);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 72%);
+  box-shadow:
+    0 0 0 0.5px rgb(0 0 0 / 8%),
+    0 6px 18px rgb(0 0 0 / 10%),
+    0 1px 3px rgb(0 0 0 / 6%),
+    inset 0 1px 0 rgb(255 255 255 / 90%);
+  color: #1d1d1f;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-decoration: none;
+  -webkit-backdrop-filter: saturate(200%) blur(24px);
+  backdrop-filter: saturate(200%) blur(24px);
+  transition:
+    box-shadow 200ms var(--ease),
+    transform 160ms var(--ease);
+}
+.back:hover,
+.glass-button:hover {
+  box-shadow:
+    0 0 0 0.5px rgb(0 0 0 / 10%),
+    0 8px 24px rgb(0 0 0 / 14%),
+    0 1px 3px rgb(0 0 0 / 8%),
+    inset 0 1px 0 rgb(255 255 255 / 90%);
+}
+.back:active,
+.glass-button:active {
+  transform: scale(0.96);
+}
+/* On the dark till page the glass turns dark, as the tab bar does over the till. */
+main.staff.till-page .back {
+  border-color: rgb(255 255 255 / 12%);
+  background: rgb(44 44 48 / 72%);
+  box-shadow:
+    0 0 0 0.5px rgb(0 0 0 / 40%),
+    0 6px 18px rgb(0 0 0 / 40%),
+    inset 0 1px 0 rgb(255 255 255 / 10%);
+  color: #f5f5f7;
 }
 /* Over the dark till the glass turns dark too, as iOS does over dark content. */
 body:has(.till) .tab-bar {

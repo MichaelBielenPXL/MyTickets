@@ -7,7 +7,7 @@ import { EventPage } from '@/features/events'
 import { LegalPage } from '@/features/legal'
 import { HomePage, JoinPage, OrganisationPage, ProfilePage, StartPage } from '@/features/organisations'
 import { CheckoutPage } from '@/features/payments'
-import { StaffPage } from '@/features/staff'
+import { StaffPage, TillPage } from '@/features/staff'
 import { TicketsPage } from '@/features/tickets'
 import { WalletPage } from '@/features/wallet'
 
@@ -29,6 +29,10 @@ export function AppRoutes() {
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/:slug/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/:slug/reset-password" element={<ResetPasswordPage />} />
+      </Route>
+      {/* The till on the whole screen: signed in as everywhere, but without the header and tabs. */}
+      <Route element={<AppShell bare />}>
+        <Route path="/:slug/staff/till" element={<TillPage />} />
       </Route>
       <Route element={<AppShell />}>
         <Route path="/" element={<StartPage />} />
