@@ -1,4 +1,5 @@
 export { staffKeys, useStaffMember } from './api/staff'
 export { StaffPage } from './routes/StaffPage'
+export { TillPage } from './routes/TillPage'
 export { EventDoors } from './components/EventDoors'
 export type { EventStatus, MemberInfo } from './types'

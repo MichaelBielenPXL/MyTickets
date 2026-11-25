@@ -218,14 +218,14 @@ export const nl: Record<string, string> = {
   Tokens: 'Tokens',
   '{price} for {tokens}: {extra} free': '{price} voor {tokens}: {extra} gratis',
   '{price} for {tokens}': '{price} voor {tokens}',
-  '‹ Back to organisation': '‹ Terug naar organisatie',
+  'Back to organisation': 'Terug naar organisatie',
   Manage: 'Beheer',
   'Your organisation’s events, memberships and sales.':
     'De evenementen, lidmaatschappen en verkoop van je organisatie.',
   'View organisation': 'Organisatie bekijken',
   'Organisation management': 'Organisatiebeheer',
   'Open door & bar': 'Deur & bar openen',
-  '‹ Manage': '‹ Beheer',
+  'Back to Manage': 'Terug naar Beheer',
   'Sign in at {org}': 'Aanmelden bij {org}',
   Email: 'E-mail',
   'you@example.com': 'jij@voorbeeld.be',
@@ -445,7 +445,6 @@ export const nl: Record<string, string> = {
   'Show this QR code at the door. Each ticket gets you in once.':
     'Toon deze QR-code aan de deur. Met elk ticket kom je één keer binnen.',
   'Already used: checked in {when}.': 'Al gebruikt: binnengekomen op {when}.',
-  'Exit fullscreen': 'Volledig scherm sluiten',
   // ---- Manage › Overview ----
   'You get from online payments': 'Je krijgt van online betalingen',
   'Top-ups at the cashier': 'Opladingen aan de kassa',

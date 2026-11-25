@@ -9,8 +9,9 @@ import { AppHeader } from './AppHeader'
 /**
  * Frame around the pages that need someone signed in to MyTickets. Inside an organisation a visitor is sent to that
  * organisation's sign-in page; someone signed in who hasn't joined it yet gets the pages, which offer to join.
+ * `bare` leaves the header out, for pages that take the whole screen.
  */
-export function AppShell() {
+export function AppShell({ bare = false }: { bare?: boolean }) {
   const location = useLocation()
   const me = useMe()
   const { slugInAddress } = useCurrentOrganisation()
@@ -30,7 +31,7 @@ export function AppShell() {
 
   return (
     <>
-      <AppHeader />
+      {!bare && <AppHeader />}
       <Outlet />
     </>
   )
